@@ -50,4 +50,24 @@ describe('photoSync', () => {
     const photo = await localDb.photos.get(draft!.items[0].photoIds[0]);
     expect(photo?.status).toBe('uploaded');
   });
+
+  it('does not double-upload when called twice concurrently for the same draft (React StrictMode double-invoke)', async () => {
+    await localDb.drafts.put({
+      draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      items: [{ id: 'item-4', serverItemId: 'server-item-4', title: 'Hedges', price: 100, photoIds: [] }],
+    });
+    await addPhotoToItem('d4', 'item-4', new Blob(['x']), 'p.jpg');
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+
+    const p1 = uploadPendingPhotos('d4');
+    const p2 = uploadPendingPhotos('d4');
+    await Promise.all([p1, p2]);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const draft = await localDb.drafts.get('d4');
+    const photo = await localDb.photos.get(draft!.items[0].photoIds[0]);
+    expect(photo?.status).toBe('uploaded');
+  });
 });

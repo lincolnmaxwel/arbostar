@@ -27,7 +27,7 @@ export interface DraftPhoto {
   draftId: string;
   blob: Blob;
   fileName: string;
-  status: 'pending' | 'uploaded';
+  status: 'pending' | 'uploading' | 'uploaded';
 }
 
 export interface OutboxEntry {

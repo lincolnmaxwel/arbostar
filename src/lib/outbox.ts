@@ -5,6 +5,9 @@ const MAX_DELAY_MS = 60000;
 const STUCK_DELAY_MS = Number.MAX_SAFE_INTEGER;
 
 export async function enqueueSync(draftId: string): Promise<void> {
+  // Transaction keeps the read+write atomic: without it, two concurrent
+  // calls for the same draftId could both see "no existing entry" and
+  // create duplicate outbox rows.
   await localDb.transaction('rw', localDb.outbox, async () => {
     const existing = await getEntryForDraft(draftId);
     if (existing) {

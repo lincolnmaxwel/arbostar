@@ -33,6 +33,7 @@ export async function runSyncCycle(): Promise<void> {
           taxRate: draft.taxRate,
           items: draft.items.map((i) => ({ localItemId: i.id, title: i.title, description: i.description, price: i.price })),
           clientUpdatedAt: draft.updatedAt,
+          send: draft.pendingSend === true,
         }),
       });
 
@@ -42,7 +43,9 @@ export async function runSyncCycle(): Promise<void> {
           responseBody.quote.items.map((si: { id: string; localItemId: string }) => [si.localItemId, si.id]),
         );
         const items = draft.items.map((i) => ({ ...i, serverItemId: serverItemByLocalId.get(i.id) ?? i.serverItemId }));
-        await localDb.drafts.update(draft.draftId, { serverId: responseBody.quote.id, status: 'synced', items });
+        // pendingSend is a one-shot signal for this specific POST — clear it so a
+        // later plain edit-and-autosave never re-sends the email.
+        await localDb.drafts.update(draft.draftId, { serverId: responseBody.quote.id, status: 'synced', items, pendingSend: false });
         await clearEntry(entry.id!);
       } else if (res.status === 409 || (res.status >= 400 && res.status < 500)) {
         await localDb.drafts.update(draft.draftId, { status: 'error' });

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/db';
 import { authOptions } from '@/lib/auth';
 import { calculateTotals } from '@/lib/quoteMath';
+import { sendQuoteApprovalEmail } from '@/lib/email';
 
 class ItemOwnershipConflictError extends Error {
   constructor(localItemId: string) {
@@ -28,6 +29,7 @@ const upsertQuoteSchema = z.object({
   taxRate: z.number().min(0).max(1),
   items: z.array(quoteItemSchema).min(1),
   clientUpdatedAt: z.number().optional(),
+  send: z.boolean().optional().default(false),
 });
 
 export async function POST(req: NextRequest) {
@@ -68,17 +70,18 @@ export async function POST(req: NextRequest) {
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
           total: totals.total,
-          // First sync sends the quote for client approval immediately — there's
-          // no separate "review before sending" step in this app, so as soon as
-          // a quote exists server-side it's awaiting the client's response.
-          status: 'sent',
-          sentAt: new Date(),
+          status: data.send ? 'sent' : 'draft',
+          sentAt: data.send ? new Date() : null,
         },
         update: {
           subtotal: totals.subtotal,
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
           total: totals.total,
+          // Only a still-unsent quote transitions on "send"; re-saving an
+          // already sent/approved/declined quote never reverts its status —
+          // "Save and Send" on one of those just resends the email below.
+          ...(data.send && existing?.status === 'draft' ? { status: 'sent' as const, sentAt: new Date() } : {}),
         },
       });
 
@@ -135,6 +138,16 @@ export async function POST(req: NextRequest) {
     where: { id: quoteId },
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   });
+
+  if (data.send) {
+    const portalUrl = `${process.env.NEXTAUTH_URL}/portal/${quote.publicToken}`;
+    await sendQuoteApprovalEmail({
+      to: client.email,
+      clientName: client.name,
+      portalUrl,
+      total: Number(quote.total),
+    });
+  }
 
   return NextResponse.json({ quote }, { status: existing ? 200 : 201 });
 }

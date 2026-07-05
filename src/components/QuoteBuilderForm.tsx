@@ -126,12 +126,21 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     updateItem(itemId, { photoIds: [...currentItem.photoIds, ...newPhotoIds] });
   }
 
-  async function handleSend() {
+  async function submit(pendingSend: boolean) {
     // .put() (not .update()) so this is safe even if the user typed fast
-    // enough to click Send before the debounced persist() ever created the
-    // row — Send always writes the current, full formState itself.
-    await localDb.drafts.put({ ...formState!, status: 'syncing', updatedAt: Date.now() });
+    // enough to click a submit button before the debounced persist() ever
+    // created the row — submitting always writes the current, full
+    // formState itself.
+    await localDb.drafts.put({ ...formState!, status: 'syncing', pendingSend, updatedAt: Date.now() });
     await enqueueSync(draftId);
+  }
+
+  async function handleSave() {
+    await submit(false);
+  }
+
+  async function handleSaveAndSend() {
+    await submit(true);
   }
 
   return (
@@ -223,8 +232,11 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.sendButton} onClick={handleSend} disabled={!canSend || draft?.status === 'syncing'}>
-          {draft?.status === 'syncing' ? 'Sending...' : 'Send quote'}
+        <button type="button" className={styles.saveButton} onClick={handleSave} disabled={!canSend || draft?.status === 'syncing'}>
+          {draft?.status === 'syncing' ? 'Saving...' : 'Save'}
+        </button>
+        <button type="button" className={styles.sendButton} onClick={handleSaveAndSend} disabled={!canSend || draft?.status === 'syncing'}>
+          {draft?.status === 'syncing' ? 'Saving...' : 'Save and Send'}
         </button>
         {!canSend && (
           <p className={styles.sendHint}>

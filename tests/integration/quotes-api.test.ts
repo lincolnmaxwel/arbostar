@@ -2,8 +2,10 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('@/lib/email', () => ({ sendQuoteApprovalEmail: vi.fn().mockResolvedValue(undefined) }));
 
 import { getServerSession } from 'next-auth';
+import { sendQuoteApprovalEmail } from '@/lib/email';
 import { POST, GET } from '@/app/api/quotes/route';
 import { prisma } from '@/lib/db';
 
@@ -140,5 +142,70 @@ describe('/api/quotes', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(Array.isArray(body.quotes)).toBe(true);
+  });
+
+  it('a plain save (send: false or omitted) keeps the quote in draft status and sends no email', async () => {
+    const draftId = randomUUID();
+    const res = await POST(
+      new Request('http://localhost/api/quotes', {
+        method: 'POST',
+        body: JSON.stringify({
+          draftId,
+          clientName: 'Nelson Costa',
+          clientEmail: `client-${draftId}@example.com`,
+          taxRate: 0.05,
+          items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+        }),
+      }) as any,
+    );
+    const body = await res.json();
+    expect(body.quote.status).toBe('draft');
+    expect(body.quote.sentAt).toBeNull();
+    expect(sendQuoteApprovalEmail).not.toHaveBeenCalled();
+  });
+
+  it('save and send transitions a new quote to sent and emails the client', async () => {
+    const draftId = randomUUID();
+    const clientEmail = `client-${draftId}@example.com`;
+    const res = await POST(
+      new Request('http://localhost/api/quotes', {
+        method: 'POST',
+        body: JSON.stringify({
+          draftId,
+          clientName: 'Nelson Costa',
+          clientEmail,
+          taxRate: 0.05,
+          items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+          send: true,
+        }),
+      }) as any,
+    );
+    const body = await res.json();
+    expect(body.quote.status).toBe('sent');
+    expect(body.quote.sentAt).not.toBeNull();
+    expect(sendQuoteApprovalEmail).toHaveBeenCalledTimes(1);
+    expect(sendQuoteApprovalEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: clientEmail, clientName: 'Nelson Costa', total: 525 }),
+    );
+  });
+
+  it('save and send on an already-approved quote resends the email without reverting its status', async () => {
+    const draftId = randomUUID();
+    const basePayload = {
+      draftId,
+      clientName: 'Nelson Costa',
+      clientEmail: `client-${draftId}@example.com`,
+      taxRate: 0.05,
+      items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+    };
+    await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify({ ...basePayload, send: true }) }) as any);
+    const created = await prisma.quote.findUniqueOrThrow({ where: { draftId } });
+    await prisma.quote.update({ where: { id: created.id }, data: { status: 'approved', respondedAt: new Date() } });
+    vi.mocked(sendQuoteApprovalEmail).mockClear();
+
+    const res = await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify({ ...basePayload, send: true }) }) as any);
+    const body = await res.json();
+    expect(body.quote.status).toBe('approved');
+    expect(sendQuoteApprovalEmail).toHaveBeenCalledTimes(1);
   });
 });

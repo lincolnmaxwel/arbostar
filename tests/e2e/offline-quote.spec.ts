@@ -26,7 +26,7 @@ test('quote builder keeps unsynced data through an offline reload, then syncs wh
   await expect(page.getByTestId('sync-badge')).toHaveText('Local');
 
   await context.setOffline(false);
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByTestId('sync-badge')).toHaveText('Synced', { timeout: 15000 });
 });
 
@@ -55,7 +55,7 @@ test('starting a new quote after a previous one was sent does not resume/overwri
   await page.getByLabel('Price').fill('500');
   await page.waitForTimeout(700);
 
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByTestId('sync-badge')).toHaveText('Synced', { timeout: 15000 });
 
   // Second "New quote" click: a fresh navigation to /quotes/new (no draft param),
@@ -86,7 +86,7 @@ test('starting a new quote after a previous one was sent does not resume/overwri
   await page.getByLabel('Price').fill('150');
   await page.waitForTimeout(700);
 
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByTestId('sync-badge')).toHaveText('Synced', { timeout: 15000 });
 
   await page.goto('/quotes');

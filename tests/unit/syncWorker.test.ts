@@ -66,6 +66,43 @@ describe('runSyncCycle', () => {
     expect(entry!.nextAttemptAt).toBeLessThan(Number.MAX_SAFE_INTEGER);
   });
 
+  it('sends pendingSend:true as send:true in the POST body, then clears it on success', async () => {
+    await localDb.drafts.put({
+      draftId: 'd5', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(), pendingSend: true,
+    });
+    await enqueueSync('d5');
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ quote: { id: 'server-5', items: [] } }) });
+
+    await runSyncCycle();
+
+    const postCall = (global.fetch as any).mock.calls[1];
+    const body = JSON.parse(postCall[1].body);
+    expect(body.send).toBe(true);
+
+    const draft = await localDb.drafts.get('d5');
+    expect(draft?.pendingSend).toBe(false);
+  });
+
+  it('sends send:false when pendingSend was never set', async () => {
+    await localDb.drafts.put({
+      draftId: 'd6', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
+    });
+    await enqueueSync('d6');
+
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ quote: { id: 'server-6', items: [] } }) });
+
+    await runSyncCycle();
+
+    const postCall = (global.fetch as any).mock.calls[1];
+    const body = JSON.parse(postCall[1].body);
+    expect(body.send).toBe(false);
+  });
+
   it('does nothing when the health check fails (offline)', async () => {
     await localDb.drafts.put({
       draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),

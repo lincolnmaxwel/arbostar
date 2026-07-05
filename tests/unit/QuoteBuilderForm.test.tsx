@@ -168,4 +168,43 @@ describe('QuoteBuilderForm', () => {
       { timeout: 2000 },
     );
   });
+
+  async function fillValidQuote(draftId: string) {
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Nelson Costa' } });
+    fireEvent.change(screen.getByLabelText('Client email'), { target: { value: 'nelson@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+    await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      expect(d?.items).toHaveLength(1);
+    });
+    fireEvent.change(screen.getByLabelText('Service title'), { target: { value: 'Hedges' } });
+  }
+
+  it('Save persists without requesting an email', async () => {
+    const draftId = 'test-draft-save-only';
+    await fillValidQuote(draftId);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      const draft = await localDb.drafts.get(draftId);
+      expect(draft?.status).toBe('syncing');
+      expect(draft?.pendingSend).toBe(false);
+    });
+  });
+
+  it('Save and Send marks the draft with pendingSend for the sync worker to act on', async () => {
+    const draftId = 'test-draft-save-and-send';
+    await fillValidQuote(draftId);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save and Send' }));
+
+    await waitFor(async () => {
+      const draft = await localDb.drafts.get(draftId);
+      expect(draft?.status).toBe('syncing');
+      expect(draft?.pendingSend).toBe(true);
+    });
+  });
 });

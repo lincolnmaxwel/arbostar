@@ -20,6 +20,10 @@ export interface DraftQuote {
   taxRate: number;
   status: 'local' | 'syncing' | 'synced' | 'error';
   updatedAt: number;
+  // One-shot signal for the next sync POST: true means "Save and Send" was
+  // clicked and this sync should tell the server to email the client. The
+  // sync worker clears it back to false once that specific POST completes.
+  pendingSend?: boolean;
 }
 
 export interface DraftPhoto {

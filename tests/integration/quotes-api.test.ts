@@ -103,6 +103,38 @@ describe('/api/quotes', () => {
     expect(staleRes.status).toBe(409);
   });
 
+  it('rejects a localItemId reused from a different quote without corrupting the original item', async () => {
+    const draftIdA = randomUUID();
+    const sharedItemId = randomUUID();
+    const payloadA = {
+      draftId: draftIdA,
+      clientName: 'Nelson Costa',
+      clientEmail: `client-${draftIdA}@example.com`,
+      taxRate: 0.05,
+      items: [{ localItemId: sharedItemId, title: 'Original Title', price: 111 }],
+    };
+    const resA = await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify(payloadA) }) as any);
+    expect(resA.status).toBe(201);
+
+    const draftIdB = randomUUID();
+    const payloadB = {
+      draftId: draftIdB,
+      clientName: 'Someone Else',
+      clientEmail: `client-${draftIdB}@example.com`,
+      taxRate: 0.05,
+      items: [{ localItemId: sharedItemId, title: 'Hijacked Title', price: 999 }],
+    };
+    const resB = await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify(payloadB) }) as any);
+    expect([409, 500]).toContain(resB.status);
+
+    const itemX = await prisma.quoteItem.findUnique({ where: { localItemId: sharedItemId } });
+    expect(itemX?.title).toBe('Original Title');
+    expect(Number(itemX?.price)).toBe(111);
+
+    const quoteBExists = await prisma.quote.findUnique({ where: { draftId: draftIdB } });
+    expect(quoteBExists).toBeNull();
+  });
+
   it('lists quotes', async () => {
     const res = await GET();
     expect(res.status).toBe(200);

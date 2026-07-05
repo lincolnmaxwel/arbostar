@@ -2119,17 +2119,24 @@ export async function uploadPendingPhotos(draftId: string): Promise<void> {
   for (const item of draft.items) {
     if (!item.serverItemId) continue;
     for (const photoId of item.photoIds) {
-      const photo = await localDb.photos.get(photoId);
-      // 'uploading' guards against a second concurrent call (this function is
-      // triggered by a useEffect that reactStrictMode can double-invoke)
-      // re-reading the same 'pending' row before the first call's write lands.
-      if (!photo || photo.status === 'uploaded' || photo.status === 'uploading') continue;
-
-      await localDb.photos.update(photoId, { status: 'uploading' });
+      // Check-and-claim must be one atomic Dexie transaction, not a separate
+      // get() then update(): this function is triggered by a useEffect that
+      // reactStrictMode can double-invoke, and two independent Dexie calls can
+      // each open their own transaction and both observe 'pending' before
+      // either commits 'uploading'. A single 'rw' transaction serializes
+      // overlapping calls against the same object store, so the second call
+      // genuinely can't see 'pending' once the first has committed 'uploading'.
+      const claimedPhoto = await localDb.transaction('rw', localDb.photos, async () => {
+        const current = await localDb.photos.get(photoId);
+        if (!current || current.status === 'uploaded' || current.status === 'uploading') return null;
+        await localDb.photos.update(photoId, { status: 'uploading' });
+        return current;
+      });
+      if (!claimedPhoto) continue;
 
       const form = new FormData();
       form.set('quoteItemId', item.serverItemId);
-      form.set('file', photo.blob, photo.fileName);
+      form.set('file', claimedPhoto.blob, claimedPhoto.fileName);
       try {
         const res = await fetch('/api/quotes/photos', { method: 'POST', body: form });
         if (res.ok) {
@@ -2149,7 +2156,7 @@ export async function uploadPendingPhotos(draftId: string): Promise<void> {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/unit/photoSync.test.ts`
-Expected: PASS (3 tests).
+Expected: PASS (3 tests). A 4th test (added by a later fix to this plan) exercises two overlapping, un-awaited calls to `uploadPendingPhotos` for the same photo and asserts `fetch` is called exactly once.
 
 - [ ] **Step 5: Add the failing UI test case**
 

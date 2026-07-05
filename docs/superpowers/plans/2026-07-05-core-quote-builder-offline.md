@@ -747,7 +747,7 @@ export interface DraftPhoto {
   draftId: string;
   blob: Blob;
   fileName: string;
-  status: 'pending' | 'uploaded';
+  status: 'pending' | 'uploading' | 'uploaded';
 }
 
 export interface OutboxEntry {
@@ -2120,7 +2120,12 @@ export async function uploadPendingPhotos(draftId: string): Promise<void> {
     if (!item.serverItemId) continue;
     for (const photoId of item.photoIds) {
       const photo = await localDb.photos.get(photoId);
-      if (!photo || photo.status === 'uploaded') continue;
+      // 'uploading' guards against a second concurrent call (this function is
+      // triggered by a useEffect that reactStrictMode can double-invoke)
+      // re-reading the same 'pending' row before the first call's write lands.
+      if (!photo || photo.status === 'uploaded' || photo.status === 'uploading') continue;
+
+      await localDb.photos.update(photoId, { status: 'uploading' });
 
       const form = new FormData();
       form.set('quoteItemId', item.serverItemId);
@@ -2129,9 +2134,12 @@ export async function uploadPendingPhotos(draftId: string): Promise<void> {
         const res = await fetch('/api/quotes/photos', { method: 'POST', body: form });
         if (res.ok) {
           await localDb.photos.update(photoId, { status: 'uploaded' });
+        } else {
+          await localDb.photos.update(photoId, { status: 'pending' });
         }
       } catch {
-        // network error: photo stays 'pending', retried on the next call
+        // network error: revert to 'pending', retried on a later call
+        await localDb.photos.update(photoId, { status: 'pending' });
       }
     }
   }

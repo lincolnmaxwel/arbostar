@@ -76,12 +76,6 @@
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.photoSection {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
-}
-
 .photoButton {
   display: inline-flex;
   align-items: center;
@@ -184,6 +178,12 @@
   cursor: not-allowed;
 }
 
+.sendHint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  align-self: center;
+}
+
 .conflictBanner {
   background: var(--color-error-bg);
   border: 1px solid var(--color-error);
@@ -243,4 +243,38 @@
   text-align: center;
   padding: 60px 16px;
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding: 16px;
+  }
+
+  .itemCardFields {
+    grid-template-columns: 1fr;
+  }
+
+  .totals {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sendButton {
+    width: 100%;
+  }
+
+  .sendHint {
+    align-self: flex-start;
+  }
+
+  .conflictBanner {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

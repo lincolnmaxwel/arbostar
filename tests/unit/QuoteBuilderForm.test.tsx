@@ -78,4 +78,33 @@ describe('QuoteBuilderForm', () => {
 
     await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));
   });
+
+  it('preserves serverId/serverItemId when editing a field after the quote has already synced', async () => {
+    const draftId = 'test-draft-5';
+    await localDb.drafts.put({
+      draftId,
+      serverId: 'server-quote-5',
+      clientName: 'Nelson Costa',
+      clientEmail: 'nelson@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [{ id: 'item-5', serverItemId: 'server-item-5', title: 'Hedges', price: 100, photoIds: [] }],
+    });
+
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+
+    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Nelson Costa Jr.' } });
+
+    await waitFor(
+      async () => {
+        const saved = await localDb.drafts.get(draftId);
+        expect(saved?.clientName).toBe('Nelson Costa Jr.');
+        expect(saved?.serverId).toBe('server-quote-5');
+        expect(saved?.items[0].serverItemId).toBe('server-item-5');
+      },
+      { timeout: 2000 },
+    );
+  });
 });

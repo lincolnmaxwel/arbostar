@@ -41,6 +41,31 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     }
   }, [draft, formState]);
 
+  // formState is the authoritative snapshot for user-editable fields (so typing
+  // in one field can't be dropped by a stale read of another field's edit), but
+  // draft.serverId and each item's serverItemId are worker-owned: the sync
+  // worker writes them into Dexie once a sync succeeds. Without reconciling
+  // them back into formState, the next debounced persist() would overwrite
+  // Dexie with formState's stale (missing) serverId/serverItemId, silently
+  // undoing the sync worker's own write.
+  useEffect(() => {
+    if (!draft) return;
+    setFormState((prev) => {
+      if (!prev) return prev;
+      const items = prev.items.map((item) => {
+        const synced = draft.items.find((d) => d.id === item.id);
+        if (synced?.serverItemId && synced.serverItemId !== item.serverItemId) {
+          return { ...item, serverItemId: synced.serverItemId };
+        }
+        return item;
+      });
+      const itemsChanged = items.some((item, i) => item !== prev.items[i]);
+      const serverIdChanged = Boolean(draft.serverId) && draft.serverId !== prev.serverId;
+      if (!itemsChanged && !serverIdChanged) return prev;
+      return { ...prev, items, serverId: draft.serverId ?? prev.serverId };
+    });
+  }, [draft]);
+
   const persist = useMemo(
     () =>
       debounce((next: DraftQuote) => {
@@ -58,6 +83,10 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   if (!formState) return <p className={styles.loading}>Loading draft...</p>;
 
   const totals = calculateTotals(formState.items, formState.taxRate);
+  const hasClientName = formState.clientName.trim().length > 0;
+  const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.clientEmail);
+  const hasItems = formState.items.length > 0;
+  const canSend = hasClientName && hasValidEmail && hasItems;
 
   function updateField<K extends keyof DraftQuote>(field: K, value: DraftQuote[K]) {
     const next = { ...formState, [field]: value } as DraftQuote;
@@ -92,7 +121,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
         </div>
         <div className={styles.field}>
           <label htmlFor="clientEmail">Client email</label>
-          <input id="clientEmail" className={styles.input} value={formState.clientEmail} onChange={(e) => updateField('clientEmail', e.target.value)} />
+          <input id="clientEmail" type="email" className={styles.input} value={formState.clientEmail} onChange={(e) => updateField('clientEmail', e.target.value)} />
         </div>
       </div>
 
@@ -162,9 +191,16 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       </div>
 
       <div className={styles.actions}>
-        <button type="button" className={styles.sendButton} onClick={handleSend} disabled={formState.items.length === 0}>
+        <button type="button" className={styles.sendButton} onClick={handleSend} disabled={!canSend || draft?.status === 'syncing'}>
           {draft?.status === 'syncing' ? 'Sending...' : 'Send quote'}
         </button>
+        {!canSend && (
+          <p className={styles.sendHint}>
+            {!hasClientName && 'Client name is required. '}
+            {!hasValidEmail && 'A valid client email is required. '}
+            {!hasItems && 'Add at least one service.'}
+          </p>
+        )}
       </div>
 
       {draft?.status === 'error' && outboxEntry && (

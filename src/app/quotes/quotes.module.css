@@ -93,3 +93,40 @@
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
 }
+
+.deleteButton {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-error);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.deleteButton:hover {
+  background: var(--color-error-bg);
+}
+
+@media (max-width: 640px) {
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    display: block;
+    padding: 12px 16px;
+  }
+
+  .table td {
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
+  }
+
+  .table tr:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}

@@ -7,12 +7,17 @@ export const metadata = {
   title: 'Arbostar Quotes',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#2c5f2d',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#2c5f2d" />
       </head>
       <body>
         <Header />

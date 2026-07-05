@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  staff
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  approved
+  declined
+  expired
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(staff)
+  createdAt    DateTime @default(now())
+  quotes       Quote[]
+}
+
+model Client {
+  id      String  @id @default(uuid())
+  name    String
+  email   String
+  phone   String?
+  address String?
+  quotes  Quote[]
+}
+
+model ServiceCatalogItem {
+  id           String  @id @default(uuid())
+  name         String
+  defaultPrice Decimal @db.Decimal(10, 2)
+}
+
+model Quote {
+  id          String      @id @default(uuid())
+  number      Int         @unique @default(autoincrement())
+  revision    Int         @default(1)
+  status      QuoteStatus @default(draft)
+  draftId     String      @unique
+  clientId    String
+  client      Client      @relation(fields: [clientId], references: [id])
+  createdById String
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  subtotal    Decimal     @db.Decimal(10, 2) @default(0)
+  taxRate     Decimal     @db.Decimal(5, 4) @default(0)
+  taxAmount   Decimal     @db.Decimal(10, 2) @default(0)
+  total       Decimal     @db.Decimal(10, 2) @default(0)
+  publicToken String      @unique @default(uuid())
+  sentAt      DateTime?
+  respondedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       QuoteItem[]
+}
+
+model QuoteItem {
+  id          String       @id @default(uuid())
+  quoteId     String
+  quote       Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  localItemId String       @unique
+  title       String
+  description String?
+  price       Decimal      @db.Decimal(10, 2)
+  sortOrder   Int          @default(0)
+  photos      QuotePhoto[]
+}
+
+model QuotePhoto {
+  id          String    @id @default(uuid())
+  quoteItemId String
+  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  filePath    String
+  sortOrder   Int       @default(0)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  actorId    String?
+  createdAt  DateTime @default(now())
+}

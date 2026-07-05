@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft, retryStuckEntry, clearEntry } from '@/lib/outbox';
@@ -8,6 +8,8 @@ import { runSyncCycle } from '@/lib/syncWorker';
 import { debounce } from '@/lib/debounce';
 import { calculateTotals } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
+import { compressImage } from '@/lib/compressImage';
+import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
 
 function emptyDraft(draftId: string): DraftQuote {
   return {
@@ -39,6 +41,12 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       }, 500),
     [],
   );
+
+  useEffect(() => {
+    if (draft?.status === 'synced') {
+      uploadPendingPhotos(draftId);
+    }
+  }, [draft?.status, draftId]);
 
   if (!draft) return <p>Loading draft...</p>;
 
@@ -83,6 +91,19 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
             value={item.price}
             onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
           />
+          <label htmlFor={`photo-${item.id}`}>Add photo for {item.title || 'this service'}</label>
+          <input
+            id={`photo-${item.id}`}
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const compressed = await compressImage(file);
+              await addPhotoToItem(draftId, item.id, compressed, file.name);
+            }}
+          />
+          <span data-testid={`photo-count-${item.id}`}>{item.photoIds.length} photo(s)</span>
         </div>
       ))}
       <button type="button" onClick={addItem}>Add service</button>

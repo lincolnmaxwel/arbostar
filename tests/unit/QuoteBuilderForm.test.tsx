@@ -1,7 +1,10 @@
 // tests/unit/QuoteBuilderForm.test.tsx
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+
+vi.mock('@/lib/compressImage', () => ({ compressImage: async (blob: Blob) => blob }));
+
 import { QuoteBuilderForm } from '@/components/QuoteBuilderForm';
 import { localDb } from '@/lib/localDb';
 import { enqueueSync, markStuck, getEntryForDraft } from '@/lib/outbox';
@@ -52,5 +55,25 @@ describe('QuoteBuilderForm', () => {
       expect(draft?.status).toBe('local');
       expect(await getEntryForDraft(draftId)).toBeUndefined();
     });
+  });
+
+  it('lets staff attach a photo to a service line item', async () => {
+    const draftId = 'test-draft-4';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+
+    const draft = await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      if (!d || d.items.length === 0) throw new Error('item not added yet');
+      return d;
+    });
+    const itemId = draft.items[0].id;
+
+    const file = new File(['fake-bytes'], 'hedge.jpg', { type: 'image/jpeg' });
+    const input = screen.getByLabelText(/add photo/i);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));
   });
 });

@@ -1,0 +1,48 @@
+{
+  "name": "arbostar",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@prisma/client": "5.18.0",
+    "next-auth": "4.24.7",
+    "bcryptjs": "2.4.3",
+    "dexie": "4.0.8",
+    "dexie-react-hooks": "1.1.7",
+    "zod": "3.23.8",
+    "next-pwa": "5.6.0"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4",
+    "ts-node": "10.9.2",
+    "@types/node": "20.14.15",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@types/bcryptjs": "2.4.6",
+    "prisma": "5.18.0",
+    "vitest": "1.6.0",
+    "fake-indexeddb": "6.0.0",
+    "jsdom": "24.1.1",
+    "@testing-library/react": "14.3.1",
+    "@playwright/test": "1.45.3",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.5"
+  }
+}

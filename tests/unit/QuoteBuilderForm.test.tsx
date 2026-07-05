@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuoteBuilderForm } from '@/components/QuoteBuilderForm';
 import { localDb } from '@/lib/localDb';
+import { enqueueSync, markStuck, getEntryForDraft } from '@/lib/outbox';
 
 describe('QuoteBuilderForm', () => {
   beforeEach(async () => {
@@ -29,5 +30,27 @@ describe('QuoteBuilderForm', () => {
   it('shows the Local badge for a freshly created draft', async () => {
     render(<QuoteBuilderForm draftId="test-draft-2" />);
     await waitFor(() => expect(screen.getByTestId('sync-badge')).toHaveTextContent('Local'));
+  });
+
+  it('shows a sync-error banner with Retry/Discard when the outbox entry is stuck', async () => {
+    const draftId = 'test-draft-3';
+    await localDb.drafts.put({
+      draftId, clientName: 'Stuck Client', clientEmail: 'x@x.com', items: [], taxRate: 0.05, status: 'error', updatedAt: Date.now(),
+    });
+    await enqueueSync(draftId);
+    const entry = await getEntryForDraft(draftId);
+    await markStuck(entry!.id!, 'sync failed: HTTP 409');
+
+    render(<QuoteBuilderForm draftId={draftId} />);
+
+    await waitFor(() => expect(screen.getByTestId('conflict-banner')).toHaveTextContent('sync failed: HTTP 409'));
+
+    fireEvent.click(screen.getByRole('button', { name: /discard/i }));
+
+    await waitFor(async () => {
+      const draft = await localDb.drafts.get(draftId);
+      expect(draft?.status).toBe('local');
+      expect(await getEntryForDraft(draftId)).toBeUndefined();
+    });
   });
 });

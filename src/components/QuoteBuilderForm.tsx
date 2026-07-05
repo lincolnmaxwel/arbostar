@@ -3,7 +3,8 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
-import { enqueueSync } from '@/lib/outbox';
+import { enqueueSync, getEntryForDraft, retryStuckEntry, clearEntry } from '@/lib/outbox';
+import { runSyncCycle } from '@/lib/syncWorker';
 import { debounce } from '@/lib/debounce';
 import { calculateTotals } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
@@ -22,6 +23,7 @@ function emptyDraft(draftId: string): DraftQuote {
 
 export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
+  const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
 
   useMemo(() => {
     localDb.drafts.get(draftId).then((existing) => {
@@ -86,6 +88,29 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       <button type="button" onClick={addItem}>Add service</button>
       <p>Total: {totals.total}</p>
       <button type="button" onClick={handleSend}>Send</button>
+      {draft.status === 'error' && outboxEntry && (
+        <div role="alert" data-testid="conflict-banner">
+          <p>{outboxEntry.lastError}</p>
+          <button
+            type="button"
+            onClick={async () => {
+              await retryStuckEntry(outboxEntry.id!);
+              await runSyncCycle();
+            }}
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              await clearEntry(outboxEntry.id!);
+              await localDb.drafts.update(draftId, { status: 'local' });
+            }}
+          >
+            Discard sync, keep editing
+          </button>
+        </div>
+      )}
     </form>
   );
 }

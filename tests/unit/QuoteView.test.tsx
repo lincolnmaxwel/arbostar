@@ -1,9 +1,14 @@
 // tests/unit/QuoteView.test.tsx
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QuoteView } from '@/components/QuoteView';
 import { localDb } from '@/lib/localDb';
+
+// jsdom doesn't implement createObjectURL/revokeObjectURL.
+let mockUrlCounter = 0;
+global.URL.createObjectURL = vi.fn(() => `blob:mock/${mockUrlCounter++}`);
+global.URL.revokeObjectURL = vi.fn();
 
 describe('QuoteView', () => {
   beforeEach(async () => {
@@ -51,5 +56,34 @@ describe('QuoteView', () => {
     render(<QuoteView draftId="view-2" />);
 
     await waitFor(() => expect(screen.getByText('No services added yet.')).toBeInTheDocument());
+  });
+
+  it('opens a photo in a lightbox on click, and navigates between attached photos', async () => {
+    await localDb.photos.add({ id: 'p1', draftId: 'view-3', blob: new Blob(['a']), fileName: 'a.jpg', status: 'uploaded' });
+    await localDb.photos.add({ id: 'p2', draftId: 'view-3', blob: new Blob(['b']), fileName: 'b.jpg', status: 'uploaded' });
+    await localDb.drafts.put({
+      draftId: 'view-3',
+      clientName: 'Photo Client',
+      clientEmail: 'photo@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [{ id: 'i1', title: 'Hedges', price: 100, photoIds: ['p1', 'p2'] }],
+    });
+
+    render(<QuoteView draftId="view-3" />);
+
+    const thumbButtons = await screen.findAllByLabelText('View photo for Hedges');
+    expect(thumbButtons).toHaveLength(2);
+    fireEvent.click(thumbButtons[0]);
+
+    expect(screen.getByTestId('photo-lightbox')).toBeInTheDocument();
+    expect(screen.getByText('Hedges — 1 of 2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Next photo'));
+    expect(screen.getByText('Hedges — 2 of 2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(screen.queryByTestId('photo-lightbox')).not.toBeInTheDocument();
   });
 });

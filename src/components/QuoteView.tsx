@@ -11,6 +11,7 @@ import styles from './QuoteView.module.css';
 export function QuoteView({ draftId }: { draftId: string }) {
   const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [openPhotoIndex, setOpenPhotoIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!draft) return;
@@ -39,9 +40,44 @@ export function QuoteView({ draftId }: { draftId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, draft?.items]);
 
+  const allPhotos = (draft?.items ?? []).flatMap((item) =>
+    item.photoIds
+      .filter((photoId) => photoUrls[photoId])
+      .map((photoId) => ({ photoId, url: photoUrls[photoId], itemTitle: item.title || 'Untitled service' })),
+  );
+
+  function closeGallery() {
+    setOpenPhotoIndex(null);
+  }
+
+  function showPrev() {
+    setOpenPhotoIndex((i) => (i === null ? i : (i - 1 + allPhotos.length) % allPhotos.length));
+  }
+
+  function showNext() {
+    setOpenPhotoIndex((i) => (i === null ? i : (i + 1) % allPhotos.length));
+  }
+
+  useEffect(() => {
+    if (openPhotoIndex === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeGallery();
+      if (e.key === 'ArrowLeft') showPrev();
+      if (e.key === 'ArrowRight') showNext();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openPhotoIndex, allPhotos.length]);
+
   if (!draft) return <p className={styles.loading}>Loading...</p>;
 
   const totals = calculateTotals(draft.items, draft.taxRate);
+
+  function openGalleryAt(photoId: string) {
+    const index = allPhotos.findIndex((p) => p.photoId === photoId);
+    if (index >= 0) setOpenPhotoIndex(index);
+  }
 
   return (
     <div className={styles.page}>
@@ -83,8 +119,16 @@ export function QuoteView({ draftId }: { draftId: string }) {
                       {item.photoIds.map(
                         (photoId) =>
                           photoUrls[photoId] && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={photoId} src={photoUrls[photoId]} className={styles.photoThumb} alt="" />
+                            <button
+                              key={photoId}
+                              type="button"
+                              className={styles.photoThumbButton}
+                              onClick={() => openGalleryAt(photoId)}
+                              aria-label={`View photo for ${item.title || 'this service'}`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={photoUrls[photoId]} className={styles.photoThumb} alt="" />
+                            </button>
                           ),
                       )}
                     </div>
@@ -111,6 +155,62 @@ export function QuoteView({ draftId }: { draftId: string }) {
           <span>${totals.total.toFixed(2)}</span>
         </div>
       </div>
+
+      {openPhotoIndex !== null && allPhotos[openPhotoIndex] && (
+        <div
+          className={styles.lightboxBackdrop}
+          data-testid="photo-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo viewer"
+          onClick={closeGallery}
+        >
+          <button type="button" className={styles.lightboxClose} onClick={closeGallery} aria-label="Close">
+            &times;
+          </button>
+
+          {allPhotos.length > 1 && (
+            <button
+              type="button"
+              className={`${styles.lightboxNav} ${styles.lightboxPrev}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                showPrev();
+              }}
+              aria-label="Previous photo"
+            >
+              &#8249;
+            </button>
+          )}
+
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={allPhotos[openPhotoIndex].url}
+            alt={allPhotos[openPhotoIndex].itemTitle}
+            className={styles.lightboxImage}
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {allPhotos.length > 1 && (
+            <button
+              type="button"
+              className={`${styles.lightboxNav} ${styles.lightboxNext}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                showNext();
+              }}
+              aria-label="Next photo"
+            >
+              &#8250;
+            </button>
+          )}
+
+          <div className={styles.lightboxCaption}>
+            {allPhotos[openPhotoIndex].itemTitle}
+            {allPhotos.length > 1 && ` — ${openPhotoIndex + 1} of ${allPhotos.length}`}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

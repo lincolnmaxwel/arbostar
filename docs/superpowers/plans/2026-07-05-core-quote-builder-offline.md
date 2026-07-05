@@ -2417,6 +2417,20 @@ A reload preserves `?draft=<uuid>` in the URL (fixing the original reload-loses-
 
 ---
 
+## Post-plan additions
+
+After the 15-task plan and its E2E addendum were done, a separate session added visual CSS/layout styling (the app had none before). The final whole-branch review that followed, plus direct user requests made during that review, added the following beyond the original 15 tasks:
+
+- **Quote view page** (`/quotes/[draftId]`, `src/components/QuoteView.tsx`): a read-only, formatted estimate view (client details, line items with photos, subtotal/tax/total) — the quotes list now opens this instead of jumping straight into the edit form; an "Edit" link goes to the existing `/quotes/new?draft=<id>` builder.
+- **Delete a quote**: `DELETE /api/quotes/[id]` (cascades items/photos via the schema, best-effort removes uploaded files from disk) plus a client-side `deleteDraft()` (`src/lib/deleteQuote.ts`) that also calls the server delete when the draft has a `serverId`, removes attached photo blobs, and clears any pending outbox entry — wired to a Delete button on the quotes list.
+- **formState/sync-worker reconciliation fix**: the CSS pass introduced a `formState` React-state snapshot in `QuoteBuilderForm` to close the previously-known "two fields edited within 500ms drops one" debounce race — correctly, but it never reconciled the sync worker's own writes (`serverId`, each item's `serverItemId`) back into itself, so editing any field after a quote had already synced silently reverted those out of Dexie on the next debounced write. Fixed with a reconciliation effect that merges worker-owned fields into `formState` without touching user-edited ones.
+- **Send validation**: gated on non-empty client name + valid-looking email (previously only checked for at least one line item), with an inline hint — an empty/invalid email used to sync-fail with an opaque "HTTP 400" in the conflict banner.
+- **Mobile responsiveness**: this app's target user is a field worker on a phone, and there was no responsive CSS at all. Added breakpoints to the header, quotes list, and quote builder form, plus an explicit `viewport` export in `src/app/layout.tsx`.
+- **PWA icons**: `public/manifest.json` referenced `icon-192.png`/`icon-512.png` that never existed (blank install icon). Generated placeholder PNGs plus an `app/icon.png` favicon — swap for real branded artwork before this ships to a client.
+- **`publicExcludes: ['!uploads/**/*']`** added to `next.config.js`'s `next-pwa` config: uploaded photos were being scanned into the service worker's precache manifest, which is build-machine-dependent and would 404 for any client whose cached manifest referenced a since-deleted photo.
+
+---
+
 ## Post-implementation manual check
 
 - Sign in as `admin@tiptoptreesltd.com`, create a quote with two line items matching the reference estimate ($1250 + $500, 5% tax) and confirm the total reads $1837.50.

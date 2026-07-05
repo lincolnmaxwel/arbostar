@@ -60,7 +60,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "@prisma/client": "5.18.0",
@@ -85,7 +85,7 @@
     "@testing-library/react": "14.3.1",
     "@playwright/test": "1.45.3",
     "eslint": "8.57.0",
-    "eslint-config-next": "14.2.5"
+    "eslint-config-next": "14.2.35"
   }
 }
 ```

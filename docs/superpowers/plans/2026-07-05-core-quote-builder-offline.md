@@ -359,6 +359,7 @@ git commit -m "feat: add Prisma schema and client singleton"
 ### Task 3: Staff authentication
 
 **Files:**
+- Create: `src/types/next-auth.d.ts`
 - Create: `src/lib/auth.ts`
 - Create: `src/app/api/auth/[...nextauth]/route.ts`
 - Create: `src/middleware.ts`
@@ -415,7 +416,37 @@ describe('verifyCredentials', () => {
 Run: `npx vitest run tests/integration/auth.test.ts`
 Expected: FAIL — `verifyCredentials` not exported from `@/lib/auth` (module doesn't exist yet).
 
-- [ ] **Step 3: Write `src/lib/auth.ts`**
+- [ ] **Step 3: Write `src/types/next-auth.d.ts`**
+
+NextAuth's built-in `User`/`Session`/`JWT` types don't know about this app's `id`/`role` fields. Augmenting them here means `src/lib/auth.ts` can assign `token.id`/`token.role` directly, with no inline casts:
+
+```ts
+import { DefaultSession } from 'next-auth';
+import { Role } from '@prisma/client';
+
+declare module 'next-auth' {
+  interface User {
+    id: string;
+    role: Role;
+  }
+
+  interface Session {
+    user: {
+      id: string;
+      role: Role;
+    } & DefaultSession['user'];
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string;
+    role: Role;
+  }
+}
+```
+
+- [ ] **Step 4: Write `src/lib/auth.ts`**
 
 ```ts
 import { NextAuthOptions } from 'next-auth';
@@ -450,15 +481,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = (user as { id: string }).id;
-        token.role = (user as { role: string }).role;
+        token.id = user.id;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { id?: string; role?: string }).id = token.id as string;
-        (session.user as { id?: string; role?: string }).role = token.role as string;
+        session.user.id = token.id;
+        session.user.role = token.role;
       }
       return session;
     },
@@ -466,12 +497,12 @@ export const authOptions: NextAuthOptions = {
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run tests/integration/auth.test.ts`
 Expected: PASS (3 tests). Requires `DATABASE_URL` pointed at a running Postgres instance with migrations applied (Task 2, Step 3).
 
-- [ ] **Step 5: Write `src/app/api/auth/[...nextauth]/route.ts`**
+- [ ] **Step 6: Write `src/app/api/auth/[...nextauth]/route.ts`**
 
 ```ts
 import NextAuth from 'next-auth';
@@ -481,7 +512,7 @@ const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
 ```
 
-- [ ] **Step 6: Write `src/middleware.ts`**
+- [ ] **Step 7: Write `src/middleware.ts`**
 
 ```ts
 export { default } from 'next-auth/middleware';
@@ -489,7 +520,7 @@ export { default } from 'next-auth/middleware';
 export const config = { matcher: ['/quotes/:path*'] };
 ```
 
-- [ ] **Step 7: Write `src/app/login/page.tsx`**
+- [ ] **Step 8: Write `src/app/login/page.tsx`**
 
 ```tsx
 'use client';
@@ -527,7 +558,7 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Step 8: Write `prisma/seed.ts`**
+- [ ] **Step 9: Write `prisma/seed.ts`**
 
 ```ts
 import { PrismaClient } from '@prisma/client';
@@ -553,15 +584,15 @@ main()
   });
 ```
 
-- [ ] **Step 9: Run the seed**
+- [ ] **Step 10: Run the seed**
 
 Run: `npx prisma db seed`
 Expected: no error; a `User` row with email `admin@tiptoptreesltd.com` exists (verify with `npx prisma studio` or a `SELECT`).
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add src/lib/auth.ts src/app/api/auth src/middleware.ts src/app/login prisma/seed.ts tests/integration/auth.test.ts
+git add src/types/next-auth.d.ts src/lib/auth.ts src/app/api/auth src/middleware.ts src/app/login prisma/seed.ts tests/integration/auth.test.ts
 git commit -m "feat: add staff credentials auth"
 ```
 

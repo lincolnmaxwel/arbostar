@@ -8,7 +8,7 @@ import styles from './Header.module.css';
 export function Header() {
   const pathname = usePathname();
 
-  if (pathname === '/login') return null;
+  if (pathname === '/login' || pathname.startsWith('/portal/')) return null;
 
   return (
     <header className={styles.header}>

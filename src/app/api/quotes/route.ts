@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
           total: totals.total,
+          // First sync sends the quote for client approval immediately — there's
+          // no separate "review before sending" step in this app, so as soon as
+          // a quote exists server-side it's awaiting the client's response.
+          status: 'sent',
+          sentAt: new Date(),
         },
         update: {
           subtotal: totals.subtotal,

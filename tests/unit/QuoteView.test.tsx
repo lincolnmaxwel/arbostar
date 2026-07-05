@@ -86,4 +86,33 @@ describe('QuoteView', () => {
     fireEvent.click(screen.getByLabelText('Close'));
     expect(screen.queryByTestId('photo-lightbox')).not.toBeInTheDocument();
   });
+
+  it('fetches and shows the approval status, and copies the client link', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ quote: { status: 'sent', publicToken: 'token-abc-123' } }),
+    });
+
+    await localDb.drafts.put({
+      draftId: 'view-4',
+      serverId: 'server-quote-4',
+      clientName: 'Approval Client',
+      clientEmail: 'approval@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [],
+    });
+
+    render(<QuoteView draftId="view-4" />);
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/quotes/server-quote-4'));
+    await waitFor(() => expect(screen.getByTestId('approval-badge')).toHaveTextContent('Pending client approval'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy client link' }));
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/portal/token-abc-123'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Link copied!' })).toBeInTheDocument());
+  });
 });

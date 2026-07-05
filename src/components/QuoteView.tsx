@@ -8,10 +8,52 @@ import { calculateTotals } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import styles from './QuoteView.module.css';
 
+interface ApprovalStatus {
+  status: 'draft' | 'sent' | 'approved' | 'declined' | 'expired';
+  publicToken: string;
+}
+
+const APPROVAL_LABEL: Record<ApprovalStatus['status'], string> = {
+  draft: 'Draft',
+  sent: 'Pending client approval',
+  approved: 'Approved',
+  declined: 'Declined',
+  expired: 'Expired',
+};
+
 export function QuoteView({ draftId }: { draftId: string }) {
   const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [openPhotoIndex, setOpenPhotoIndex] = useState<number | null>(null);
+  const [approval, setApproval] = useState<ApprovalStatus | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const serverId = draft?.serverId;
+
+  useEffect(() => {
+    if (!serverId) return;
+    let cancelled = false;
+    fetch(`/api/quotes/${serverId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!cancelled && body?.quote) {
+          setApproval({ status: body.quote.status, publicToken: body.quote.publicToken });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
+
+  function copyClientLink() {
+    if (!approval) return;
+    const url = `${window.location.origin}/portal/${approval.publicToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     if (!draft) return;
@@ -84,10 +126,22 @@ export function QuoteView({ draftId }: { draftId: string }) {
       <div className={styles.topBar}>
         <div>
           <SyncStatusBadge status={draft.status} />
+          {approval && (
+            <span className={`${styles.approvalBadge} ${styles[approval.status]}`} data-testid="approval-badge">
+              {APPROVAL_LABEL[approval.status]}
+            </span>
+          )}
           <h1 className={styles.title}>Estimate</h1>
           <p className={styles.meta}>Last updated {new Date(draft.updatedAt).toLocaleString()}</p>
         </div>
-        <Link href={`/quotes/new?draft=${draftId}`} className={styles.editButton}>Edit</Link>
+        <div className={styles.topBarActions}>
+          {approval && (
+            <button type="button" className={styles.copyLinkButton} onClick={copyClientLink}>
+              {copied ? 'Link copied!' : 'Copy client link'}
+            </button>
+          )}
+          <Link href={`/quotes/new?draft=${draftId}`} className={styles.editButton}>Edit</Link>
+        </div>
       </div>
 
       <div className={styles.party}>

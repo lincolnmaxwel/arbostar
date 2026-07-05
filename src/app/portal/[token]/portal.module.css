@@ -1,0 +1,183 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding: 32px 16px;
+}
+
+.card {
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px;
+}
+
+.topBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.meta {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  margin-top: 4px;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.sent {
+  background: #fef9e7;
+  color: #b58900;
+}
+
+.approved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.declined {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.draft,
+.expired {
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.party {
+  margin-bottom: 32px;
+}
+
+.partyLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.partyName {
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.partyLine {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin-top: 2px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--color-primary);
+  padding: 10px 12px;
+}
+
+.table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.priceCol {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.itemTitle {
+  font-weight: 600;
+}
+
+.itemDescription {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+
+.photos {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.photoThumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.totals {
+  margin-left: auto;
+  max-width: 320px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+}
+
+.grandTotal {
+  border-top: 1px solid var(--color-border);
+  margin-top: 6px;
+  padding-top: 12px;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px 8px;
+  }
+
+  .card {
+    padding: 20px 16px;
+  }
+
+  .topBar {
+    flex-direction: column-reverse;
+  }
+
+  .totals {
+    max-width: none;
+  }
+}

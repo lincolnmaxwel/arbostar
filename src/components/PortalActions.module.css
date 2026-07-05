@@ -1,0 +1,63 @@
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.actionError {
+  color: var(--color-error);
+  font-size: 0.8125rem;
+  align-self: center;
+  margin-right: auto;
+}
+
+.declineButton {
+  padding: 10px 24px;
+  background: var(--color-surface);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.declineButton:hover:not(:disabled) {
+  background: var(--color-error-bg);
+}
+
+.approveButton {
+  padding: 10px 24px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.approveButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.declineButton:disabled,
+.approveButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .actionError {
+    margin-right: 0;
+  }
+}

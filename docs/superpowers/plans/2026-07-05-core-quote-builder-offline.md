@@ -83,6 +83,7 @@
     "fake-indexeddb": "6.0.0",
     "jsdom": "24.1.1",
     "@testing-library/react": "14.3.1",
+    "@testing-library/jest-dom": "6.9.1",
     "@playwright/test": "1.45.3",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.35"
@@ -193,6 +194,12 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  esbuild: {
+    // tsconfig.json sets "jsx": "preserve" for Next.js's own build; Vitest's
+    // esbuild transform needs its own JSX setting or .tsx test files (first
+    // one lands in Task 10) are left with untransformed JSX at runtime.
+    jsx: 'automatic',
+  },
 });
 ```
 
@@ -200,6 +207,7 @@ export default defineConfig({
 
 ```ts
 import 'fake-indexeddb/auto';
+import '@testing-library/jest-dom/vitest';
 ```
 
 - [ ] **Step 10: Install dependencies**

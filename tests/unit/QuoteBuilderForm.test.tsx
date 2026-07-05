@@ -1,7 +1,7 @@
 // tests/unit/QuoteBuilderForm.test.tsx
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 
 vi.mock('@/lib/compressImage', () => ({ compressImage: async (blob: Blob) => blob }));
 
@@ -10,6 +10,8 @@ import { localDb } from '@/lib/localDb';
 import { enqueueSync, markStuck, getEntryForDraft } from '@/lib/outbox';
 
 describe('QuoteBuilderForm', () => {
+  afterEach(cleanup);
+
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.outbox.clear();
@@ -71,7 +73,7 @@ describe('QuoteBuilderForm', () => {
     const itemId = draft.items[0].id;
 
     const file = new File(['fake-bytes'], 'hedge.jpg', { type: 'image/jpeg' });
-    const input = screen.getByLabelText(/add photo/i);
+    const input = screen.getByLabelText('+ Attach photo');
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));

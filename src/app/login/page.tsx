@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import styles from './login.module.css';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,13 +22,25 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label htmlFor="email">Email</label>
-      <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <label htmlFor="password">Password</label>
-      <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      {error && <p role="alert">{error}</p>}
-      <button type="submit">Sign in</button>
-    </form>
+    <div className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>Arbostar</h1>
+        <p className={styles.subtitle}>Sign in to your account</p>
+
+        {error && <p className={styles.error} role="alert">{error}</p>}
+
+        <form onSubmit={handleSubmit}>
+          <div className={styles.field}>
+            <label htmlFor="email">Email</label>
+            <input id="email" className={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="password">Password</label>
+            <input id="password" className={styles.input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <button className={styles.button} type="submit">Sign in</button>
+        </form>
+      </div>
+    </div>
   );
 }

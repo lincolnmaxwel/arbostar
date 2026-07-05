@@ -1,14 +1,19 @@
 import { localDb } from '@/lib/localDb';
 import type { DraftPhoto } from '@/lib/localDb';
 
-export async function addPhotoToItem(draftId: string, itemId: string, blob: Blob, fileName: string): Promise<void> {
+export async function addPhotoToItem(draftId: string, blob: Blob, fileName: string): Promise<string> {
   const photoId = crypto.randomUUID();
   await localDb.photos.add({ id: photoId, draftId, blob, fileName, status: 'pending' });
 
-  const draft = await localDb.drafts.get(draftId);
-  if (!draft) return;
-  const items = draft.items.map((i) => (i.id === itemId ? { ...i, photoIds: [...i.photoIds, photoId] } : i));
-  await localDb.drafts.put({ ...draft, items, updatedAt: Date.now() });
+  // Deliberately does NOT read-modify-write localDb.drafts here: the quote
+  // builder form holds the authoritative draft snapshot in React state and
+  // owns writing it to Dexie (debounced). If this function also read/wrote
+  // localDb.drafts directly, its read could race a not-yet-persisted field
+  // edit and revert it, or a later debounced write (built from the form's
+  // state, which doesn't know about this photoId yet) could overwrite this
+  // photo's photoIds entry right back out. The caller merges the returned
+  // photoId into its own state and lets the normal save path persist it.
+  return photoId;
 }
 
 export async function uploadPendingPhotos(draftId: string): Promise<void> {

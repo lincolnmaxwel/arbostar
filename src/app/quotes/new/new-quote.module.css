@@ -1,0 +1,16 @@
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px 16px;
+  color: var(--color-text-secondary);
+}

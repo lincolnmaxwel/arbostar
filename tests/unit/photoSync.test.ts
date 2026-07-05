@@ -2,26 +2,35 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { localDb } from '@/lib/localDb';
 import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
 
+// Mirrors what QuoteBuilderForm does in production: addPhotoToItem only writes
+// the blob to localDb.photos and returns its id; the caller is responsible for
+// merging that id into the item's photoIds via its own draft-state update path.
+async function attachPhoto(draftId: string, itemId: string, blob: Blob, fileName: string): Promise<string> {
+  const photoId = await addPhotoToItem(draftId, blob, fileName);
+  const draft = await localDb.drafts.get(draftId);
+  if (!draft) throw new Error('draft not found');
+  const items = draft.items.map((i) => (i.id === itemId ? { ...i, photoIds: [...i.photoIds, photoId] } : i));
+  await localDb.drafts.put({ ...draft, items });
+  return photoId;
+}
+
 describe('photoSync', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.photos.clear();
   });
 
-  it('stores the photo locally and links it to the item, pending upload', async () => {
-    await localDb.drafts.put({
-      draftId: 'd1', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
-      items: [{ id: 'item-1', title: 'Hedges', price: 100, photoIds: [] }],
-    });
+  it('stores the photo locally, pending upload, without touching the draft directly', async () => {
     const blob = new Blob(['fake'], { type: 'image/jpeg' });
 
-    await addPhotoToItem('d1', 'item-1', blob, 'photo.jpg');
+    const photoId = await addPhotoToItem('d1', blob, 'photo.jpg');
 
-    const draft = await localDb.drafts.get('d1');
-    expect(draft?.items[0].photoIds).toHaveLength(1);
-    const photoId = draft!.items[0].photoIds[0];
     const photo = await localDb.photos.get(photoId);
     expect(photo?.status).toBe('pending');
+    expect(photo?.draftId).toBe('d1');
+    // addPhotoToItem must not read/write localDb.drafts itself (that's what
+    // caused a stale-read/overwrite race with the form's own debounced save).
+    expect(await localDb.drafts.get('d1')).toBeUndefined();
   });
 
   it('skips items with no serverItemId yet', async () => {
@@ -29,7 +38,7 @@ describe('photoSync', () => {
       draftId: 'd2', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
       items: [{ id: 'item-2', title: 'Hedges', price: 100, photoIds: [] }],
     });
-    await addPhotoToItem('d2', 'item-2', new Blob(['x']), 'p.jpg');
+    await attachPhoto('d2', 'item-2', new Blob(['x']), 'p.jpg');
 
     global.fetch = vi.fn();
     await uploadPendingPhotos('d2');
@@ -41,7 +50,7 @@ describe('photoSync', () => {
       draftId: 'd3', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-3', serverItemId: 'server-item-3', title: 'Hedges', price: 100, photoIds: [] }],
     });
-    await addPhotoToItem('d3', 'item-3', new Blob(['x']), 'p.jpg');
+    await attachPhoto('d3', 'item-3', new Blob(['x']), 'p.jpg');
 
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
     await uploadPendingPhotos('d3');
@@ -56,7 +65,7 @@ describe('photoSync', () => {
       draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-4', serverItemId: 'server-item-4', title: 'Hedges', price: 100, photoIds: [] }],
     });
-    await addPhotoToItem('d4', 'item-4', new Blob(['x']), 'p.jpg');
+    await attachPhoto('d4', 'item-4', new Blob(['x']), 'p.jpg');
 
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
 

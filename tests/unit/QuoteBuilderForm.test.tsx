@@ -37,6 +37,16 @@ describe('QuoteBuilderForm', () => {
     await waitFor(() => expect(screen.getByTestId('sync-badge')).toHaveTextContent('Local'));
   });
 
+  it('does not create a row in localDb.drafts just from opening the builder untouched', async () => {
+    render(<QuoteBuilderForm draftId="test-draft-untouched" />);
+    await screen.findByLabelText('Client name');
+
+    // give any accidental eager write a chance to land before asserting its absence
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(await localDb.drafts.get('test-draft-untouched')).toBeUndefined();
+  });
+
   it('shows a sync-error banner with Retry/Discard when the outbox entry is stuck', async () => {
     const draftId = 'test-draft-3';
     await localDb.drafts.put({

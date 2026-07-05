@@ -29,17 +29,22 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
   const [formState, setFormState] = useState<DraftQuote | null>(null);
 
+  // Seed formState from an existing draft if one's already persisted, or from
+  // an in-memory empty draft otherwise. Deliberately does NOT write anything
+  // to localDb.drafts here: just opening the builder (and leaving without
+  // typing anything) must not create a visible "Untitled" entry in the
+  // quotes list. The row only starts existing once the user's first edit
+  // reaches the debounced persist() below.
   useEffect(() => {
+    let cancelled = false;
+    setFormState(null);
     localDb.drafts.get(draftId).then((existing) => {
-      if (!existing) localDb.drafts.put(emptyDraft(draftId));
+      if (!cancelled) setFormState(existing ?? emptyDraft(draftId));
     });
+    return () => {
+      cancelled = true;
+    };
   }, [draftId]);
-
-  useEffect(() => {
-    if (draft && !formState) {
-      setFormState(draft);
-    }
-  }, [draft, formState]);
 
   // formState is the authoritative snapshot for user-editable fields (so typing
   // in one field can't be dropped by a stale read of another field's edit), but
@@ -107,7 +112,10 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   }
 
   async function handleSend() {
-    await localDb.drafts.update(draftId, { status: 'syncing' });
+    // .put() (not .update()) so this is safe even if the user typed fast
+    // enough to click Send before the debounced persist() ever created the
+    // row — Send always writes the current, full formState itself.
+    await localDb.drafts.put({ ...formState!, status: 'syncing', updatedAt: Date.now() });
     await enqueueSync(draftId);
   }
 

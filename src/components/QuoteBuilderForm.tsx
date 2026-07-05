@@ -111,6 +111,21 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     );
   }
 
+  function removeItem(id: string) {
+    updateField('items', formState!.items.filter((i) => i.id !== id));
+  }
+
+  async function handlePhotoFiles(itemId: string, files: FileList) {
+    const currentItem = formState!.items.find((i) => i.id === itemId);
+    if (!currentItem) return;
+    const newPhotoIds: string[] = [];
+    for (const file of Array.from(files)) {
+      const compressed = await compressImage(file);
+      newPhotoIds.push(await addPhotoToItem(draftId, compressed, file.name));
+    }
+    updateItem(itemId, { photoIds: [...currentItem.photoIds, ...newPhotoIds] });
+  }
+
   async function handleSend() {
     // .put() (not .update()) so this is safe even if the user typed fast
     // enough to click Send before the debounced persist() ever created the
@@ -141,6 +156,16 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
 
         {formState.items.map((item) => (
           <div key={item.id} className={styles.itemCard}>
+            <div className={styles.itemCardHeader}>
+              <button
+                type="button"
+                className={styles.removeItemButton}
+                onClick={() => removeItem(item.id)}
+                aria-label={`Remove ${item.title || 'this service'}`}
+              >
+                Remove
+              </button>
+            </div>
             <div className={styles.itemCardFields}>
               <div className={`${styles.itemField} ${styles.itemFieldFull}`}>
                 <label htmlFor={`title-${item.id}`}>Service title</label>
@@ -165,13 +190,12 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                   id={`photo-${item.id}`}
                   type="file"
                   accept="image/*"
+                  multiple
                   style={{ display: 'none' }}
                   onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const compressed = await compressImage(file);
-                    const photoId = await addPhotoToItem(draftId, compressed, file.name);
-                    updateItem(item.id, { photoIds: [...item.photoIds, photoId] });
+                    if (!e.target.files || e.target.files.length === 0) return;
+                    await handlePhotoFiles(item.id, e.target.files);
+                    e.target.value = '';
                   }}
                 />
                 <span className={styles.photoCount} data-testid={`photo-count-${item.id}`}>{item.photoIds.length} photo(s)</span>

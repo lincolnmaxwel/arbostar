@@ -89,6 +89,57 @@ describe('QuoteBuilderForm', () => {
     await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));
   });
 
+  it('lets staff select and attach multiple photos to a line item in one go', async () => {
+    const draftId = 'test-draft-multi-photo';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+
+    const draft = await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      if (!d || d.items.length === 0) throw new Error('item not added yet');
+      return d;
+    });
+    const itemId = draft.items[0].id;
+
+    const input = screen.getByLabelText('+ Attach photo') as HTMLInputElement;
+    expect(input.multiple).toBe(true);
+
+    const fileA = new File(['a'], 'a.jpg', { type: 'image/jpeg' });
+    const fileB = new File(['b'], 'b.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [fileA, fileB] } });
+
+    await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('2 photo'));
+
+    await waitFor(
+      async () => {
+        const saved = await localDb.drafts.get(draftId);
+        expect(saved?.items[0].photoIds).toHaveLength(2);
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('lets staff remove a service line item', async () => {
+    const draftId = 'test-draft-remove-item';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+
+    await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      expect(d?.items).toHaveLength(1);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+
+    await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      expect(d?.items).toHaveLength(0);
+    });
+    expect(screen.queryByLabelText('Service title')).not.toBeInTheDocument();
+  });
+
   it('preserves serverId/serverItemId when editing a field after the quote has already synced', async () => {
     const draftId = 'test-draft-5';
     await localDb.drafts.put({

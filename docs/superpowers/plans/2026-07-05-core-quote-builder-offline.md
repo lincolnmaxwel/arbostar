@@ -1255,7 +1255,7 @@ describe('/api/quotes/photos', () => {
         draftId: randomUUID(),
         clientId: client.id,
         createdById: userId,
-        items: { create: [{ title: 'Hedges', price: 100, sortOrder: 0 }] },
+        items: { create: [{ localItemId: randomUUID(), title: 'Hedges', price: 100, sortOrder: 0 }] },
       },
       include: { items: true },
     });

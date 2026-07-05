@@ -876,16 +876,20 @@ const MAX_DELAY_MS = 60000;
 const STUCK_DELAY_MS = Number.MAX_SAFE_INTEGER;
 
 export async function enqueueSync(draftId: string): Promise<void> {
-  const existing = await getEntryForDraft(draftId);
-  if (existing) {
-    await localDb.outbox.update(existing.id!, { nextAttemptAt: Date.now() });
-    return;
-  }
-  await localDb.outbox.add({
-    draftId,
-    attempts: 0,
-    nextAttemptAt: Date.now(),
-    createdAt: Date.now(),
+  // Wrapped in a transaction so the dedupe check-then-write is atomic — two
+  // concurrent calls for the same draftId must never create two outbox rows.
+  await localDb.transaction('rw', localDb.outbox, async () => {
+    const existing = await getEntryForDraft(draftId);
+    if (existing) {
+      await localDb.outbox.update(existing.id!, { nextAttemptAt: Date.now() });
+      return;
+    }
+    await localDb.outbox.add({
+      draftId,
+      attempts: 0,
+      nextAttemptAt: Date.now(),
+      createdAt: Date.now(),
+    });
   });
 }
 

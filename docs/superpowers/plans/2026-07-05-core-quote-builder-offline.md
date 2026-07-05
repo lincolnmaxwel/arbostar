@@ -2321,6 +2321,102 @@ git commit -m "test: add e2e offline reload coverage for the quote builder"
 
 ---
 
+## Task 15 addendum: bugs the E2E test caught that no earlier task's tests could
+
+Running Task 15's real Playwright test against a real production build surfaced five defects that every prior task's unit/integration tests (which never exercise a real browser, a real service worker, or two sequential full page loads) had no way to catch. Fixing them touched files outside Task 15's original file list. Recorded here so a future re-run of this plan produces a working app the first time.
+
+**1. Service worker was never registered.** `next-pwa` builds `public/sw.js` correctly, but its auto-registration script only injects into the legacy Pages Router webpack entry point — this app is App-Router-only, so the chunk that would call `navigator.serviceWorker.register(...)` never loads. Fix: add an explicit registration component.
+
+Create `src/components/ServiceWorkerRegistration.tsx`:
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+
+export function ServiceWorkerRegistration() {
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.error('Service worker registration failed:', err);
+      });
+    }
+  }, []);
+
+  return null;
+}
+```
+Render `<ServiceWorkerRegistration />` inside `<body>` in `src/app/layout.tsx` (Task 1), alongside `{children}`.
+
+**2. The background sync loop was never started.** Task 9 exports `startSyncLoop()`, but nothing in the app ever calls it — clicking "Send" enqueues to the outbox, but nothing processes the queue automatically. Fix: start it once for the app's whole lifetime.
+
+Create `src/components/SyncLoopStarter.tsx`:
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+import { startSyncLoop } from '@/lib/syncWorker';
+
+export function SyncLoopStarter() {
+  useEffect(() => {
+    const stop = startSyncLoop();
+    return stop;
+  }, []);
+
+  return null;
+}
+```
+Render `<SyncLoopStarter />` inside `<body>` in `src/app/layout.tsx` (Task 1), alongside `<ServiceWorkerRegistration />` and `{children}`. Rendering both from the root layout (not a page) matters: the root layout doesn't remount on client-side navigation, so the sync loop starts exactly once per tab/hard-load.
+
+**3. The service worker installed but Workbox aborted, because the precache manifest included a URL that always 404s.** `next-pwa`'s generated precache list includes `/_next/app-build-manifest.json`, a server-only build artifact Next.js's App Router never serves publicly. Workbox fails the entire SW install if any precached URL 404s — so even with fixes 1–2 in place, offline reload still failed. Fix: exclude it in `next.config.js` (Task 1):
+```js
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  buildExcludes: [/app-build-manifest\.json$/],
+});
+```
+
+**4. The new-quote draft id must not live in global `localStorage`.** The first fix attempt persisted `draftId` in a single global `localStorage` key so a reload would resume the same draft — this correctly fixed reload-safety, but since the app's only "New quote" entry point always read that same global key, a browser could only ever create **one quote, ever**: every subsequent "New quote" click resumed the first (already-sent) draft, and re-sending it silently overwrote the first customer's completed quote via the server's `upsert({ where: { draftId } })`. This is a worse variant of the exact bug the project exists to fix. Correct fix: key the draft id by URL, not global storage, replacing Task 10 Step 6's original `src/app/quotes/new/page.tsx`:
+
+```tsx
+'use client';
+
+import { Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { QuoteBuilderForm } from '@/components/QuoteBuilderForm';
+
+function NewQuotePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftId = searchParams.get('draft');
+
+  useEffect(() => {
+    if (!draftId) {
+      const id = crypto.randomUUID();
+      router.replace(`/quotes/new?draft=${id}`);
+    }
+  }, [draftId, router]);
+
+  if (!draftId) return <p>Loading...</p>;
+  return <QuoteBuilderForm draftId={draftId} />;
+}
+
+export default function NewQuotePage() {
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <NewQuotePageInner />
+    </Suspense>
+  );
+}
+```
+A reload preserves `?draft=<uuid>` in the URL (fixing the original reload-loses-data complaint), while every fresh navigation to plain `/quotes/new` (no query string — the quotes list's "New quote" link never changes) mints a new id and can never collide with or overwrite a previous draft. The `<Suspense>` boundary is required by Next.js for `useSearchParams()` in a statically-prerendered route — omitting it fails `npm run build`.
+
+**5. Known, disclosed, not-yet-fixed bug: `QuoteBuilderForm`'s single shared debounce can silently drop edits.** `saveLocal` (Task 10) is one debounced function shared across every field. Because the debounce is trailing-edge (cancels the previous pending call rather than queuing it) and each call captures a spread of the current `draft` render snapshot, editing two fields within the same 500ms window can silently discard the first edit entirely — plausible via autofill, paste, or fast tabbing between fields, none of which are contrived given this app's field-staff users. Task 15's E2E test paces its own field fills 600ms apart to avoid tripping this deterministically, which is a valid test-stability workaround but does **not** fix the underlying bug. This should be prioritized as a near-term follow-up (e.g., per-field debounced writes that merge into the latest draft snapshot instead of one shared debounce keyed off a stale closure).
+
+**6. Known, disclosed gap: the quotes list has no way to resume an existing unsent draft.** `/quotes/new` (always minting a fresh id) is the only entry point into `QuoteBuilderForm`; the list page (Task 11) renders each draft as plain text with no link back into the builder using that draft's id. Once a tab showing an in-progress (`status: 'local'`) draft is closed, that draft is orphaned — still present in IndexedDB and visible in the list, but unopenable. Follow-up: add `href={`/quotes/new?draft=${d.draftId}`}` per list item.
+
+---
+
 ## Post-implementation manual check
 
 - Sign in as `admin@tiptoptreesltd.com`, create a quote with two line items matching the reference estimate ($1250 + $500, 5% tax) and confirm the total reads $1837.50.

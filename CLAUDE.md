@@ -55,7 +55,7 @@ Photos are written to a top-level `uploads/` directory (project root, **not** `p
 
 ### Client approval portal (public, unauthenticated)
 
-`/portal/[token]` (a Server Component) and `POST /api/portal/[token]/respond` are intentionally outside `src/middleware.ts`'s matcher (`/quotes/:path*` only) and carry no session check — the long random `Quote.publicToken` (a UUID) is the only credential. A quote's `status` moves `draft` → `sent` ("Pending" in the UI) the moment "Save and Send" first syncs it (triggers `sendQuoteApprovalEmail()`, `src/lib/email.ts`, itemized proposal + portal link); the client's Approve/Decline sets `approved`/`declined` and is idempotent (repeat clicks don't re-flip an already-decided quote). Client details never update on a resend (`client.upsert` with an empty `update: {}`) — this is a known, accepted simplification, not a bug.
+`/portal/[token]` (a Server Component) and `POST /api/portal/[token]/respond` are intentionally outside `src/middleware.ts`'s matcher (`/quotes/:path*` only) and carry no session check — the long random `Quote.publicToken` (a UUID) is the only credential. A quote's `status` moves `draft` → `sent` ("Pending" in the UI) the moment "Save and Send" first syncs it (triggers `sendQuoteApprovalEmail()`, `src/lib/email.ts`, itemized proposal + portal link); the client's Approve/Decline sets `approved`/`declined` and is idempotent (repeat clicks don't re-flip an already-decided quote). `client.upsert`'s `update` clause keeps `name`/`phone`/`address` in sync with whatever the most recent save sent (matched by email, which itself is never changed by an update) — a plain edit to client details, or a resend, both update the shared `Client` row. This used to be a no-op `update: {}` "by design," but that silently reverted any client-detail edit the moment cross-device sync (`pullServerQuotes()`) refreshed the draft from the server's still-stale copy — fixed rather than documented around.
 
 Email SMTP config is env-driven (`SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`FROM`) — swapping providers (Ethereal for local dev, Gmail app-password, etc.) is a `.env` change only, no code changes.
 
@@ -74,4 +74,4 @@ Email SMTP config is env-driven (`SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`FROM
 
 ### Github
 
-- Sempre que realizar alterações no sistema, deve realiar o commit dessas alteracoes para o repo https://github.com/lincolnmaxwel/arbostar e na sequencia realiazr o push
+- Sempre que realizar alterações no sistema, deve realiar o commit dessas alteracoes para o repo https://github.com/lincolnmaxwel/arbostar e na sequencia realiazr o push para branch master.

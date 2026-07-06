@@ -49,9 +49,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'conflict', serverUpdatedAt: existing.updatedAt }, { status: 409 });
   }
 
+  // update (not {}) so an edited name/phone/address actually sticks server-side.
+  // Previously a no-op update meant a plain "Save" never persisted a client-detail
+  // edit at all: the next pull of this draft's own data (cross-device refresh, or
+  // even just re-reading the server after a resync) would show the client's
+  // original name forever, silently reverting the edit.
   const client = await prisma.client.upsert({
     where: { email: data.clientEmail },
-    update: {},
+    update: { name: data.clientName, phone: data.clientPhone, address: data.clientAddress },
     create: { name: data.clientName, email: data.clientEmail, phone: data.clientPhone, address: data.clientAddress },
   });
 

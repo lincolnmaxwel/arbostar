@@ -71,3 +71,7 @@ Email SMTP config is env-driven (`SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`FROM
 - Integration tests (`tests/integration/`) mock `next-auth`'s `getServerSession` via `vi.mock('next-auth', ...)` but hit a real Postgres DB through Prisma — clean up created rows in `afterAll`.
 - Component tests needing `createObjectURL`/`clipboard`/etc. stub them directly (jsdom doesn't implement these) — see `tests/unit/QuoteView.test.tsx` for the pattern.
 - `tests/e2e/offline-quote.spec.ts` paces field edits ~600ms apart (`page.waitForTimeout`) to clear the 500ms autosave debounce deterministically before the next action.
+
+### Github
+
+- Sempre que realizar alterações no sistema, deve realiar o commit dessas alteracoes para o repo https://github.com/lincolnmaxwel/arbostar e na sequencia realiazr o push

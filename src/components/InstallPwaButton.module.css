@@ -1,0 +1,34 @@
+.installButton {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.installButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.iosHint {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  max-width: 280px;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  font-size: 0.875rem;
+  z-index: 60;
+}
+
+.iosHint button {
+  margin-top: 8px;
+}

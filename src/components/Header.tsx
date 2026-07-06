@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import { InstallPwaButton } from './InstallPwaButton';
 import styles from './Header.module.css';
 
 export function Header() {
@@ -18,13 +19,16 @@ export function Header() {
           <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
           <Link href="/quotes/new" className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</Link>
         </nav>
-        <button
-          type="button"
-          className={styles.signOutButton}
-          onClick={() => signOut({ callbackUrl: '/login' })}
-        >
-          Sign out
-        </button>
+        <div className={styles.actions}>
+          <InstallPwaButton />
+          <button
+            type="button"
+            className={styles.signOutButton}
+            onClick={() => signOut({ callbackUrl: '/login' })}
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </header>
   );

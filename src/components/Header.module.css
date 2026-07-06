@@ -54,6 +54,12 @@
   border-bottom-color: var(--color-accent);
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .signOutButton {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.4);

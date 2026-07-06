@@ -18,14 +18,21 @@ interface ServerQuote {
 }
 
 // The Quotes list is a pure IndexedDB view (offline-first by design), so a
-// quote synced from another device never shows up here on its own — this
-// device's Dexie simply never heard about it. Pull the server's full list
-// and fill in any draftId this device doesn't already know about. Existing
-// local rows are left untouched: this device's own copy may have newer
-// unsynced edits, and the one-way outbox sync is the only thing allowed to
-// overwrite it. Photos aren't backfilled — they live only as local blobs on
-// whichever device captured them, so a quote pulled from another device will
-// show its text/pricing but not its photos.
+// quote synced from another device never shows up here — and an edit synced
+// from another device never refreshes here either — on their own. Pull the
+// server's full list and, for each quote:
+//   - unknown draftId here -> insert it
+//   - known here but this device has no unsynced changes of its own
+//     (status 'synced') and the server copy is newer -> refresh it
+//   - known here with unsynced local changes (status 'local'/'syncing'/
+//     'error') -> leave it alone; this device's own outbox sync is the only
+//     thing allowed to overwrite it, otherwise a pending edit gets clobbered
+//     right before it has a chance to sync out
+//   - queued for local deletion (pendingDeletes) -> skip, or the delete
+//     would be silently undone by resurrecting the quote from the server
+// Photos aren't backfilled — they live only as local blobs on whichever
+// device captured them, so a pulled/refreshed quote shows its text/pricing
+// but not photos captured on another device.
 export async function pullServerQuotes(): Promise<void> {
   let res: Response;
   try {
@@ -36,18 +43,26 @@ export async function pullServerQuotes(): Promise<void> {
   if (!res.ok) return;
 
   const { quotes } = (await res.json()) as { quotes: ServerQuote[] };
+  const pendingDeleteServerIds = new Set((await localDb.pendingDeletes.toArray()).map((p) => p.serverId));
 
   for (const q of quotes) {
-    const existing = await localDb.drafts.get(q.draftId);
-    if (existing) continue;
+    if (pendingDeleteServerIds.has(q.id)) continue;
 
+    const existing = await localDb.drafts.get(q.draftId);
+    const serverUpdatedAt = new Date(q.updatedAt).getTime();
+    if (existing) {
+      if (existing.status !== 'synced') continue;
+      if (serverUpdatedAt <= existing.updatedAt) continue;
+    }
+
+    const existingPhotosByItemId = new Map(existing?.items.map((i) => [i.id, i.photoIds]) ?? []);
     const items: DraftQuoteItem[] = q.items.map((i) => ({
       id: i.localItemId,
       serverItemId: i.id,
       title: i.title,
       description: i.description ?? undefined,
       price: Number(i.price),
-      photoIds: [],
+      photoIds: existingPhotosByItemId.get(i.localItemId) ?? [],
     }));
 
     const draft: DraftQuote = {
@@ -60,7 +75,7 @@ export async function pullServerQuotes(): Promise<void> {
       items,
       taxRate: Number(q.taxRate),
       status: 'synced',
-      updatedAt: new Date(q.updatedAt).getTime(),
+      updatedAt: serverUpdatedAt,
     };
     await localDb.drafts.put(draft);
   }

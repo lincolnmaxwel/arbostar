@@ -1,5 +1,6 @@
 import { localDb } from '@/lib/localDb';
 import { dueEntries, recordFailure, markStuck, clearEntry } from '@/lib/outbox';
+import { flushPendingDeletes } from '@/lib/pendingDeletes';
 
 async function isReallyOnline(): Promise<boolean> {
   try {
@@ -12,6 +13,8 @@ async function isReallyOnline(): Promise<boolean> {
 
 export async function runSyncCycle(): Promise<void> {
   if (!(await isReallyOnline())) return;
+
+  await flushPendingDeletes();
 
   const entries = await dueEntries();
   for (const entry of entries) {

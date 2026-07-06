@@ -19,6 +19,11 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/prisma ./prisma
+# npm ci --omit=dev runs before prisma/ is copied in, so @prisma/client's
+# own postinstall generate step can't find the schema and produces nothing —
+# node_modules/.prisma/client ends up empty, which is the "did not initialize
+# yet" error at runtime. Generate explicitly, now that the schema is present.
+RUN prisma generate
 RUN mkdir -p /app/uploads
 EXPOSE 3000
 CMD ["sh", "-c", "prisma migrate deploy && npm start"]

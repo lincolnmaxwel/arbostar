@@ -8,9 +8,18 @@ import { calculateTotals } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import styles from './QuoteView.module.css';
 
+type BookingStatus = 'idle' | 'proposed' | 'rejected' | 'confirmed';
+type DayWindow = 'morning' | 'afternoon' | 'fullday';
+
 interface ApprovalStatus {
-  status: 'draft' | 'sent' | 'approved' | 'declined' | 'expired';
+  status: 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled';
   publicToken: string;
+}
+
+interface BookingState {
+  bookingStatus: BookingStatus;
+  scheduledDate?: string | null;
+  scheduledWindow?: DayWindow | null;
 }
 
 const APPROVAL_LABEL: Record<ApprovalStatus['status'], string> = {
@@ -19,6 +28,13 @@ const APPROVAL_LABEL: Record<ApprovalStatus['status'], string> = {
   approved: 'Approved',
   declined: 'Declined',
   expired: 'Expired',
+  scheduled: 'Scheduled',
+};
+
+const WINDOW_LABEL: Record<DayWindow, string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  fullday: 'Full day',
 };
 
 export function QuoteView({ draftId }: { draftId: string }) {
@@ -26,6 +42,7 @@ export function QuoteView({ draftId }: { draftId: string }) {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [openPhotoIndex, setOpenPhotoIndex] = useState<number | null>(null);
   const [approval, setApproval] = useState<ApprovalStatus | null>(null);
+  const [booking, setBooking] = useState<BookingState | null>(null);
   const [copied, setCopied] = useState(false);
 
   const serverId = draft?.serverId;
@@ -38,6 +55,20 @@ export function QuoteView({ draftId }: { draftId: string }) {
       .then((body) => {
         if (!cancelled && body?.quote) {
           setApproval({ status: body.quote.status, publicToken: body.quote.publicToken });
+          if (body.quote.status === 'approved' || body.quote.status === 'scheduled') {
+            fetch(`/api/quotes/${serverId}/booking`)
+              .then((res) => (res.ok ? res.json() : null))
+              .then((b) => {
+                if (!cancelled && b?.quote) {
+                  setBooking({
+                    bookingStatus: b.quote.bookingStatus,
+                    scheduledDate: b.quote.scheduledDate ?? null,
+                    scheduledWindow: b.quote.scheduledWindow ?? null,
+                  });
+                }
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {});
@@ -143,6 +174,29 @@ export function QuoteView({ draftId }: { draftId: string }) {
           <Link href={`/quotes/new?draft=${draftId}`} className={styles.editButton}>Edit</Link>
         </div>
       </div>
+
+      {approval && booking && (approval.status === 'approved' || approval.status === 'scheduled') && (
+        <div className={styles.bookingArea} data-testid="booking-area">
+          {booking.bookingStatus === 'idle' && (
+            <Link href={`/quotes/${draftId}/booking`} className={styles.bookingAction}>
+              Schedule
+            </Link>
+          )}
+          {booking.bookingStatus === 'proposed' && (
+            <span className={styles.bookingPending}>Booking pending — awaiting client response.</span>
+          )}
+          {booking.bookingStatus === 'rejected' && (
+            <Link href={`/quotes/${draftId}/booking`} className={styles.bookingAction}>
+              Re-propose dates
+            </Link>
+          )}
+          {booking.bookingStatus === 'confirmed' && booking.scheduledDate && booking.scheduledWindow && (
+            <span className={styles.bookingConfirmed}>
+              Scheduled: {new Date(booking.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {WINDOW_LABEL[booking.scheduledWindow]}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className={styles.party}>
         <h2 className={styles.partyLabel}>To</h2>

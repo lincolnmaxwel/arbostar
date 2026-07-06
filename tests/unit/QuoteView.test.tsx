@@ -1,7 +1,7 @@
 // tests/unit/QuoteView.test.tsx
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { QuoteView } from '@/components/QuoteView';
 import { localDb } from '@/lib/localDb';
 
@@ -15,6 +15,8 @@ describe('QuoteView', () => {
     await localDb.drafts.clear();
     await localDb.photos.clear();
   });
+
+  afterEach(cleanup);
 
   it('renders client details, line items, and computed totals', async () => {
     await localDb.drafts.put({
@@ -114,5 +116,86 @@ describe('QuoteView', () => {
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/portal/token-abc-123'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Link copied!' })).toBeInTheDocument());
+  });
+
+  function seedSyncedDraft(draftId: string, serverId: string) {
+    return localDb.drafts.put({
+      draftId,
+      serverId,
+      clientName: 'Booking View Client',
+      clientEmail: 'bv@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [{ id: 'i1', title: 'Tree removal', price: 500, photoIds: [] }],
+    });
+  }
+
+  it('renders a "Schedule" button when the quote is approved and bookingStatus=idle', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { id: 'q-bv1', status: 'approved', bookingStatus: 'idle' }, latestRound: null }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await seedSyncedDraft('bv-1', 'q-bv1');
+    render(<QuoteView draftId="bv-1" />);
+
+    await waitFor(() => expect(screen.getByTestId('booking-area')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /schedule/i })).toBeInTheDocument();
+  });
+
+  it('renders "Booking pending" (disabled) when bookingStatus=proposed', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ quote: { id: 'q-bv2', status: 'approved', bookingStatus: 'proposed' }, latestRound: { id: 'r', roundNumber: 1, status: 'proposed', rejectionReason: null, proposedAt: '2099-01-01T00:00:00Z', respondedAt: null, options: [] } }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await seedSyncedDraft('bv-2', 'q-bv2');
+    render(<QuoteView draftId="bv-2" />);
+
+    await waitFor(() => expect(screen.getByText(/booking pending/i)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /schedule/i })).not.toBeInTheDocument();
+  });
+
+  it('renders "Re-propose dates" when bookingStatus=rejected', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ quote: { id: 'q-bv3', status: 'approved', bookingStatus: 'rejected' }, latestRound: { id: 'r', roundNumber: 1, status: 'rejected', rejectionReason: 'Bad days.', proposedAt: '2099-01-01T00:00:00Z', respondedAt: '2099-01-02T00:00:00Z', options: [] } }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await seedSyncedDraft('bv-3', 'q-bv3');
+    render(<QuoteView draftId="bv-3" />);
+
+    await waitFor(() => expect(screen.getByRole('link', { name: /re-propose dates/i })).toBeInTheDocument());
+  });
+
+  it('renders "Scheduled: <date> · <window>" when quote is scheduled', async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'scheduled', publicToken: 'ptok' } }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ quote: { id: 'q-bv4', status: 'scheduled', bookingStatus: 'confirmed', scheduledDate: '2099-07-15T00:00:00.000Z', scheduledWindow: 'morning' }, latestRound: null }),
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await seedSyncedDraft('bv-4', 'q-bv4');
+    render(<QuoteView draftId="bv-4" />);
+
+    await waitFor(() => expect(screen.getByTestId('booking-area')).toHaveTextContent(/scheduled/i));
+    expect(screen.getByTestId('booking-area')).toHaveTextContent(/morning/i);
   });
 });

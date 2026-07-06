@@ -294,6 +294,36 @@
   font-size: 0.875rem;
 }
 
+.bookingArea {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.bookingAction {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #2c5f2d;
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.bookingPending {
+  color: #92400e;
+  font-size: 14px;
+}
+
+.bookingConfirmed {
+  color: #2c5f2d;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .page {
     padding: 20px 16px;

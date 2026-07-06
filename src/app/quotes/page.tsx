@@ -42,7 +42,10 @@ export default function QuotesListPage() {
             {drafts.map((d) => (
               <tr key={d.draftId}>
                 <td>
-                  <Link href={`/quotes/${d.draftId}`} className={styles.clientName}>
+                  <Link
+                    href={d.serverId ? `/quotes/${d.draftId}` : `/quotes/new?draft=${d.draftId}`}
+                    className={styles.clientName}
+                  >
                     {d.clientName || 'Untitled'}
                   </Link>
                   {d.clientEmail && <div className={styles.clientEmail}>{d.clientEmail}</div>}

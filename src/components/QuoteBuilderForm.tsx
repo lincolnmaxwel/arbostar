@@ -170,9 +170,27 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     // enough to click a submit button before the debounced persist() ever
     // created the row — submitting always writes the current, full
     // formState itself.
-    await localDb.drafts.put({ ...formState!, status: 'syncing', pendingSend, updatedAt: Date.now() });
+    //
+    // status only goes to 'syncing' when actually online: runSyncCycle bails
+    // out immediately (without touching the draft) whenever it detects no
+    // real connectivity, so an offline Save would otherwise leave status
+    // stuck at 'syncing' forever — permanently disabling the Save/Send
+    // buttons (they're disabled while status === 'syncing') until the device
+    // happens to come back online. Staying at 'local' offline keeps the form
+    // usable; enqueueSync below still queues the row so the background sync
+    // loop picks it up the moment connectivity actually returns.
+    const online = navigator.onLine;
+    await localDb.drafts.put({ ...formState!, status: online ? 'syncing' : 'local', pendingSend, updatedAt: Date.now() });
     await enqueueSync(draftId);
-    router.push(`/quotes/${draftId}`);
+    // /quotes/[draftId] is a dynamic route the service worker has no generic
+    // cache entry for — if this draftId's view page was never visited online
+    // before, navigating there while offline fails as a hard navigation (no
+    // cached match), which blows away the whole SPA and looks to the user
+    // like the save itself was lost. Only navigate when there's a real
+    // chance the network request succeeds.
+    if (online) {
+      router.push(`/quotes/${draftId}`);
+    }
   }
 
   async function handleSave() {

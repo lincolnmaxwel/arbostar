@@ -1,3 +1,18 @@
+// Stamped into the two custom runtime-cache names below so every deploy gets
+// a brand-new Cache Storage namespace. Without this, a cached page shell from
+// an OLDER deploy (referencing that build's content-hashed JS chunk URLs)
+// keeps being served by NetworkFirst's offline fallback indefinitely — old
+// runtime caches are never cleared on SW update (only the precache manifest
+// is, via cleanupOutdatedCaches()). Since Next.js deletes each build's old
+// hashed chunks, a stale cached shell's script tags 404 once actually
+// executed, breaking the page in a way that looks "random" (works or not
+// depending on whether this exact device happened to cache a shell from the
+// latest build). A fresh cache name per build means a stale shell is just
+// orphaned and ignored, not served — the cost is that the very first offline
+// visit after a new deploy needs one prior online visit to prime the new
+// cache, same as it already did for a brand new install.
+const BUILD_CACHE_VERSION = String(Date.now());
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
@@ -27,7 +42,7 @@ const withPWA = require('next-pwa')({
       urlPattern: ({ url }) => self.origin === url.origin && url.pathname === '/quotes/new',
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'quote-builder',
+        cacheName: `quote-builder-${BUILD_CACHE_VERSION}`,
         matchOptions: { ignoreSearch: true },
         networkTimeoutSeconds: 3,
       },
@@ -53,7 +68,7 @@ const withPWA = require('next-pwa')({
       },
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'quote-view',
+        cacheName: `quote-view-${BUILD_CACHE_VERSION}`,
         networkTimeoutSeconds: 3,
         plugins: [
           {
@@ -65,6 +80,18 @@ const withPWA = require('next-pwa')({
             },
           },
         ],
+      },
+    },
+    {
+      // The Quotes list itself — same stale-shell-after-a-deploy risk as the
+      // two rules above (falls under next-pwa's generic 'others' cache
+      // otherwise, whose name never changes across deploys), and it's the
+      // very first page most offline sessions land on.
+      urlPattern: ({ url }) => self.origin === url.origin && url.pathname === '/quotes',
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: `quote-list-${BUILD_CACHE_VERSION}`,
+        networkTimeoutSeconds: 3,
       },
     },
     ...require('next-pwa/cache'),

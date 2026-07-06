@@ -156,6 +156,13 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     updateItem(itemId, { photoIds: [...currentItem.photoIds, ...newPhotoIds] });
   }
 
+  function removePhoto(itemId: string, photoId: string) {
+    const currentItem = formState!.items.find((i) => i.id === itemId);
+    if (!currentItem) return;
+    localDb.photos.delete(photoId);
+    updateItem(itemId, { photoIds: currentItem.photoIds.filter((id) => id !== photoId) });
+  }
+
   async function submit(pendingSend: boolean) {
     // .put() (not .update()) so this is safe even if the user typed fast
     // enough to click a submit button before the debounced persist() ever
@@ -247,13 +254,22 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                     {item.photoIds.map((photoId) => {
                       if (!photoUrls[photoId]) return null;
                       return (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={photoId}
-                          src={photoUrls[photoId]}
-                          className={styles.photoThumb}
-                          alt=""
-                        />
+                        <div key={photoId} className={styles.photoThumbWrap}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photoUrls[photoId]}
+                            className={styles.photoThumb}
+                            alt=""
+                          />
+                          <button
+                            type="button"
+                            className={styles.photoThumbRemove}
+                            onClick={() => removePhoto(item.id, photoId)}
+                            aria-label="Remove photo"
+                          >
+                            &times;
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

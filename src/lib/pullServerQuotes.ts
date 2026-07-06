@@ -44,6 +44,22 @@ export async function pullServerQuotes(): Promise<void> {
 
   const { quotes } = (await res.json()) as { quotes: ServerQuote[] };
   const pendingDeleteServerIds = new Set((await localDb.pendingDeletes.toArray()).map((p) => p.serverId));
+  const serverIds = new Set(quotes.map((q) => q.id));
+
+  // A quote deleted on another device (or by this one, once its own
+  // pendingDelete already flushed) simply stops appearing in this list. Mirror
+  // that locally: any fully-synced draft whose serverId no longer shows up
+  // server-side gets removed here too. Only 'synced' drafts qualify — a draft
+  // with its own unsynced local edits keeps existing until that edit resolves
+  // (same "don't clobber pending local work" rule as the refresh path below).
+  const localSynced = await localDb.drafts.where('status').equals('synced').toArray();
+  for (const local of localSynced) {
+    if (local.serverId && !serverIds.has(local.serverId)) {
+      const photoIds = local.items.flatMap((i) => i.photoIds);
+      if (photoIds.length > 0) await localDb.photos.bulkDelete(photoIds);
+      await localDb.drafts.delete(local.draftId);
+    }
+  }
 
   for (const q of quotes) {
     if (pendingDeleteServerIds.has(q.id)) continue;

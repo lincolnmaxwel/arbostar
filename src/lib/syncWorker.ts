@@ -1,6 +1,7 @@
 import { localDb } from '@/lib/localDb';
 import { dueEntries, recordFailure, markStuck, clearEntry } from '@/lib/outbox';
 import { flushPendingDeletes } from '@/lib/pendingDeletes';
+import { pullServerQuotes } from '@/lib/pullServerQuotes';
 
 async function isReallyOnline(): Promise<boolean> {
   try {
@@ -15,6 +16,11 @@ export async function runSyncCycle(): Promise<void> {
   if (!(await isReallyOnline())) return;
 
   await flushPendingDeletes();
+  // Runs every cycle (every 5s, plus on the 'online' event) app-wide via
+  // startSyncLoop — not just when the Quotes list happens to be open — so an
+  // edit or delete made on another device shows up here within a few seconds
+  // instead of only the next time this page is manually reloaded.
+  await pullServerQuotes();
 
   const entries = await dueEntries();
   for (const entry of entries) {

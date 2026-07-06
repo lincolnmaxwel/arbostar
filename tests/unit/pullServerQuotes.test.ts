@@ -89,4 +89,32 @@ describe('pullServerQuotes', () => {
 
     expect(await localDb.drafts.get('d1')).toBeUndefined();
   });
+
+  it('removes a fully-synced draft that was deleted on another device', async () => {
+    await localDb.photos.add({ id: 'photo-1', draftId: 'd1', blob: new Blob(['x']), fileName: 'p.jpg', status: 'uploaded' });
+    await localDb.drafts.put({
+      draftId: 'd1', serverId: 'server-1', clientName: 'Gone', clientEmail: 'a@x.com',
+      taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      items: [{ id: 'item-1', serverItemId: 'server-item-1', title: 'Hedges', price: 100, photoIds: ['photo-1'] }],
+    });
+    // Server list no longer contains server-1 -> it was deleted elsewhere.
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [] }) });
+
+    await pullServerQuotes();
+
+    expect(await localDb.drafts.get('d1')).toBeUndefined();
+    expect(await localDb.photos.get('photo-1')).toBeUndefined();
+  });
+
+  it('does not remove a local draft with unsynced changes even if absent from the server list', async () => {
+    await localDb.drafts.put({
+      draftId: 'd1', serverId: 'server-1', clientName: 'Still Editing', clientEmail: 'a@x.com',
+      taxRate: 0.05, status: 'local', updatedAt: Date.now(), items: [],
+    });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [] }) });
+
+    await pullServerQuotes();
+
+    expect(await localDb.drafts.get('d1')).toBeDefined();
+  });
 });

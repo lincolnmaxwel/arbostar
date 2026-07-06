@@ -4,10 +4,38 @@ import { localDb } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft } from '@/lib/outbox';
 import { runSyncCycle } from '@/lib/syncWorker';
 
+// runSyncCycle also health-checks and pulls the server's quote list every
+// cycle (for cross-device sync), in addition to POSTing due outbox entries —
+// so tests route by URL/method instead of a fixed positional call sequence.
+function mockFetch({
+  health = true,
+  pull = { quotes: [] },
+  post,
+}: {
+  health?: boolean;
+  pull?: unknown;
+  post?: (body: any) => { ok: boolean; status: number; json?: () => Promise<any> };
+}) {
+  return vi.fn(async (url: string, opts?: RequestInit) => {
+    if (url === '/api/health') {
+      return { ok: health, status: health ? 200 : 503 };
+    }
+    if (url === '/api/quotes' && (!opts || !opts.method)) {
+      return { ok: true, json: async () => pull };
+    }
+    if (url === '/api/quotes' && opts?.method === 'POST') {
+      const body = JSON.parse(opts.body as string);
+      return post!(body);
+    }
+    throw new Error(`unexpected fetch: ${url} ${opts?.method ?? 'GET'}`);
+  });
+}
+
 describe('runSyncCycle', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.outbox.clear();
+    await localDb.pendingDeletes.clear();
   });
 
   it('syncs a due draft successfully and clears the outbox entry', async () => {
@@ -16,9 +44,9 @@ describe('runSyncCycle', () => {
     });
     await enqueueSync('d1');
 
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 }) // /api/health HEAD
-      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ quote: { id: 'server-1', items: [] } }) }); // POST
+    global.fetch = mockFetch({
+      post: () => ({ ok: true, status: 201, json: async () => ({ quote: { id: 'server-1', items: [] } }) }),
+    }) as any;
 
     await runSyncCycle();
 
@@ -34,9 +62,7 @@ describe('runSyncCycle', () => {
     });
     await enqueueSync('d2');
 
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: false, status: 409 });
+    global.fetch = mockFetch({ post: () => ({ ok: false, status: 409 }) }) as any;
 
     await runSyncCycle();
 
@@ -52,9 +78,12 @@ describe('runSyncCycle', () => {
     });
     await enqueueSync('d3');
 
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockRejectedValueOnce(new Error('network down'));
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (url === '/api/health') return { ok: true, status: 200 };
+      if (url === '/api/quotes' && (!opts || !opts.method)) return { ok: true, json: async () => ({ quotes: [] }) };
+      if (url === '/api/quotes' && opts?.method === 'POST') throw new Error('network down');
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as any;
 
     await runSyncCycle();
 
@@ -72,15 +101,17 @@ describe('runSyncCycle', () => {
     });
     await enqueueSync('d5');
 
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ quote: { id: 'server-5', items: [] } }) });
+    let capturedBody: any;
+    global.fetch = mockFetch({
+      post: (body) => {
+        capturedBody = body;
+        return { ok: true, status: 200, json: async () => ({ quote: { id: 'server-5', items: [] } }) };
+      },
+    }) as any;
 
     await runSyncCycle();
 
-    const postCall = (global.fetch as any).mock.calls[1];
-    const body = JSON.parse(postCall[1].body);
-    expect(body.send).toBe(true);
+    expect(capturedBody.send).toBe(true);
 
     const draft = await localDb.drafts.get('d5');
     expect(draft?.pendingSend).toBe(false);
@@ -92,15 +123,17 @@ describe('runSyncCycle', () => {
     });
     await enqueueSync('d6');
 
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200 })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ quote: { id: 'server-6', items: [] } }) });
+    let capturedBody: any;
+    global.fetch = mockFetch({
+      post: (body) => {
+        capturedBody = body;
+        return { ok: true, status: 200, json: async () => ({ quote: { id: 'server-6', items: [] } }) };
+      },
+    }) as any;
 
     await runSyncCycle();
 
-    const postCall = (global.fetch as any).mock.calls[1];
-    const body = JSON.parse(postCall[1].body);
-    expect(body.send).toBe(false);
+    expect(capturedBody.send).toBe(false);
   });
 
   it('does nothing when the health check fails (offline)', async () => {
@@ -116,5 +149,26 @@ describe('runSyncCycle', () => {
     const draft = await localDb.drafts.get('d4');
     expect(draft?.status).toBe('syncing');
     expect(await getEntryForDraft('d4')).toBeDefined();
+  });
+
+  it('pulls and applies another device\'s edit within the same cycle', async () => {
+    await localDb.drafts.put({
+      draftId: 'd7', serverId: 'server-7', clientName: 'Old Name', clientEmail: 'a@x.com',
+      taxRate: 0.05, status: 'synced', updatedAt: Date.now() - 60_000, items: [],
+    });
+
+    global.fetch = mockFetch({
+      pull: {
+        quotes: [{
+          id: 'server-7', draftId: 'd7', client: { name: 'New Name', email: 'a@x.com' },
+          taxRate: '0.05', items: [], updatedAt: new Date().toISOString(),
+        }],
+      },
+    }) as any;
+
+    await runSyncCycle();
+
+    const draft = await localDb.drafts.get('d7');
+    expect(draft?.clientName).toBe('New Name');
   });
 });

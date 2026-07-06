@@ -26,6 +26,7 @@ const upsertQuoteSchema = z.object({
   clientEmail: z.string().email(),
   clientPhone: z.string().optional(),
   clientAddress: z.string().optional(),
+  serviceAddress: z.string().optional(),
   taxRate: z.number().min(0).max(1),
   items: z.array(quoteItemSchema).min(1),
   clientUpdatedAt: z.number().optional(),
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
           total: totals.total,
+          serviceAddress: data.serviceAddress,
           status: data.send ? 'sent' : 'draft',
           sentAt: data.send ? new Date() : null,
         },
@@ -83,6 +85,7 @@ export async function POST(req: NextRequest) {
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
           total: totals.total,
+          serviceAddress: data.serviceAddress,
           // Only a still-unsent quote transitions on "send"; re-saving an
           // already sent/approved/declined quote never reverts its status —
           // "Save and Send" on one of those just resends the email below.
@@ -157,6 +160,7 @@ export async function POST(req: NextRequest) {
       taxRate: Number(quote.taxRate),
       taxAmount: Number(quote.taxAmount),
       total: Number(quote.total),
+      serviceAddress: quote.serviceAddress ?? undefined,
     });
   }
 

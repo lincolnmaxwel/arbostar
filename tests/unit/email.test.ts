@@ -55,6 +55,24 @@ describe('sendQuoteApprovalEmail', () => {
     expect(call.html).toContain('$1,837.50');
   });
 
+  it('includes the service address when provided', async () => {
+    await sendQuoteApprovalEmail({
+      to: 'nelson@example.com',
+      clientName: 'Nelson Costa',
+      portalUrl: 'http://localhost:3000/portal/abc-123',
+      items: [{ title: 'Hedges', price: 500 }],
+      subtotal: 500,
+      taxRate: 0.05,
+      taxAmount: 25,
+      total: 525,
+      serviceAddress: '123 Oak St, Springfield',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.text).toContain('123 Oak St, Springfield');
+    expect(call.html).toContain('123 Oak St, Springfield');
+  });
+
   it('escapes HTML in item titles/descriptions and client name', async () => {
     await sendQuoteApprovalEmail({
       to: 'x@example.com',
@@ -179,6 +197,38 @@ describe('sendQuoteDecisionNotificationEmail', () => {
     const call = sendMailMock.mock.calls[0][0];
     expect(call.html).not.toContain('<b>Nelson</b>');
     expect(call.html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
+  });
+
+  it('includes the client phone and service address when provided', async () => {
+    await sendQuoteDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Nelson Costa',
+      clientPhone: '(555) 123-4567',
+      serviceAddress: '123 Oak St, Springfield',
+      quoteNumber: 5,
+      decision: 'approved',
+      quoteUrl: 'http://localhost:3000/quotes/draft-5',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.text).toContain('(555) 123-4567');
+    expect(call.text).toContain('123 Oak St, Springfield');
+    expect(call.html).toContain('(555) 123-4567');
+    expect(call.html).toContain('123 Oak St, Springfield');
+  });
+
+  it('omits the contact block entirely when phone and address are absent', async () => {
+    await sendQuoteDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Nelson Costa',
+      quoteNumber: 6,
+      decision: 'approved',
+      quoteUrl: 'http://localhost:3000/quotes/draft-6',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.text).not.toContain('Phone:');
+    expect(call.html).not.toContain('Phone:');
   });
 });
 

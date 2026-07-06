@@ -78,6 +78,8 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       await sendBookingDecisionNotificationEmail({
         to: quote.createdBy.notificationEmail || quote.createdBy.email,
         clientName: quote.client.name,
+        clientPhone: quote.client.phone ?? undefined,
+        serviceAddress: quote.serviceAddress ?? undefined,
         quoteNumber: quote.number,
         quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
         decision: 'confirmed',
@@ -108,6 +110,8 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     await sendBookingDecisionNotificationEmail({
       to: quote.createdBy.notificationEmail || quote.createdBy.email,
       clientName: quote.client.name,
+      clientPhone: quote.client.phone ?? undefined,
+      serviceAddress: quote.serviceAddress ?? undefined,
       quoteNumber: quote.number,
       quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
       decision: 'rejected',

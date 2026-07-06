@@ -39,6 +39,7 @@ export async function runSyncCycle(): Promise<void> {
           clientEmail: draft.clientEmail,
           clientPhone: draft.clientPhone,
           clientAddress: draft.clientAddress,
+          serviceAddress: draft.serviceAddress,
           taxRate: draft.taxRate,
           items: draft.items.map((i) => ({ localItemId: i.id, title: i.title, description: i.description, price: i.price })),
           clientUpdatedAt: draft.updatedAt,

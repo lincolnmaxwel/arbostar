@@ -90,6 +90,10 @@ model Quote {
   taxAmount   Decimal     @db.Decimal(10, 2) @default(0)
   total       Decimal     @db.Decimal(10, 2) @default(0)
   publicToken String      @unique @default(uuid())
+  // Where the work happens — kept on the Quote, not the Client, since the
+  // same client can request quotes for different properties (rental, a
+  // second home, a job for someone else's address, etc).
+  serviceAddress   String?
   bookingStatus    BookingStatus @default(idle)
   scheduledDate    DateTime?
   scheduledWindow  DayWindow?

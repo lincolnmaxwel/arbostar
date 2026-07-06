@@ -67,6 +67,7 @@ Email SMTP config is env-driven (`SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`FROM
 
 - `Quote.status` enum: `draft | sent | approved | declined | expired`. `sent` is the client-facing "Pending" state.
 - `Client.email` is unique — client resolution is `upsert`, not a racy find-then-create.
+- `Quote.serviceAddress` (where the work happens) lives on the Quote, not the Client — `Client.phone`/`Client.address` are the client's own contact info, but the same client can request quotes for different properties. The builder form's Client phone field masks input to `(xxx) xxx-xxxx` client-side (`src/lib/formatPhone.ts`) as the user types; the stored value is the masked string itself, not raw digits.
 - Money/rate fields are Prisma `Decimal`; convert with `Number(x)` before arithmetic or JSON responses.
 - Scope note: this is sub-project 1 of a larger system (client portal is included; order/scheduling conversion and invoicing are separate, not-yet-built sub-projects per the original spec).
 

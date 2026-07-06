@@ -16,6 +16,10 @@ export interface DraftQuote {
   clientEmail: string;
   clientPhone?: string;
   clientAddress?: string;
+  // Where the work happens — distinct from clientAddress (the client's own
+  // contact address), since the same client can request quotes for
+  // different properties.
+  serviceAddress?: string;
   items: DraftQuoteItem[];
   taxRate: number;
   status: 'local' | 'syncing' | 'synced' | 'error';

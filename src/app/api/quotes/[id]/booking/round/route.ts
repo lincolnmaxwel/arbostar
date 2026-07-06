@@ -80,6 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       portalUrl,
       roundNumber: nextRoundNumber,
       options: parsed.data.options,
+      serviceAddress: quote.serviceAddress ?? undefined,
     });
   } catch (err) {
     // Round is already persisted; email failure is logged but not surfaced to

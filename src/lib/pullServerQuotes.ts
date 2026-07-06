@@ -12,6 +12,7 @@ interface ServerQuote {
   id: string;
   draftId: string;
   client: { name: string; email: string; phone?: string | null; address?: string | null };
+  serviceAddress?: string | null;
   taxRate: string | number;
   items: ServerQuoteItem[];
   updatedAt: string;
@@ -91,6 +92,7 @@ export async function pullServerQuotes(): Promise<void> {
       clientEmail: q.client.email,
       clientPhone: q.client.phone ?? undefined,
       clientAddress: q.client.address ?? undefined,
+      serviceAddress: q.serviceAddress ?? undefined,
       items,
       taxRate: Number(q.taxRate),
       status: 'synced',

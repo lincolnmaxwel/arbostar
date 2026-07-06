@@ -206,6 +206,13 @@ export function QuoteView({ draftId }: { draftId: string }) {
         {draft.clientAddress && <p className={styles.partyLine}>{draft.clientAddress}</p>}
       </div>
 
+      {draft.serviceAddress && (
+        <div className={styles.party}>
+          <h2 className={styles.partyLabel}>Service address</h2>
+          <p className={styles.partyLine}>{draft.serviceAddress}</p>
+        </div>
+      )}
+
       {draft.items.length === 0 ? (
         <p className={styles.emptyItems}>No services added yet.</p>
       ) : (

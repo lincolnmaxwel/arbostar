@@ -137,6 +137,34 @@ describe('/api/quotes', () => {
     expect(quoteBExists).toBeNull();
   });
 
+  it('persists clientPhone and serviceAddress, and updates them on resave', async () => {
+    const draftId = randomUUID();
+    const basePayload = {
+      draftId,
+      clientName: 'Nelson Costa',
+      clientEmail: `client-${draftId}@example.com`,
+      clientPhone: '(555) 123-4567',
+      serviceAddress: '123 Oak St, Springfield',
+      taxRate: 0.05,
+      items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+    };
+    await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify(basePayload) }) as any);
+
+    const created = await prisma.quote.findUniqueOrThrow({ where: { draftId }, include: { client: true } });
+    expect(created.serviceAddress).toBe('123 Oak St, Springfield');
+    expect(created.client.phone).toBe('(555) 123-4567');
+
+    await POST(
+      new Request('http://localhost/api/quotes', {
+        method: 'POST',
+        body: JSON.stringify({ ...basePayload, clientPhone: '(555) 999-0000', serviceAddress: '456 Elm St' }),
+      }) as any,
+    );
+    const updated = await prisma.quote.findUniqueOrThrow({ where: { draftId }, include: { client: true } });
+    expect(updated.serviceAddress).toBe('456 Elm St');
+    expect(updated.client.phone).toBe('(555) 999-0000');
+  });
+
   it('lists quotes', async () => {
     const res = await GET();
     expect(res.status).toBe(200);

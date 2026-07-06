@@ -9,6 +9,7 @@ function serverQuote(overrides: Partial<{
   price: string;
   updatedAt: string;
   localItemId: string;
+  serviceAddress: string;
 }> = {}) {
   const {
     id = 'server-1',
@@ -17,11 +18,13 @@ function serverQuote(overrides: Partial<{
     price = '100',
     updatedAt = new Date().toISOString(),
     localItemId = 'item-1',
+    serviceAddress,
   } = overrides;
   return {
     id,
     draftId,
     client: { name: clientName, email: 'a@x.com' },
+    serviceAddress,
     taxRate: '0.05',
     items: [{ id: 'server-item-1', localItemId, title: 'Hedges', price }],
     updatedAt,
@@ -43,6 +46,18 @@ describe('pullServerQuotes', () => {
     expect(draft?.clientName).toBe('A');
     expect(draft?.serverId).toBe('server-1');
     expect(draft?.status).toBe('synced');
+  });
+
+  it('inserts serviceAddress along with the rest of the quote', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ quotes: [serverQuote({ serviceAddress: '123 Oak St, Springfield' })] }),
+    });
+
+    await pullServerQuotes();
+
+    const draft = await localDb.drafts.get('d1');
+    expect(draft?.serviceAddress).toBe('123 Oak St, Springfield');
   });
 
   it('does not clobber a local draft that has unsynced changes', async () => {

@@ -11,6 +11,7 @@ import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { compressImage } from '@/lib/compressImage';
 import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
+import { formatPhoneInput } from '@/lib/formatPhone';
 import styles from './QuoteBuilderForm.module.css';
 
 function emptyDraft(draftId: string): DraftQuote {
@@ -221,6 +222,21 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
         <div className={styles.field}>
           <label htmlFor="clientEmail">Client email</label>
           <input id="clientEmail" type="email" className={styles.input} value={formState.clientEmail} onChange={(e) => updateField('clientEmail', e.target.value)} />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="clientPhone">Client phone</label>
+          <input
+            id="clientPhone"
+            type="tel"
+            className={styles.input}
+            placeholder="(555) 123-4567"
+            value={formState.clientPhone ?? ''}
+            onChange={(e) => updateField('clientPhone', formatPhoneInput(e.target.value))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="serviceAddress">Service address</label>
+          <input id="serviceAddress" className={styles.input} value={formState.serviceAddress ?? ''} onChange={(e) => updateField('serviceAddress', e.target.value)} />
         </div>
       </div>
 

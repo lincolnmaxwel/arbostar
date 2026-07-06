@@ -39,6 +39,7 @@ export interface SendQuoteApprovalEmailOptions {
   taxRate: number;
   taxAmount: number;
   total: number;
+  serviceAddress?: string;
 }
 
 function buildItemsHtml(items: SendQuoteApprovalEmailItem[]): string {
@@ -64,7 +65,7 @@ export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions
   const text = `Hi ${opts.clientName},
 
 Your estimate is ready for review.
-
+${opts.serviceAddress ? `\nService address: ${opts.serviceAddress}\n` : ''}
 ${buildItemsText(opts.items)}
 
 Subtotal: ${formatMoney(opts.subtotal)}
@@ -78,6 +79,7 @@ View and respond here: ${opts.portalUrl}
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>Your estimate is ready for review:</p>
+      ${opts.serviceAddress ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Service address: ${escapeHtml(opts.serviceAddress)}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <thead>
           <tr>
@@ -125,6 +127,7 @@ export interface SendBookingProposalEmailOptions {
   portalUrl: string;
   roundNumber: number;
   options: { date: string; window: 'morning' | 'afternoon' | 'fullday' }[];
+  serviceAddress?: string;
 }
 
 const WINDOW_LABEL: Record<'morning' | 'afternoon' | 'fullday', string> = {
@@ -162,7 +165,7 @@ export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOpt
   const text = `Hi ${opts.clientName},
 
 Your approved estimate is ready to schedule. Round ${opts.roundNumber} of date proposals:
-
+${opts.serviceAddress ? `\nService address: ${opts.serviceAddress}\n` : ''}
 ${buildOptionsText(opts.options)}
 
 Pick the one that works for you here: ${opts.portalUrl}
@@ -172,6 +175,7 @@ Pick the one that works for you here: ${opts.portalUrl}
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>Your approved estimate is ready to schedule. Here are ${opts.options.length === 1 ? 'the date option we have' : 'the date options we have'} for you (round ${opts.roundNumber}):</p>
+      ${opts.serviceAddress ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Service address: ${escapeHtml(opts.serviceAddress)}</p>` : ''}
       <table style="width:100%;border-collapse:separate;border-spacing:0 8px;margin:16px 0;">
         <tbody>${buildOptionsHtml(opts.options)}</tbody>
       </table>
@@ -205,17 +209,39 @@ Pick the one that works for you here: ${opts.portalUrl}
 export interface SendQuoteDecisionNotificationEmailOptions {
   to: string;
   clientName: string;
+  clientPhone?: string;
+  serviceAddress?: string;
   quoteNumber: number;
   decision: 'approved' | 'declined';
   quoteUrl: string;
 }
 
+function buildContactLinesText(clientPhone?: string, serviceAddress?: string): string {
+  const lines: string[] = [];
+  if (clientPhone) lines.push(`Phone: ${clientPhone}`);
+  if (serviceAddress) lines.push(`Service address: ${serviceAddress}`);
+  return lines.length > 0 ? `\n${lines.join('\n')}\n` : '';
+}
+
+function buildContactLinesHtml(clientPhone?: string, serviceAddress?: string): string {
+  const lines: string[] = [];
+  if (clientPhone) lines.push(`Phone: ${escapeHtml(clientPhone)}`);
+  if (serviceAddress) lines.push(`Service address: ${escapeHtml(serviceAddress)}`);
+  return lines.length > 0
+    ? `<p style="color:#6b7280;font-size:14px;margin:4px 0 0;">${lines.join('<br/>')}</p>`
+    : '';
+}
+
 export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecisionNotificationEmailOptions): Promise<void> {
   const verb = opts.decision === 'approved' ? 'approved' : 'declined';
-  const text = `${opts.clientName} just ${verb} quote #${opts.quoteNumber}.\n\nView it here: ${opts.quoteUrl}\n`;
+  const text = `${opts.clientName} just ${verb} quote #${opts.quoteNumber}.
+${buildContactLinesText(opts.clientPhone, opts.serviceAddress)}
+View it here: ${opts.quoteUrl}
+`;
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> just ${verb} quote #${opts.quoteNumber}.</p>
+      ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
         <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           View quote
@@ -241,6 +267,8 @@ export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecision
 export interface SendBookingDecisionNotificationEmailOptions {
   to: string;
   clientName: string;
+  clientPhone?: string;
+  serviceAddress?: string;
   quoteNumber: number;
   quoteUrl: string;
   decision: 'confirmed' | 'rejected';
@@ -255,10 +283,14 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
       ? `chose ${opts.scheduledDate ? formatOptionDate(opts.scheduledDate) : 'a date'}${opts.scheduledWindow ? ` (${WINDOW_LABEL[opts.scheduledWindow]})` : ''}`
       : `rejected the proposed dates${opts.rejectionReason ? `: "${opts.rejectionReason}"` : ''}`;
 
-  const text = `${opts.clientName} just ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${detail}.\n\nView it here: ${opts.quoteUrl}\n`;
+  const text = `${opts.clientName} just ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${detail}.
+${buildContactLinesText(opts.clientPhone, opts.serviceAddress)}
+View it here: ${opts.quoteUrl}
+`;
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${escapeHtml(detail)}.</p>
+      ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
         <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           View quote

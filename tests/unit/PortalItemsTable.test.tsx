@@ -26,7 +26,7 @@ describe('PortalItemsTable', () => {
     );
 
     expect(screen.getByText('Hedges')).toBeInTheDocument();
-    expect(screen.getByText('$1250.00')).toBeInTheDocument();
+    expect(screen.getByText('$1,250.00')).toBeInTheDocument();
 
     const thumbButtons = screen.getAllByLabelText('View photo for Hedges');
     expect(thumbButtons).toHaveLength(2);

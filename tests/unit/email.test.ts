@@ -42,12 +42,12 @@ describe('sendQuoteApprovalEmail', () => {
     expect(call.text).toContain('http://localhost:3000/portal/abc-123');
     expect(call.text).toContain('Hedges');
     expect(call.text).toContain('Trim the top');
-    expect(call.text).toContain('$1250.00');
-    expect(call.text).toContain('$1837.50');
+    expect(call.text).toContain('$1,250.00');
+    expect(call.text).toContain('$1,837.50');
     expect(call.html).toContain('http://localhost:3000/portal/abc-123');
     expect(call.html).toContain('Hedges');
     expect(call.html).toContain('Trim the top');
-    expect(call.html).toContain('$1837.50');
+    expect(call.html).toContain('$1,837.50');
   });
 
   it('escapes HTML in item titles/descriptions and client name', async () => {

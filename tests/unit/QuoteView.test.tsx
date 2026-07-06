@@ -38,9 +38,9 @@ describe('QuoteView', () => {
     await waitFor(() => expect(screen.getByText('Nelson Costa')).toBeInTheDocument());
     expect(screen.getByText('(250) 216-1006')).toBeInTheDocument();
     expect(screen.getByText('Trim the top')).toBeInTheDocument();
-    expect(screen.getByText('$1750.00')).toBeInTheDocument(); // subtotal
+    expect(screen.getByText('$1,750.00')).toBeInTheDocument(); // subtotal
     expect(screen.getByText('$87.50')).toBeInTheDocument(); // tax
-    expect(screen.getByText('$1837.50')).toBeInTheDocument(); // total
+    expect(screen.getByText('$1,837.50')).toBeInTheDocument(); // total
     expect(screen.getByTestId('sync-badge')).toHaveTextContent('Synced');
   });
 

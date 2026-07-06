@@ -12,3 +12,7 @@ export function calculateTotals(items: QuoteLineItem[], taxRate: number) {
   const total = round2(subtotal + taxAmount);
   return { subtotal, taxAmount, total };
 }
+
+export function formatMoney(value: number): string {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}

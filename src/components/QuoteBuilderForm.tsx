@@ -7,7 +7,7 @@ import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft, retryStuckEntry, clearEntry } from '@/lib/outbox';
 import { runSyncCycle } from '@/lib/syncWorker';
 import { debounce } from '@/lib/debounce';
-import { calculateTotals } from '@/lib/quoteMath';
+import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { compressImage } from '@/lib/compressImage';
 import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
@@ -288,15 +288,15 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       <div className={styles.totals}>
         <div className={styles.totalItem}>
           <div className={styles.totalItemLabel}>Subtotal</div>
-          <div className={styles.totalItemValue}>${totals.subtotal.toFixed(2)}</div>
+          <div className={styles.totalItemValue}>{formatMoney(totals.subtotal)}</div>
         </div>
         <div className={styles.totalItem}>
           <div className={styles.totalItemLabel}>Tax ({(formState.taxRate * 100).toFixed(1)}%)</div>
-          <div className={styles.totalItemValue}>${totals.taxAmount.toFixed(2)}</div>
+          <div className={styles.totalItemValue}>{formatMoney(totals.taxAmount)}</div>
         </div>
         <div className={styles.totalItem}>
           <div className={styles.totalItemLabel}>Total</div>
-          <div className={styles.totalItemValueGrand}>${totals.total.toFixed(2)}</div>
+          <div className={styles.totalItemValueGrand}>{formatMoney(totals.total)}</div>
         </div>
       </div>
 

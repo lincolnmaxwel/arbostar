@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatMoney } from '@/lib/quoteMath';
 import styles from '@/app/portal/[token]/portal.module.css';
 
 export interface PortalItem {
@@ -79,7 +80,7 @@ export function PortalItemsTable({ items }: { items: PortalItem[] }) {
                   </div>
                 )}
               </td>
-              <td className={styles.priceCol}>${item.price.toFixed(2)}</td>
+              <td className={styles.priceCol}>{formatMoney(item.price)}</td>
             </tr>
           ))}
         </tbody>

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
+import { formatMoney } from '@/lib/quoteMath';
 import { PortalActions } from '@/components/PortalActions';
 import { PortalItemsTable } from '@/components/PortalItemsTable';
 import { BookingPicker } from '@/components/BookingPicker';
@@ -83,15 +84,15 @@ export default async function PortalPage({ params }: { params: { token: string }
         <div className={styles.totals}>
           <div className={styles.totalRow}>
             <span>Subtotal</span>
-            <span>${Number(quote.subtotal).toFixed(2)}</span>
+            <span>{formatMoney(Number(quote.subtotal))}</span>
           </div>
           <div className={styles.totalRow}>
             <span>Tax ({(Number(quote.taxRate) * 100).toFixed(1)}%)</span>
-            <span>${Number(quote.taxAmount).toFixed(2)}</span>
+            <span>{formatMoney(Number(quote.taxAmount))}</span>
           </div>
           <div className={`${styles.totalRow} ${styles.grandTotal}`}>
             <span>Total</span>
-            <span>${Number(quote.total).toFixed(2)}</span>
+            <span>{formatMoney(Number(quote.total))}</span>
           </div>
         </div>
 

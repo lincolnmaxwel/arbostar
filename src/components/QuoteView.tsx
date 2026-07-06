@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
-import { calculateTotals } from '@/lib/quoteMath';
+import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import styles from './QuoteView.module.css';
 
@@ -242,7 +242,7 @@ export function QuoteView({ draftId }: { draftId: string }) {
                     </div>
                   )}
                 </td>
-                <td className={styles.priceCol}>${item.price.toFixed(2)}</td>
+                <td className={styles.priceCol}>{formatMoney(item.price)}</td>
               </tr>
             ))}
           </tbody>
@@ -252,15 +252,15 @@ export function QuoteView({ draftId }: { draftId: string }) {
       <div className={styles.totals}>
         <div className={styles.totalRow}>
           <span>Subtotal</span>
-          <span>${totals.subtotal.toFixed(2)}</span>
+          <span>{formatMoney(totals.subtotal)}</span>
         </div>
         <div className={styles.totalRow}>
           <span>Tax ({(draft.taxRate * 100).toFixed(1)}%)</span>
-          <span>${totals.taxAmount.toFixed(2)}</span>
+          <span>{formatMoney(totals.taxAmount)}</span>
         </div>
         <div className={`${styles.totalRow} ${styles.grandTotal}`}>
           <span>Total</span>
-          <span>${totals.total.toFixed(2)}</span>
+          <span>{formatMoney(totals.total)}</span>
         </div>
       </div>
 

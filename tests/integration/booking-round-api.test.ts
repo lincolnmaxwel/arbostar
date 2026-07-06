@@ -9,7 +9,7 @@ vi.mock('@/lib/email', () => ({
 
 import { getServerSession } from 'next-auth';
 import { sendBookingProposalEmail } from '@/lib/email';
-import { GET as getBooking, POST as createRound } from '@/app/api/quotes/[id]/booking/round/route';
+import { POST as createRound } from '@/app/api/quotes/[id]/booking/round/route';
 import { GET as getBookingState } from '@/app/api/quotes/[id]/booking/route';
 import { prisma } from '@/lib/db';
 

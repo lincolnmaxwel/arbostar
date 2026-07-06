@@ -1,5 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" covers local dev outside Docker; linux-musl-openssl-3.0.x covers
+  // the node:20-alpine deploy image (Alpine ships OpenSSL 3.x, not 1.1) — without
+  // this, Prisma's engine can fail to detect libssl in some container/host
+  // combinations and crash with a non-JSON "Error loading..." response.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

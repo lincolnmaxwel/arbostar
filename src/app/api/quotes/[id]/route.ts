@@ -25,7 +25,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   // QuoteItem/QuotePhoto rows cascade via the schema's onDelete: Cascade.
   await prisma.quote.delete({ where: { id: params.id } });
 
-  const dir = path.join(process.cwd(), 'public', 'uploads', 'quotes', params.id);
+  const dir = path.join(process.cwd(), 'uploads', 'quotes', params.id);
   await rm(dir, { recursive: true, force: true }).catch(() => {});
 
   return NextResponse.json({ ok: true });

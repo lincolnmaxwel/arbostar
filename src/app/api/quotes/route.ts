@@ -145,6 +145,12 @@ export async function POST(req: NextRequest) {
       to: client.email,
       clientName: client.name,
       portalUrl,
+      items: quote.items
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((item) => ({ title: item.title, description: item.description, price: Number(item.price) })),
+      subtotal: Number(quote.subtotal),
+      taxRate: Number(quote.taxRate),
+      taxAmount: Number(quote.taxAmount),
       total: Number(quote.total),
     });
   }

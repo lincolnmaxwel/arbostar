@@ -20,14 +20,18 @@ export async function POST(req: NextRequest) {
   const item = await prisma.quoteItem.findUnique({ where: { id: quoteItemId } });
   if (!item) return NextResponse.json({ error: 'quote item not found' }, { status: 404 });
 
-  const dir = path.join(process.cwd(), 'public', 'uploads', 'quotes', item.quoteId);
+  // Written under a top-level uploads/ directory (not public/) and served via
+  // /api/uploads/... — see that route for why: next start only scans public/
+  // once at boot, so files written after startup (every real upload) would
+  // 404 until the whole app restarts.
+  const dir = path.join(process.cwd(), 'uploads', 'quotes', item.quoteId);
   await mkdir(dir, { recursive: true });
   const fileName = `${randomUUID()}.jpg`;
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(dir, fileName), buffer);
 
   const photo = await prisma.quotePhoto.create({
-    data: { quoteItemId, filePath: `/uploads/quotes/${item.quoteId}/${fileName}`, sortOrder: 0 },
+    data: { quoteItemId, filePath: `/api/uploads/quotes/${item.quoteId}/${fileName}`, sortOrder: 0 },
   });
 
   return NextResponse.json({ photo }, { status: 201 });

@@ -1,7 +1,7 @@
 node_modules
 .next
 .env
-/public/uploads
+/uploads
 /public/sw.js
 /public/workbox-*.js
 /test-results

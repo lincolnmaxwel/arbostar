@@ -37,11 +37,11 @@ describe('/api/quotes/photos', () => {
   afterAll(async () => {
     await prisma.quote.delete({ where: { id: quoteId } });
     await prisma.user.delete({ where: { id: userId } });
-    const dir = path.join(process.cwd(), 'public', 'uploads', 'quotes', quoteId);
+    const dir = path.join(process.cwd(), 'uploads', 'quotes', quoteId);
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   });
 
-  it('stores the uploaded file and creates a QuotePhoto row', async () => {
+  it('stores the uploaded file outside public/ and creates a QuotePhoto row pointing at the serving API route', async () => {
     const form = new FormData();
     form.set('quoteItemId', quoteItemId);
     form.set('file', new Blob([Buffer.from([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }), 'photo.jpg');
@@ -50,9 +50,13 @@ describe('/api/quotes/photos', () => {
     const res = await POST(req as any);
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.photo.filePath).toMatch(new RegExp(`^/uploads/quotes/${quoteId}/`));
+    expect(body.photo.filePath).toMatch(new RegExp(`^/api/uploads/quotes/${quoteId}/`));
 
-    const filePath = path.join(process.cwd(), 'public', body.photo.filePath);
+    // Written under uploads/ (project root), not public/uploads/ — files under
+    // public/ are only picked up by `next start` at boot, so a real upload
+    // written after the server is already running would 404 forever.
+    const fileName = body.photo.filePath.split('/').pop();
+    const filePath = path.join(process.cwd(), 'uploads', 'quotes', quoteId, fileName);
     expect(existsSync(filePath)).toBe(true);
   });
 });

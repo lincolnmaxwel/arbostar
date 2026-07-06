@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { PortalActions } from '@/components/PortalActions';
+import { PortalItemsTable } from '@/components/PortalItemsTable';
 import styles from './portal.module.css';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -41,33 +42,15 @@ export default async function PortalPage({ params }: { params: { token: string }
           {quote.client.address && <p className={styles.partyLine}>{quote.client.address}</p>}
         </div>
 
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Proposed work</th>
-              <th className={styles.priceCol}>Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quote.items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <div className={styles.itemTitle}>{item.title}</div>
-                  {item.description && <div className={styles.itemDescription}>{item.description}</div>}
-                  {item.photos.length > 0 && (
-                    <div className={styles.photos}>
-                      {item.photos.map((photo) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.filePath} className={styles.photoThumb} alt="" />
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td className={styles.priceCol}>${Number(item.price).toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <PortalItemsTable
+          items={quote.items.map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            price: Number(item.price),
+            photos: item.photos.map((photo) => ({ id: photo.id, filePath: photo.filePath })),
+          }))}
+        />
 
         <div className={styles.totals}>
           <div className={styles.totalRow}>

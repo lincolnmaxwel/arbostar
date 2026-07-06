@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import QuotesListPage from '@/app/quotes/page';
 import { localDb } from '@/lib/localDb';
 
@@ -43,5 +43,35 @@ describe('QuotesListPage', () => {
     render(<QuotesListPage />);
     await waitFor(() => expect(screen.getByText('Approved Client')).toBeInTheDocument());
     expect(screen.getByTestId('quote-status-badge')).toHaveTextContent('Pending scheduling');
+  });
+
+  it('filters by name, phone, address, email, and status', async () => {
+    await localDb.drafts.put({
+      draftId: 'd4', serverId: 'server-4', clientName: 'Nelson Costa', clientEmail: 'nelson@x.com',
+      clientPhone: '(555) 123-4567', clientAddress: '1 Main St', serviceAddress: '99 Oak Ave',
+      items: [], taxRate: 0.05, status: 'synced', approvalStatus: 'sent', bookingStatus: 'idle', updatedAt: Date.now(),
+    });
+    await localDb.drafts.put({
+      draftId: 'd5', serverId: 'server-5', clientName: 'Maria Silva', clientEmail: 'maria@x.com',
+      clientPhone: '(555) 999-0000', items: [], taxRate: 0.05, status: 'synced', approvalStatus: 'approved', bookingStatus: 'idle', updatedAt: Date.now(),
+    });
+    render(<QuotesListPage />);
+    await waitFor(() => expect(screen.getByText('Nelson Costa')).toBeInTheDocument());
+    const search = screen.getByLabelText('Search quotes');
+
+    fireEvent.change(search, { target: { value: 'oak ave' } });
+    expect(screen.getByText('Nelson Costa')).toBeInTheDocument();
+    expect(screen.queryByText('Maria Silva')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '999-0000' } });
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument();
+    expect(screen.queryByText('Nelson Costa')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'pending approval' } });
+    expect(screen.getByText('Nelson Costa')).toBeInTheDocument();
+    expect(screen.queryByText('Maria Silva')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'no such client' } });
+    expect(screen.getByText(/No quotes match/)).toBeInTheDocument();
   });
 });

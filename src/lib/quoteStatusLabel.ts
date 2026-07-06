@@ -31,3 +31,24 @@ export function getQuoteStatusLabel(
   if (bookingStatus === 'rejected') return { label: 'Scheduling declined', variant: 'schedulingDeclined' };
   return { label: 'Approved', variant: 'approved' };
 }
+
+const SYNC_STATUS_LABELS: Record<'local' | 'syncing' | 'synced' | 'error', string> = {
+  local: 'Local',
+  syncing: 'Syncing...',
+  synced: 'Synced',
+  error: 'Sync error',
+};
+
+// The exact text shown in the Status column for a given draft — used by the
+// Quotes list search so typing a status word ("approved", "pending", "local")
+// matches the same thing the user sees, whichever badge is actually showing.
+export function getDraftDisplayStatus(draft: {
+  pendingDelete?: boolean;
+  status: 'local' | 'syncing' | 'synced' | 'error';
+  approvalStatus?: ApprovalStatus;
+  bookingStatus?: BookingStatus;
+}): string {
+  if (draft.pendingDelete) return 'Queued for deletion';
+  if (draft.status !== 'synced') return SYNC_STATUS_LABELS[draft.status];
+  return getQuoteStatusLabel(draft.approvalStatus, draft.bookingStatus).label;
+}

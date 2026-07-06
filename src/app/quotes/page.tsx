@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { QuoteStatusBadge } from '@/components/QuoteStatusBadge';
+import { getDraftDisplayStatus } from '@/lib/quoteStatusLabel';
 import { deleteDraft } from '@/lib/deleteQuote';
 import { cancelPendingDelete } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
@@ -13,7 +14,20 @@ import { NewQuoteLink } from '@/components/NewQuoteLink';
 import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
-  const drafts = useLiveQuery(() => localDb.drafts.orderBy('updatedAt').reverse().toArray(), []) ?? [];
+  const allDrafts = useLiveQuery(() => localDb.drafts.orderBy('updatedAt').reverse().toArray(), []) ?? [];
+  const [search, setSearch] = useState('');
+
+  const drafts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allDrafts;
+    return allDrafts.filter((d) => {
+      const haystack = [d.clientName, d.clientPhone, d.clientEmail, d.clientAddress, d.serviceAddress, getDraftDisplayStatus(d)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [allDrafts, search]);
 
   // This list is otherwise a pure IndexedDB view — a quote synced from another
   // device never appears here on its own. Pull the server's list on mount and
@@ -42,10 +56,25 @@ export default function QuotesListPage() {
         <NewQuoteLink className={styles.newButton}>+ New quote</NewQuoteLink>
       </div>
 
-      {drafts.length === 0 ? (
+      {allDrafts.length > 0 && (
+        <input
+          type="search"
+          className={styles.searchInput}
+          placeholder="Search by name, phone, address, email, or status"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search quotes"
+        />
+      )}
+
+      {allDrafts.length === 0 ? (
         <div className={styles.empty}>
           <p>No quotes yet.</p>
           <NewQuoteLink className={styles.newButton}>Create your first quote</NewQuoteLink>
+        </div>
+      ) : drafts.length === 0 ? (
+        <div className={styles.empty}>
+          <p>No quotes match &quot;{search}&quot;.</p>
         </div>
       ) : (
         <table className={styles.table}>

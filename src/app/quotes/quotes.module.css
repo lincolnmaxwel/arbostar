@@ -110,6 +110,38 @@
   background: var(--color-error-bg);
 }
 
+.pendingDeleteRow {
+  opacity: 0.6;
+}
+
+.pendingDeleteBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.cancelDeleteButton {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.cancelDeleteButton:hover {
+  border-color: var(--color-text-secondary);
+}
+
 @media (max-width: 640px) {
   .table thead {
     display: none;

@@ -75,3 +75,7 @@ Email SMTP config is env-driven (`SMTP_HOST`/`PORT`/`SECURE`/`USER`/`PASS`/`FROM
 ### Github
 
 - Sempre que realizar alterações no sistema, deve realiar o commit dessas alteracoes para o repo https://github.com/lincolnmaxwel/arbostar e na sequencia realiazr o push para branch master.
+
+### Idioma
+
+Qualquer texto que for adicionado ao sistema precisa ser em ingles. Mesmo eu pedindo em portugues, faça a tradução e deixe todo o texto para o usuario em ingle

@@ -24,6 +24,13 @@ export interface DraftQuote {
   // clicked and this sync should tell the server to email the client. The
   // sync worker clears it back to false once that specific POST completes.
   pendingSend?: boolean;
+  // Set while a delete is queued in `pendingDeletes` but hasn't flushed to
+  // the server yet (offline, or the DELETE request failed). The draft row
+  // stays visible — with this flag — instead of vanishing immediately, so
+  // the Quotes list can show "pending deletion" and offer Cancel; the row is
+  // only actually removed once flushPendingDeletes() confirms the server
+  // copy is gone.
+  pendingDelete?: boolean;
 }
 
 export interface DraftPhoto {

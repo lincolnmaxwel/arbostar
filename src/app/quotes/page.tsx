@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { deleteDraft } from '@/lib/deleteQuote';
+import { cancelPendingDelete } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 import { NewQuoteLink } from '@/components/NewQuoteLink';
 import styles from './quotes.module.css';
@@ -26,6 +27,11 @@ export default function QuotesListPage() {
     const label = draft.clientName || 'this quote';
     if (!window.confirm(`Delete ${label}? This can't be undone.`)) return;
     await deleteDraft(draft);
+  }
+
+  async function handleCancelDelete(draft: (typeof drafts)[number]) {
+    if (!draft.serverId) return;
+    await cancelPendingDelete(draft.serverId, draft.draftId);
   }
 
   return (
@@ -52,7 +58,7 @@ export default function QuotesListPage() {
           </thead>
           <tbody>
             {drafts.map((d) => (
-              <tr key={d.draftId}>
+              <tr key={d.draftId} className={d.pendingDelete ? styles.pendingDeleteRow : ''}>
                 <td>
                   <Link
                     href={d.serverId ? `/quotes/${d.draftId}` : `/quotes/new?draft=${d.draftId}`}
@@ -62,12 +68,26 @@ export default function QuotesListPage() {
                   </Link>
                   {d.clientEmail && <div className={styles.clientEmail}>{d.clientEmail}</div>}
                 </td>
-                <td><SyncStatusBadge status={d.status} /></td>
+                <td>
+                  {d.pendingDelete ? (
+                    <span className={styles.pendingDeleteBadge} data-testid="pending-delete-badge">
+                      Queued for deletion
+                    </span>
+                  ) : (
+                    <SyncStatusBadge status={d.status} />
+                  )}
+                </td>
                 <td>{new Date(d.updatedAt).toLocaleDateString()}</td>
                 <td>
-                  <button type="button" className={styles.deleteButton} onClick={() => handleDelete(d)}>
-                    Delete
-                  </button>
+                  {d.pendingDelete ? (
+                    <button type="button" className={styles.cancelDeleteButton} onClick={() => handleCancelDelete(d)}>
+                      Cancel
+                    </button>
+                  ) : (
+                    <button type="button" className={styles.deleteButton} onClick={() => handleDelete(d)}>
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

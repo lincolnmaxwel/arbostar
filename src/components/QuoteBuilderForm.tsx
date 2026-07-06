@@ -31,6 +31,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const [formState, setFormState] = useState<DraftQuote | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [syncingNow, setSyncingNow] = useState(false);
+  const [focusedPriceId, setFocusedPriceId] = useState<string | null>(null);
   const router = useRouter();
 
   // Seed formState from an existing draft if one's already persisted, or from
@@ -252,8 +253,10 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                   id={`price-${item.id}`}
                   className={styles.itemInput}
                   type="number"
-                  value={item.price}
-                  onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
+                  value={focusedPriceId === item.id && item.price === 0 ? '' : item.price}
+                  onFocus={() => setFocusedPriceId(item.id)}
+                  onBlur={() => setFocusedPriceId(null)}
+                  onChange={(e) => updateItem(item.id, { price: e.target.value === '' ? 0 : Number(e.target.value) })}
                 />
               </div>
               <div className={`${styles.itemField} ${styles.itemFieldFull}`}>

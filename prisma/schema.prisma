@@ -18,6 +18,26 @@ enum QuoteStatus {
   approved
   declined
   expired
+  scheduled
+}
+
+enum BookingStatus {
+  idle
+  proposed
+  rejected
+  confirmed
+}
+
+enum DayWindow {
+  morning
+  afternoon
+  fullday
+}
+
+enum ScheduleRoundStatus {
+  proposed
+  rejected
+  confirmed
 }
 
 model User {
@@ -60,6 +80,10 @@ model Quote {
   taxAmount   Decimal     @db.Decimal(10, 2) @default(0)
   total       Decimal     @db.Decimal(10, 2) @default(0)
   publicToken String      @unique @default(uuid())
+  bookingStatus    BookingStatus @default(idle)
+  scheduledDate    DateTime?
+  scheduledWindow  DayWindow?
+  rounds           ScheduleRound[]
   sentAt      DateTime?
   respondedAt DateTime?
   createdAt   DateTime    @default(now())
@@ -94,4 +118,29 @@ model AuditLog {
   action     String
   actorId    String?
   createdAt  DateTime @default(now())
+}
+
+model ScheduleRound {
+  id              String              @id @default(uuid())
+  quoteId         String
+  quote           Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  roundNumber     Int
+  status          ScheduleRoundStatus @default(proposed)
+  rejectionReason String?
+  proposedAt      DateTime            @default(now())
+  respondedAt     DateTime?
+  options         ScheduleOption[]
+
+  @@unique([quoteId, roundNumber])
+}
+
+model ScheduleOption {
+  id           String         @id @default(uuid())
+  roundId      String
+  round        ScheduleRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  proposedDate DateTime       @db.Date
+  window       DayWindow
+  chosen       Boolean        @default(false)
+
+  @@unique([roundId, proposedDate, window])
 }

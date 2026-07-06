@@ -65,6 +65,11 @@
   color: var(--color-text-secondary);
 }
 
+.scheduled {
+  background: #2c5f2d;
+  color: #fff;
+}
+
 .party {
   margin-bottom: 32px;
 }
@@ -283,4 +288,20 @@
   .lightboxNext {
     right: 4px;
   }
+}
+
+.scheduledBanner {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #2c5f2d;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.bookingWait {
+  margin-top: 16px;
+  color: #6b7280;
+  font-style: italic;
 }

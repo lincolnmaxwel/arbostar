@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './PortalActions.module.css';
 
-type QuoteStatus = 'draft' | 'sent' | 'approved' | 'declined' | 'expired';
+type QuoteStatus = 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled';
 
 export function PortalActions({ token, status }: { token: string; status: QuoteStatus }) {
   const router = useRouter();

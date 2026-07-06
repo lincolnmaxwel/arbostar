@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { PortalActions } from '@/components/PortalActions';
 import { PortalItemsTable } from '@/components/PortalItemsTable';
+import { BookingPicker } from '@/components/BookingPicker';
 import styles from './portal.module.css';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -10,7 +11,21 @@ const STATUS_LABEL: Record<string, string> = {
   approved: 'Approved',
   declined: 'Declined',
   expired: 'Expired',
+  scheduled: 'Scheduled',
 };
+
+const WINDOW_LABEL: Record<string, string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  fullday: 'Full day',
+};
+
+function formatScheduledDate(iso: Date | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  d.setHours(12, 0, 0, 0);
+  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
 
 export default async function PortalPage({ params }: { params: { token: string } }) {
   const quote = await prisma.quote.findUnique({
@@ -22,6 +37,19 @@ export default async function PortalPage({ params }: { params: { token: string }
   });
 
   if (!quote) notFound();
+
+  const activeRound =
+    quote.status === 'approved' && quote.bookingStatus === 'proposed'
+      ? await prisma.scheduleRound.findFirst({
+          where: { quoteId: quote.id, status: 'proposed' },
+          orderBy: { roundNumber: 'desc' },
+          include: { options: { orderBy: { proposedDate: 'asc' } } },
+        })
+      : null;
+
+  const showBookingPicker = !!(activeRound && activeRound.options.length > 0);
+  const showScheduledBanner = quote.status === 'scheduled' || quote.bookingStatus === 'confirmed';
+  const scheduledDateStr = formatScheduledDate(quote.scheduledDate);
 
   return (
     <div className={styles.page}>
@@ -67,7 +95,33 @@ export default async function PortalPage({ params }: { params: { token: string }
           </div>
         </div>
 
-        <PortalActions token={params.token} status={quote.status} />
+        {quote.status === 'sent' && <PortalActions token={params.token} status={quote.status} />}
+
+        {showBookingPicker && activeRound && (
+          <BookingPicker
+            token={params.token}
+            roundId={activeRound.id}
+            options={activeRound.options.map((o) => ({
+              id: o.id,
+              proposedDate: o.proposedDate.toISOString().slice(0, 10),
+              window: o.window,
+              chosen: o.chosen,
+            }))}
+          />
+        )}
+
+        {showScheduledBanner && scheduledDateStr && quote.scheduledWindow && (
+          <div className={styles.scheduledBanner}>
+            Job scheduled for {scheduledDateStr} · {WINDOW_LABEL[quote.scheduledWindow]}
+          </div>
+        )}
+
+        {quote.status === 'approved' && quote.bookingStatus === 'idle' && (
+          <p className={styles.bookingWait}>Staff will propose scheduling dates shortly.</p>
+        )}
+        {quote.status === 'approved' && quote.bookingStatus === 'rejected' && (
+          <p className={styles.bookingWait}>Staff will propose new dates shortly.</p>
+        )}
       </div>
     </div>
   );

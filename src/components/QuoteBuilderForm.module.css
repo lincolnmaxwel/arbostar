@@ -327,6 +327,40 @@
   border-color: var(--color-text-secondary);
 }
 
+.pendingSyncBanner {
+  background: #fef9e7;
+  border: 1px solid #f0d97a;
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pendingSyncText {
+  font-size: 0.8125rem;
+  color: #b58900;
+  flex: 1;
+}
+
+.syncNowButton {
+  padding: 6px 14px;
+  background: #b58900;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.syncNowButton:hover {
+  background: #96700a;
+}
+
 .loading {
   text-align: center;
   padding: 60px 16px;

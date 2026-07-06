@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { InstallPwaButton } from './InstallPwaButton';
+import { NewQuoteLink } from './NewQuoteLink';
 import styles from './Header.module.css';
 
 export function Header() {
@@ -17,7 +18,7 @@ export function Header() {
         <Link href="/quotes" className={styles.brand}>Arbostar</Link>
         <nav className={styles.nav}>
           <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
-          <Link href="/quotes/new" className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</Link>
+          <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
         </nav>
         <div className={styles.actions}>
           <InstallPwaButton />

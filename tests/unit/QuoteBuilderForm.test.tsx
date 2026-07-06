@@ -22,6 +22,11 @@ describe('QuoteBuilderForm', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.outbox.clear();
+    // submit() checks real connectivity (isReallyOnline(), a HEAD to
+    // /api/health) before deciding whether to mark the draft 'syncing' and
+    // navigate — these tests exercise the "online" path, so answer that
+    // check the same way the sync worker's own tests do.
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as any;
   });
 
   it('autosaves the client name locally after the debounce window', async () => {

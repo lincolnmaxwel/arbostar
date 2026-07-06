@@ -3,7 +3,7 @@ import { dueEntries, recordFailure, markStuck, clearEntry } from '@/lib/outbox';
 import { flushPendingDeletes } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 
-async function isReallyOnline(): Promise<boolean> {
+export async function isReallyOnline(): Promise<boolean> {
   try {
     const res = await fetch('/api/health', { method: 'HEAD', cache: 'no-store' });
     return res.ok;

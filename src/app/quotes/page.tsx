@@ -7,6 +7,7 @@ import { localDb } from '@/lib/localDb';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { deleteDraft } from '@/lib/deleteQuote';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
+import { NewQuoteLink } from '@/components/NewQuoteLink';
 import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
@@ -31,13 +32,13 @@ export default function QuotesListPage() {
     <div>
       <div className={styles.header}>
         <h1 className={styles.title}>Quotes</h1>
-        <Link href="/quotes/new" className={styles.newButton}>+ New quote</Link>
+        <NewQuoteLink className={styles.newButton}>+ New quote</NewQuoteLink>
       </div>
 
       {drafts.length === 0 ? (
         <div className={styles.empty}>
           <p>No quotes yet.</p>
-          <Link href="/quotes/new" className={styles.newButton}>Create your first quote</Link>
+          <NewQuoteLink className={styles.newButton}>Create your first quote</NewQuoteLink>
         </div>
       ) : (
         <table className={styles.table}>

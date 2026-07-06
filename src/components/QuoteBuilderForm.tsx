@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft, retryStuckEntry, clearEntry } from '@/lib/outbox';
-import { runSyncCycle } from '@/lib/syncWorker';
+import { runSyncCycle, isReallyOnline } from '@/lib/syncWorker';
 import { debounce } from '@/lib/debounce';
 import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
@@ -30,6 +30,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
   const [formState, setFormState] = useState<DraftQuote | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [syncingNow, setSyncingNow] = useState(false);
   const router = useRouter();
 
   // Seed formState from an existing draft if one's already persisted, or from
@@ -179,7 +180,14 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     // happens to come back online. Staying at 'local' offline keeps the form
     // usable; enqueueSync below still queues the row so the background sync
     // loop picks it up the moment connectivity actually returns.
-    const online = navigator.onLine;
+    //
+    // isReallyOnline() (a real fetch, same check the sync loop uses) instead
+    // of navigator.onLine: navigator.onLine only reflects whether the device
+    // has a network interface up at all — it reports true on a wifi with no
+    // real internet (captive portal, ISP down), which would otherwise still
+    // send this down the "online" path below and hit the same broken
+    // navigation this whole check exists to avoid.
+    const online = await isReallyOnline();
     await localDb.drafts.put({ ...formState!, status: online ? 'syncing' : 'local', pendingSend, updatedAt: Date.now() });
     await enqueueSync(draftId);
     // /quotes/[draftId] is a dynamic route the service worker has no generic
@@ -333,6 +341,26 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
           </p>
         )}
       </div>
+
+      {draft?.status === 'local' && outboxEntry && (
+        <div className={styles.pendingSyncBanner} role="status" data-testid="pending-sync-banner">
+          <span className={styles.pendingSyncText}>
+            Saved on this device — waiting for a connection to sync to the server.
+          </span>
+          <button
+            type="button"
+            className={styles.syncNowButton}
+            disabled={syncingNow}
+            onClick={async () => {
+              setSyncingNow(true);
+              await runSyncCycle();
+              setSyncingNow(false);
+            }}
+          >
+            {syncingNow ? 'Syncing...' : 'Sync now'}
+          </button>
+        </div>
+      )}
 
       {draft?.status === 'error' && outboxEntry && (
         <div className={styles.conflictBanner} role="alert" data-testid="conflict-banner">

@@ -1,14 +1,25 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { deleteDraft } from '@/lib/deleteQuote';
+import { pullServerQuotes } from '@/lib/pullServerQuotes';
 import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
   const drafts = useLiveQuery(() => localDb.drafts.orderBy('updatedAt').reverse().toArray(), []) ?? [];
+
+  // This list is otherwise a pure IndexedDB view — a quote synced from another
+  // device never appears here on its own. Pull the server's list on mount and
+  // whenever connectivity returns, so quotes made elsewhere show up here too.
+  useEffect(() => {
+    pullServerQuotes();
+    window.addEventListener('online', pullServerQuotes);
+    return () => window.removeEventListener('online', pullServerQuotes);
+  }, []);
 
   async function handleDelete(draft: (typeof drafts)[number]) {
     const label = draft.clientName || 'this quote';

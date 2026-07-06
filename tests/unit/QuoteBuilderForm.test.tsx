@@ -4,6 +4,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 
 vi.mock('@/lib/compressImage', () => ({ compressImage: async (blob: Blob) => blob }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 
 let mockUrlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock/${mockUrlCounter++}`) as any;

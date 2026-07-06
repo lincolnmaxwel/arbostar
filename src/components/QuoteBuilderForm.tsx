@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft, retryStuckEntry, clearEntry } from '@/lib/outbox';
@@ -29,6 +30,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
   const [formState, setFormState] = useState<DraftQuote | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const router = useRouter();
 
   // Seed formState from an existing draft if one's already persisted, or from
   // an in-memory empty draft otherwise. Deliberately does NOT write anything
@@ -170,6 +172,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     // formState itself.
     await localDb.drafts.put({ ...formState!, status: 'syncing', pendingSend, updatedAt: Date.now() });
     await enqueueSync(draftId);
+    router.push(`/quotes/${draftId}`);
   }
 
   async function handleSave() {

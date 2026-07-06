@@ -10,7 +10,7 @@ vi.mock('nodemailer', () => ({
   },
 }));
 
-import { sendQuoteApprovalEmail } from '@/lib/email';
+import { sendQuoteApprovalEmail, sendBookingProposalEmail } from '@/lib/email';
 
 describe('sendQuoteApprovalEmail', () => {
   beforeEach(() => {
@@ -66,5 +66,59 @@ describe('sendQuoteApprovalEmail', () => {
     expect(call.html).not.toContain('<script>alert(1)</script>');
     expect(call.html).toContain('&lt;script&gt;');
     expect(call.html).not.toContain('<b>Nelson</b>');
+  });
+});
+
+describe('sendBookingProposalEmail', () => {
+  beforeEach(() => {
+    sendMailMock.mockClear();
+    createTransportMock.mockClear();
+    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
+  });
+
+  it('sends an email with the client name, portal link, round number, and date options', async () => {
+    await sendBookingProposalEmail({
+      to: 'maria@example.com',
+      clientName: 'Maria Silva',
+      portalUrl: 'http://localhost:3000/portal/token-xyz',
+      roundNumber: 1,
+      options: [
+        { date: '2026-07-15', window: 'morning' },
+        { date: '2026-07-17', window: 'fullday' },
+      ],
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.to).toBe('maria@example.com');
+    expect(call.from).toBe('Arbostar Quotes <test@example.com>');
+    expect(call.subject).toBe('Scheduling options for your approved estimate');
+    expect(call.text).toContain('Maria Silva');
+    expect(call.text).toContain('http://localhost:3000/portal/token-xyz');
+    expect(call.text).toContain('Round 1');
+    // Date formatting: 'Tuesday, July 15, 2026' (en-US locale default for toLocaleDateString)
+    expect(call.text).toMatch(/July 15, 2026/);
+    expect(call.text).toMatch(/July 17, 2026/);
+    expect(call.text).toContain('Morning');
+    expect(call.text).toContain('Full day');
+    expect(call.html).toContain('http://localhost:3000/portal/token-xyz');
+    expect(call.html).toContain('Morning');
+    expect(call.html).toContain('Full day');
+  });
+
+  it('escapes HTML in client name and does not repeat the line-item breakdown', async () => {
+    await sendBookingProposalEmail({
+      to: 'x@example.com',
+      clientName: '<b>Maria</b>',
+      portalUrl: 'http://localhost:3000/portal/t',
+      roundNumber: 2,
+      options: [{ date: '2026-07-15', window: 'afternoon' }],
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.html).not.toContain('<b>Maria</b>');
+    expect(call.html).toContain('&lt;b&gt;Maria&lt;/b&gt;');
+    // No price table — booking email never lists line items.
+    expect(call.html).not.toMatch(/\$\d+\.\d{2}/);
   });
 });

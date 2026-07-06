@@ -117,3 +117,81 @@ View and respond here: ${opts.portalUrl}
     console.log(`[email] preview: ${previewUrl}`);
   }
 }
+
+export interface SendBookingProposalEmailOptions {
+  to: string;
+  clientName: string;
+  portalUrl: string;
+  roundNumber: number;
+  options: { date: string; window: 'morning' | 'afternoon' | 'fullday' }[];
+}
+
+const WINDOW_LABEL: Record<'morning' | 'afternoon' | 'fullday', string> = {
+  morning: 'Morning',
+  afternoon: 'Afternoon',
+  fullday: 'Full day',
+};
+
+function formatOptionDate(dateStr: string): string {
+  // dateStr is 'YYYY-MM-DD'; parse at noon local to avoid midnight-UTC edge cases
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  return dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function buildOptionsText(options: SendBookingProposalEmailOptions['options']): string {
+  return options.map((o) => `- ${formatOptionDate(o.date)} — ${WINDOW_LABEL[o.window]}`).join('\n');
+}
+
+function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): string {
+  return options
+    .map(
+      (o) => `
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d5db;border-radius:6px;text-align:center;font-weight:600;color:#2c5f2d;">
+            ${escapeHtml(formatOptionDate(o.date))}
+            <div style="font-weight:400;color:#6b7280;font-size:13px;margin-top:4px;">${escapeHtml(WINDOW_LABEL[o.window])}</div>
+          </td>
+        </tr>`,
+    )
+    .join('');
+}
+
+export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOptions): Promise<void> {
+  const text = `Hi ${opts.clientName},
+
+Your approved estimate is ready to schedule. Round ${opts.roundNumber} of date proposals:
+
+${buildOptionsText(opts.options)}
+
+Pick the one that works for you here: ${opts.portalUrl}
+`;
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+      <p>Hi ${escapeHtml(opts.clientName)},</p>
+      <p>Your approved estimate is ready to schedule. Here are ${opts.options.length === 1 ? 'the date option we have' : 'the date options we have'} for you (round ${opts.roundNumber}):</p>
+      <table style="width:100%;border-collapse:separate;border-spacing:0 8px;margin:16px 0;">
+        <tbody>${buildOptionsHtml(opts.options)}</tbody>
+      </table>
+      <p style="margin-top:24px;">
+        <a href="${opts.portalUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Choose your date
+        </a>
+      </p>
+    </div>
+  `;
+
+  const info = await getTransporter().sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: opts.to,
+    subject: 'Scheduling options for your approved estimate',
+    text,
+    html,
+  });
+
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  if (previewUrl) {
+    console.log(`[email] booking proposal preview: ${previewUrl}`);
+  }
+}

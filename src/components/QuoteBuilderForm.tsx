@@ -28,6 +28,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
   const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
   const [formState, setFormState] = useState<DraftQuote | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
 
   // Seed formState from an existing draft if one's already persisted, or from
   // an in-memory empty draft otherwise. Deliberately does NOT write anything
@@ -70,6 +71,35 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       return { ...prev, items, serverId: draft.serverId ?? prev.serverId };
     });
   }, [draft]);
+
+  const photoIdsKey = formState?.items.map((i) => i.photoIds.join(',')).join('|') ?? '';
+
+  useEffect(() => {
+    if (!photoIdsKey) {
+      setPhotoUrls({});
+      return;
+    }
+    let cancelled = false;
+    const urlsToRevoke: string[] = [];
+    const allPhotoIds = photoIdsKey.split('|').flatMap((s) => (s ? s.split(',') : []));
+    (async () => {
+      const map: Record<string, string> = {};
+      for (const photoId of allPhotoIds) {
+        const photo = await localDb.photos.get(photoId);
+        if (photo) {
+          const url = URL.createObjectURL(photo.blob);
+          map[photoId] = url;
+          urlsToRevoke.push(url);
+        }
+      }
+      if (!cancelled) setPhotoUrls(map);
+    })();
+    return () => {
+      cancelled = true;
+      urlsToRevoke.forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoIdsKey]);
 
   const persist = useMemo(
     () =>
@@ -190,24 +220,44 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                   onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
                 />
               </div>
-              <div className={styles.itemField}>
+              <div className={`${styles.itemField} ${styles.itemFieldFull}`}>
                 <label>Photo</label>
-                <label htmlFor={`photo-${item.id}`} className={styles.photoButton}>
-                  + Attach photo
-                </label>
-                <input
-                  id={`photo-${item.id}`}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={async (e) => {
-                    if (!e.target.files || e.target.files.length === 0) return;
-                    await handlePhotoFiles(item.id, e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-                <span className={styles.photoCount} data-testid={`photo-count-${item.id}`}>{item.photoIds.length} photo(s)</span>
+                <div className={styles.photoActions}>
+                  <label htmlFor={`photo-${item.id}`} className={styles.photoButton}>
+                    + Attach photo
+                  </label>
+                  <input
+                    id={`photo-${item.id}`}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      if (!e.target.files || e.target.files.length === 0) return;
+                      await handlePhotoFiles(item.id, e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                  {item.photoIds.length > 0 && (
+                    <span className={styles.photoCount} data-testid={`photo-count-${item.id}`}>{item.photoIds.length} photo(s)</span>
+                  )}
+                </div>
+                {item.photoIds.length > 0 && (
+                  <div className={styles.photoThumbs}>
+                    {item.photoIds.map((photoId) => {
+                      if (!photoUrls[photoId]) return null;
+                      return (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={photoId}
+                          src={photoUrls[photoId]}
+                          className={styles.photoThumb}
+                          alt=""
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>

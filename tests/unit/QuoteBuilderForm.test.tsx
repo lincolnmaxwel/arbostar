@@ -5,6 +5,10 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 
 vi.mock('@/lib/compressImage', () => ({ compressImage: async (blob: Blob) => blob }));
 
+let mockUrlCounter = 0;
+global.URL.createObjectURL = vi.fn(() => `blob:mock/${mockUrlCounter++}`) as any;
+global.URL.revokeObjectURL = vi.fn();
+
 import { QuoteBuilderForm } from '@/components/QuoteBuilderForm';
 import { localDb } from '@/lib/localDb';
 import { enqueueSync, markStuck, getEntryForDraft } from '@/lib/outbox';

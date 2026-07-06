@@ -176,6 +176,9 @@ describe('POST /api/portal/[token]/booking/respond', () => {
   });
 
   it('after rejection, staff can create a new round (round 2) — verified via direct Prisma call', async () => {
+    // Both reject and confirm below now send a real staff-notification email
+    // (unmocked, same as this file's other tests) — two round trips in one
+    // test can occasionally exceed the default 5s timeout.
     const { quote, round } = await createProposedQuote();
     await respond(quote.publicToken, { decision: 'reject', reason: 'Bad days.' });
 
@@ -198,5 +201,5 @@ describe('POST /api/portal/[token]/booking/respond', () => {
     const res = await respond(quote.publicToken, { decision: 'confirm', optionId: r2.options[0].id });
     expect(res.status).toBe(200);
     expect((await res.json()).bookingStatus).toBe('confirmed');
-  });
+  }, 15000);
 });

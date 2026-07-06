@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import { sendBookingDecisionNotificationEmail } from '@/lib/email';
 
 const respondSchema = z
   .object({
@@ -26,7 +27,10 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const quote = await prisma.quote.findUnique({ where: { publicToken: params.token } });
+  const quote = await prisma.quote.findUnique({
+    where: { publicToken: params.token },
+    include: { client: true, createdBy: true },
+  });
   if (!quote) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   // Idempotency: if the quote has already moved past 'proposed' on the booking
@@ -69,6 +73,21 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         },
       }),
     ]);
+
+    try {
+      await sendBookingDecisionNotificationEmail({
+        to: quote.createdBy.notificationEmail || quote.createdBy.email,
+        clientName: quote.client.name,
+        quoteNumber: quote.number,
+        quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+        decision: 'confirmed',
+        scheduledDate: option.proposedDate.toISOString().slice(0, 10),
+        scheduledWindow: option.window,
+      });
+    } catch (err) {
+      console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+    }
+
     return NextResponse.json({ status: 'scheduled', bookingStatus: 'confirmed' });
   }
 
@@ -84,5 +103,19 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       data: { bookingStatus: 'rejected' },
     }),
   ]);
+
+  try {
+    await sendBookingDecisionNotificationEmail({
+      to: quote.createdBy.notificationEmail || quote.createdBy.email,
+      clientName: quote.client.name,
+      quoteNumber: quote.number,
+      quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+      decision: 'rejected',
+      rejectionReason: reason,
+    });
+  } catch (err) {
+    console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+  }
+
   return NextResponse.json({ status: 'approved', bookingStatus: 'rejected' });
 }

@@ -46,13 +46,18 @@ enum ScheduleRoundStatus {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(staff)
-  createdAt    DateTime @default(now())
-  quotes       Quote[]
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  passwordHash      String
+  role              Role     @default(staff)
+  // Where client-response notifications (quote approved/declined, booking
+  // date confirmed/rejected) get sent. Null means "use `email`" — kept
+  // separate from the login email so a user can route notifications
+  // elsewhere without changing how they sign in.
+  notificationEmail String?
+  createdAt         DateTime @default(now())
+  quotes            Quote[]
 }
 
 model Client {

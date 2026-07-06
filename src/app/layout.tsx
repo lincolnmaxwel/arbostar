@@ -1,4 +1,5 @@
 import './globals.css';
+import { Providers } from '@/components/Providers';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import { SyncLoopStarter } from '@/components/SyncLoopStarter';
 import { Header } from '@/components/Header';
@@ -20,12 +21,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
-        <Header />
-        <main style={{ maxWidth: 'var(--max-width)', margin: '0 auto', padding: '24px 16px' }}>
-          {children}
-        </main>
-        <ServiceWorkerRegistration />
-        <SyncLoopStarter />
+        <Providers>
+          <Header />
+          <main style={{ maxWidth: 'var(--max-width)', margin: '0 auto', padding: '24px 16px' }}>
+            {children}
+          </main>
+          <ServiceWorkerRegistration />
+          <SyncLoopStarter />
+        </Providers>
       </body>
     </html>
   );

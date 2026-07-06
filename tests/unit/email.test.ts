@@ -10,7 +10,12 @@ vi.mock('nodemailer', () => ({
   },
 }));
 
-import { sendQuoteApprovalEmail, sendBookingProposalEmail } from '@/lib/email';
+import {
+  sendQuoteApprovalEmail,
+  sendBookingProposalEmail,
+  sendQuoteDecisionNotificationEmail,
+  sendBookingDecisionNotificationEmail,
+} from '@/lib/email';
 
 describe('sendQuoteApprovalEmail', () => {
   beforeEach(() => {
@@ -120,5 +125,100 @@ describe('sendBookingProposalEmail', () => {
     expect(call.html).toContain('&lt;b&gt;Maria&lt;/b&gt;');
     // No price table — booking email never lists line items.
     expect(call.html).not.toMatch(/\$\d+\.\d{2}/);
+  });
+});
+
+describe('sendQuoteDecisionNotificationEmail', () => {
+  beforeEach(() => {
+    sendMailMock.mockClear();
+    createTransportMock.mockClear();
+    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
+  });
+
+  it('notifies staff of an approval with the client name, quote number, and link', async () => {
+    await sendQuoteDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Nelson Costa',
+      quoteNumber: 42,
+      decision: 'approved',
+      quoteUrl: 'http://localhost:3000/quotes/draft-123',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.to).toBe('staff@example.com');
+    expect(call.subject).toContain('#42');
+    expect(call.subject).toContain('approved');
+    expect(call.text).toContain('Nelson Costa');
+    expect(call.text).toContain('approved');
+    expect(call.text).toContain('http://localhost:3000/quotes/draft-123');
+  });
+
+  it('notifies staff of a decline', async () => {
+    await sendQuoteDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Nelson Costa',
+      quoteNumber: 7,
+      decision: 'declined',
+      quoteUrl: 'http://localhost:3000/quotes/draft-456',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.subject).toContain('declined');
+    expect(call.text).toContain('declined');
+  });
+
+  it('escapes HTML in the client name', async () => {
+    await sendQuoteDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: '<b>Nelson</b>',
+      quoteNumber: 1,
+      decision: 'approved',
+      quoteUrl: 'http://localhost:3000/quotes/draft-789',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.html).not.toContain('<b>Nelson</b>');
+    expect(call.html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
+  });
+});
+
+describe('sendBookingDecisionNotificationEmail', () => {
+  beforeEach(() => {
+    sendMailMock.mockClear();
+    createTransportMock.mockClear();
+    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
+  });
+
+  it('notifies staff of a confirmed date/window', async () => {
+    await sendBookingDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Maria Silva',
+      quoteNumber: 10,
+      quoteUrl: 'http://localhost:3000/quotes/draft-abc',
+      decision: 'confirmed',
+      scheduledDate: '2026-07-15',
+      scheduledWindow: 'morning',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.subject).toContain('confirmed');
+    expect(call.text).toContain('Maria Silva');
+    expect(call.text).toMatch(/July 15, 2026/);
+    expect(call.text).toContain('Morning');
+  });
+
+  it('notifies staff of a rejection with the client-provided reason', async () => {
+    await sendBookingDecisionNotificationEmail({
+      to: 'staff@example.com',
+      clientName: 'Maria Silva',
+      quoteNumber: 11,
+      quoteUrl: 'http://localhost:3000/quotes/draft-def',
+      decision: 'rejected',
+      rejectionReason: 'None of these days work.',
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.subject).toContain('rejected');
+    expect(call.text).toContain('None of these days work.');
   });
 });

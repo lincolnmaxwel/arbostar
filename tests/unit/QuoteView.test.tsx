@@ -10,6 +10,19 @@ let mockUrlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock/${mockUrlCounter++}`);
 global.URL.revokeObjectURL = vi.fn();
 
+// QuoteView also fires a pullServerQuotes() GET to /api/quotes on every mount
+// (to resolve a quote this device may never have loaded before, e.g. from a
+// notification email link) alongside the per-quote approval/booking fetches
+// — route by URL instead of a fixed call-order queue so that extra call
+// doesn't shift a positional mock sequence out of order.
+function mockFetchRoutes(routes: Record<string, unknown>) {
+  return vi.fn(async (url: string) => {
+    if (url in routes) return routes[url];
+    if (url === '/api/quotes') return { ok: true, json: async () => ({ quotes: [] }) };
+    throw new Error(`unexpected fetch: ${url}`);
+  }) as unknown as typeof fetch;
+}
+
 describe('QuoteView', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
@@ -91,9 +104,8 @@ describe('QuoteView', () => {
 
   it('fetches and shows the approval status, and copies the client link', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ quote: { status: 'sent', publicToken: 'token-abc-123' } }),
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/server-quote-4': { ok: true, json: async () => ({ quote: { status: 'sent', publicToken: 'token-abc-123' } }) },
     });
 
     await localDb.drafts.put({
@@ -133,11 +145,10 @@ describe('QuoteView', () => {
 
   it('renders a "Schedule" button when the quote is approved and bookingStatus=idle', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { id: 'q-bv1', status: 'approved', bookingStatus: 'idle' }, latestRound: null }) });
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/q-bv1': { ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) },
+      '/api/quotes/q-bv1/booking': { ok: true, json: async () => ({ quote: { id: 'q-bv1', status: 'approved', bookingStatus: 'idle' }, latestRound: null }) },
+    });
 
     await seedSyncedDraft('bv-1', 'q-bv1');
     render(<QuoteView draftId="bv-1" />);
@@ -148,14 +159,13 @@ describe('QuoteView', () => {
 
   it('renders "Booking pending" (disabled) when bookingStatus=proposed', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
-      .mockResolvedValueOnce({
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/q-bv2': { ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) },
+      '/api/quotes/q-bv2/booking': {
         ok: true,
         json: async () => ({ quote: { id: 'q-bv2', status: 'approved', bookingStatus: 'proposed' }, latestRound: { id: 'r', roundNumber: 1, status: 'proposed', rejectionReason: null, proposedAt: '2099-01-01T00:00:00Z', respondedAt: null, options: [] } }),
-      });
-    global.fetch = fetchMock as unknown as typeof fetch;
+      },
+    });
 
     await seedSyncedDraft('bv-2', 'q-bv2');
     render(<QuoteView draftId="bv-2" />);
@@ -166,14 +176,13 @@ describe('QuoteView', () => {
 
   it('renders "Re-propose dates" when bookingStatus=rejected', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) })
-      .mockResolvedValueOnce({
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/q-bv3': { ok: true, json: async () => ({ quote: { status: 'approved', publicToken: 'ptok' } }) },
+      '/api/quotes/q-bv3/booking': {
         ok: true,
         json: async () => ({ quote: { id: 'q-bv3', status: 'approved', bookingStatus: 'rejected' }, latestRound: { id: 'r', roundNumber: 1, status: 'rejected', rejectionReason: 'Bad days.', proposedAt: '2099-01-01T00:00:00Z', respondedAt: '2099-01-02T00:00:00Z', options: [] } }),
-      });
-    global.fetch = fetchMock as unknown as typeof fetch;
+      },
+    });
 
     await seedSyncedDraft('bv-3', 'q-bv3');
     render(<QuoteView draftId="bv-3" />);
@@ -183,14 +192,13 @@ describe('QuoteView', () => {
 
   it('renders "Scheduled: <date> · <window>" when quote is scheduled', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
-    const fetchMock = vi.fn();
-    fetchMock
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ quote: { status: 'scheduled', publicToken: 'ptok' } }) })
-      .mockResolvedValueOnce({
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/q-bv4': { ok: true, json: async () => ({ quote: { status: 'scheduled', publicToken: 'ptok' } }) },
+      '/api/quotes/q-bv4/booking': {
         ok: true,
         json: async () => ({ quote: { id: 'q-bv4', status: 'scheduled', bookingStatus: 'confirmed', scheduledDate: '2099-07-15T00:00:00.000Z', scheduledWindow: 'morning' }, latestRound: null }),
-      });
-    global.fetch = fetchMock as unknown as typeof fetch;
+      },
+    });
 
     await seedSyncedDraft('bv-4', 'q-bv4');
     render(<QuoteView draftId="bv-4" />);

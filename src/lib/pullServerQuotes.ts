@@ -42,7 +42,10 @@ export async function pullServerQuotes(): Promise<void> {
   }
   if (!res.ok) return;
 
-  const { quotes } = (await res.json()) as { quotes: ServerQuote[] };
+  const body = (await res.json().catch(() => null)) as { quotes?: ServerQuote[] } | null;
+  const quotes = body?.quotes;
+  if (!Array.isArray(quotes)) return;
+
   const pendingDeleteServerIds = new Set((await localDb.pendingDeletes.toArray()).map((p) => p.serverId));
   const serverIds = new Set(quotes.map((q) => q.id));
 

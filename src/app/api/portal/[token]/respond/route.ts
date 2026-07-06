@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import { sendQuoteDecisionNotificationEmail } from '@/lib/email';
 
 const respondSchema = z.object({ decision: z.enum(['approve', 'decline']) });
 
@@ -14,7 +15,10 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const quote = await prisma.quote.findUnique({ where: { publicToken: params.token } });
+  const quote = await prisma.quote.findUnique({
+    where: { publicToken: params.token },
+    include: { client: true, createdBy: true },
+  });
   if (!quote) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   if (quote.status !== 'sent') {
@@ -29,6 +33,20 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     where: { id: quote.id },
     data: { status, respondedAt: new Date() },
   });
+
+  try {
+    await sendQuoteDecisionNotificationEmail({
+      to: quote.createdBy.notificationEmail || quote.createdBy.email,
+      clientName: quote.client.name,
+      quoteNumber: quote.number,
+      decision: status,
+      quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+    });
+  } catch (err) {
+    // The client's decision is already persisted; a notification failure
+    // shouldn't turn into a 5xx for the client-facing portal.
+    console.error('[portal] sendQuoteDecisionNotificationEmail failed', err);
+  }
 
   return NextResponse.json({ status });
 }

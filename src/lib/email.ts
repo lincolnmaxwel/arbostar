@@ -196,3 +196,87 @@ Pick the one that works for you here: ${opts.portalUrl}
     console.log(`[email] booking proposal preview: ${previewUrl}`);
   }
 }
+
+// --- Staff notifications: the client responded to something, so whoever
+// created the quote should hear about it without having to keep checking
+// the app. Distinct from the client-facing emails above (sent to `to`,
+// which is the User's configured notification address, not the Client's).
+
+export interface SendQuoteDecisionNotificationEmailOptions {
+  to: string;
+  clientName: string;
+  quoteNumber: number;
+  decision: 'approved' | 'declined';
+  quoteUrl: string;
+}
+
+export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecisionNotificationEmailOptions): Promise<void> {
+  const verb = opts.decision === 'approved' ? 'approved' : 'declined';
+  const text = `${opts.clientName} just ${verb} quote #${opts.quoteNumber}.\n\nView it here: ${opts.quoteUrl}\n`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+      <p><strong>${escapeHtml(opts.clientName)}</strong> just ${verb} quote #${opts.quoteNumber}.</p>
+      <p style="margin-top:24px;">
+        <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          View quote
+        </a>
+      </p>
+    </div>
+  `;
+
+  const info = await getTransporter().sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: opts.to,
+    subject: `Quote #${opts.quoteNumber} was ${verb}`,
+    text,
+    html,
+  });
+
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  if (previewUrl) {
+    console.log(`[email] quote decision notification preview: ${previewUrl}`);
+  }
+}
+
+export interface SendBookingDecisionNotificationEmailOptions {
+  to: string;
+  clientName: string;
+  quoteNumber: number;
+  quoteUrl: string;
+  decision: 'confirmed' | 'rejected';
+  scheduledDate?: string;
+  scheduledWindow?: 'morning' | 'afternoon' | 'fullday';
+  rejectionReason?: string;
+}
+
+export async function sendBookingDecisionNotificationEmail(opts: SendBookingDecisionNotificationEmailOptions): Promise<void> {
+  const detail =
+    opts.decision === 'confirmed'
+      ? `chose ${opts.scheduledDate ? formatOptionDate(opts.scheduledDate) : 'a date'}${opts.scheduledWindow ? ` (${WINDOW_LABEL[opts.scheduledWindow]})` : ''}`
+      : `rejected the proposed dates${opts.rejectionReason ? `: "${opts.rejectionReason}"` : ''}`;
+
+  const text = `${opts.clientName} just ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${detail}.\n\nView it here: ${opts.quoteUrl}\n`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+      <p><strong>${escapeHtml(opts.clientName)}</strong> ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${escapeHtml(detail)}.</p>
+      <p style="margin-top:24px;">
+        <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          View quote
+        </a>
+      </p>
+    </div>
+  `;
+
+  const info = await getTransporter().sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: opts.to,
+    subject: opts.decision === 'confirmed' ? `Scheduling confirmed for quote #${opts.quoteNumber}` : `Scheduling rejected for quote #${opts.quoteNumber}`,
+    text,
+    html,
+  });
+
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  if (previewUrl) {
+    console.log(`[email] booking decision notification preview: ${previewUrl}`);
+  }
+}

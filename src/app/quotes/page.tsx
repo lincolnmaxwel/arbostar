@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
+import { QuoteStatusBadge } from '@/components/QuoteStatusBadge';
 import { deleteDraft } from '@/lib/deleteQuote';
 import { cancelPendingDelete } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
@@ -73,6 +74,11 @@ export default function QuotesListPage() {
                     <span className={styles.pendingDeleteBadge} data-testid="pending-delete-badge">
                       Queued for deletion
                     </span>
+                  ) : d.status === 'synced' ? (
+                    // Once synced, what matters is the quote's business status
+                    // (pending client approval, approved, pending scheduling,
+                    // ...) — not the now-uninteresting fact that it's synced.
+                    <QuoteStatusBadge approvalStatus={d.approvalStatus} bookingStatus={d.bookingStatus} />
                   ) : (
                     <SyncStatusBadge status={d.status} />
                   )}

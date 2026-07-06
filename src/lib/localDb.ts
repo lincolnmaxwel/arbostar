@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { ApprovalStatus, BookingStatus } from '@/lib/quoteStatusLabel';
 
 export interface DraftQuoteItem {
   id: string;
@@ -24,6 +25,13 @@ export interface DraftQuote {
   taxRate: number;
   status: 'local' | 'syncing' | 'synced' | 'error';
   updatedAt: number;
+  // The quote's business status server-side — where it stands with the
+  // client (pending approval, approved, declined, pending scheduling,
+  // scheduled) — as of the last successful sync/pull. Distinct from `status`
+  // above, which only tracks whether THIS DEVICE's copy has reached the
+  // server. Undefined until the first successful sync.
+  approvalStatus?: ApprovalStatus;
+  bookingStatus?: BookingStatus;
   // One-shot signal for the next sync POST: true means "Save and Send" was
   // clicked and this sync should tell the server to email the client. The
   // sync worker clears it back to false once that specific POST completes.

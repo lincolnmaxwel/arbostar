@@ -54,8 +54,18 @@ export async function runSyncCycle(): Promise<void> {
         );
         const items = draft.items.map((i) => ({ ...i, serverItemId: serverItemByLocalId.get(i.id) ?? i.serverItemId }));
         // pendingSend is a one-shot signal for this specific POST — clear it so a
-        // later plain edit-and-autosave never re-sends the email.
-        await localDb.drafts.update(draft.draftId, { serverId: responseBody.quote.id, status: 'synced', items, pendingSend: false });
+        // later plain edit-and-autosave never re-sends the email. approvalStatus/
+        // bookingStatus reflect this quote's business status right away (Draft
+        // vs Pending approval vs already Approved/Scheduled from an earlier
+        // response) rather than waiting for the next periodic pull.
+        await localDb.drafts.update(draft.draftId, {
+          serverId: responseBody.quote.id,
+          status: 'synced',
+          items,
+          pendingSend: false,
+          approvalStatus: responseBody.quote.status,
+          bookingStatus: responseBody.quote.bookingStatus,
+        });
         await clearEntry(entry.id!);
       } else if (res.status === 409 || (res.status >= 400 && res.status < 500)) {
         await localDb.drafts.update(draft.draftId, { status: 'error' });

@@ -1,4 +1,5 @@
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
+import { ApprovalStatus, BookingStatus } from '@/lib/quoteStatusLabel';
 
 interface ServerQuoteItem {
   id: string;
@@ -13,6 +14,8 @@ interface ServerQuote {
   draftId: string;
   client: { name: string; email: string; phone?: string | null; address?: string | null };
   serviceAddress?: string | null;
+  status: ApprovalStatus;
+  bookingStatus: BookingStatus;
   taxRate: string | number;
   items: ServerQuoteItem[];
   updatedAt: string;
@@ -96,6 +99,8 @@ export async function pullServerQuotes(): Promise<void> {
       items,
       taxRate: Number(q.taxRate),
       status: 'synced',
+      approvalStatus: q.status,
+      bookingStatus: q.bookingStatus,
       updatedAt: serverUpdatedAt,
     };
     await localDb.drafts.put(draft);

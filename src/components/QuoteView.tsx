@@ -200,7 +200,14 @@ export function QuoteView({ draftId }: { draftId: string }) {
               {copied ? 'Link copied!' : 'Copy client link'}
             </button>
           )}
-          <Link href={`/quotes/new?draft=${draftId}`} className={styles.editButton}>Edit</Link>
+          {/* Once a quote is sent, the client may already be looking at (or have
+              acted on) the copy the server has — editing it out from under
+              them would be confusing at best. Only local/never-synced or
+              still-draft quotes stay editable; !approval covers a never-synced
+              local draft, which has no server-side status to check. */}
+          {(!approval || approval.status === 'draft') && (
+            <Link href={`/quotes/new?draft=${draftId}`} className={styles.editButton}>Edit</Link>
+          )}
         </div>
       </div>
 

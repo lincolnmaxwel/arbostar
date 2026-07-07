@@ -165,6 +165,37 @@ describe('/api/quotes', () => {
     expect(updated.client.phone).toBe('(555) 999-0000');
   });
 
+  it('re-points the quote at a new client when the email is edited on resave, instead of silently keeping the old one', async () => {
+    const draftId = randomUUID();
+    const originalEmail = `original-${draftId}@example.com`;
+    const newEmail = `changed-${draftId}@example.com`;
+    const basePayload = {
+      draftId,
+      clientName: 'Nelson Costa',
+      clientEmail: originalEmail,
+      taxRate: 0.05,
+      items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+    };
+    await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: JSON.stringify(basePayload) }) as any);
+
+    await POST(
+      new Request('http://localhost/api/quotes', {
+        method: 'POST',
+        body: JSON.stringify({ ...basePayload, clientEmail: newEmail }),
+      }) as any,
+    );
+
+    const updated = await prisma.quote.findUniqueOrThrow({ where: { draftId }, include: { client: true } });
+    expect(updated.client.email).toBe(newEmail);
+
+    // A subsequent GET (what pullServerQuotes reads) must reflect the new
+    // email too — not the stale one the quote used to point at.
+    const res = await GET();
+    const body = await res.json();
+    const fetched = body.quotes.find((q: { draftId: string }) => q.draftId === draftId);
+    expect(fetched.client.email).toBe(newEmail);
+  });
+
   it('lists quotes', async () => {
     const res = await GET();
     expect(res.status).toBe(200);

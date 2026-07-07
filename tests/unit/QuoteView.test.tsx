@@ -128,6 +128,48 @@ describe('QuoteView', () => {
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/portal/token-abc-123'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Link copied!' })).toBeInTheDocument());
+
+    // Sent to the client for approval — no longer editable from here.
+    expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Edit link for a quote that synced but is still in draft (saved without sending)', async () => {
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/server-quote-5': { ok: true, json: async () => ({ quote: { status: 'draft', publicToken: 'token-def-456' } }) },
+    });
+
+    await localDb.drafts.put({
+      draftId: 'view-5',
+      serverId: 'server-quote-5',
+      clientName: 'Draft Client',
+      clientEmail: 'draft@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [],
+    });
+
+    render(<QuoteView draftId="view-5" />);
+
+    await waitFor(() => expect(screen.getByTestId('approval-badge')).toHaveTextContent('Draft'));
+    expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
+  });
+
+  it('keeps the Edit link for a quote that has never synced (no serverId yet)', async () => {
+    await localDb.drafts.put({
+      draftId: 'view-6',
+      clientName: 'Never Synced Client',
+      clientEmail: 'neversynced@example.com',
+      taxRate: 0.05,
+      status: 'local',
+      updatedAt: Date.now(),
+      items: [],
+    });
+
+    render(<QuoteView draftId="view-6" />);
+
+    await waitFor(() => expect(screen.getByText('Never Synced Client')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
   });
 
   function seedSyncedDraft(draftId: string, serverId: string) {

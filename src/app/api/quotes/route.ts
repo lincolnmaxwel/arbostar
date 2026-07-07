@@ -81,6 +81,13 @@ export async function POST(req: NextRequest) {
           sentAt: data.send ? new Date() : null,
         },
         update: {
+          // Without this, editing the client's email into one that doesn't
+          // match an existing Client row creates/finds a *different* Client
+          // above (client.upsert is keyed by email) but left this quote
+          // pointed at its old clientId — the edit appeared to save, but the
+          // next pull (GET /api/quotes, which includes the still-old
+          // `client` relation) silently reverted it back.
+          clientId: client.id,
           subtotal: totals.subtotal,
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,

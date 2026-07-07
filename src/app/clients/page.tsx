@@ -1,5 +1,6 @@
 import { getConfirmedClients } from '@/lib/clients';
 import { DeleteClientButton } from '@/components/DeleteClientButton';
+import { AutoRefresh } from '@/components/AutoRefresh';
 import styles from './clients.module.css';
 
 // A raw Prisma call gives Next.js no "dynamic" signal (unlike fetch()), so
@@ -17,6 +18,7 @@ export default async function ClientsPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <div className={styles.header}>
         <h1 className={styles.title}>Clients</h1>
       </div>

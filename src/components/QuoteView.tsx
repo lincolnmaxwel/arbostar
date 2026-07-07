@@ -53,30 +53,42 @@ export function QuoteView({ draftId }: { draftId: string }) {
   useEffect(() => {
     if (!serverId) return;
     let cancelled = false;
-    fetch(`/api/quotes/${serverId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body) => {
-        if (!cancelled && body?.quote) {
-          setApproval({ status: body.quote.status, publicToken: body.quote.publicToken });
-          if (body.quote.status === 'approved' || body.quote.status === 'scheduled') {
-            fetch(`/api/quotes/${serverId}/booking`)
-              .then((res) => (res.ok ? res.json() : null))
-              .then((b) => {
-                if (!cancelled && b?.quote) {
-                  setBooking({
-                    bookingStatus: b.quote.bookingStatus,
-                    scheduledDate: b.quote.scheduledDate ?? null,
-                    scheduledWindow: b.quote.scheduledWindow ?? null,
-                  });
-                }
-              })
-              .catch(() => {});
+
+    // Polls every 5s (matching the background sync loop's cadence) rather
+    // than fetching once — a client approving/declining or confirming a
+    // booking date changes server-side state that this tab has no other way
+    // of finding out about, so without polling this badge stays frozen at
+    // whatever it was when the page first loaded until a manual reload.
+    function loadStatus() {
+      fetch(`/api/quotes/${serverId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body) => {
+          if (!cancelled && body?.quote) {
+            setApproval({ status: body.quote.status, publicToken: body.quote.publicToken });
+            if (body.quote.status === 'approved' || body.quote.status === 'scheduled') {
+              fetch(`/api/quotes/${serverId}/booking`)
+                .then((res) => (res.ok ? res.json() : null))
+                .then((b) => {
+                  if (!cancelled && b?.quote) {
+                    setBooking({
+                      bookingStatus: b.quote.bookingStatus,
+                      scheduledDate: b.quote.scheduledDate ?? null,
+                      scheduledWindow: b.quote.scheduledWindow ?? null,
+                    });
+                  }
+                })
+                .catch(() => {});
+            }
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    }
+
+    loadStatus();
+    const timer = setInterval(loadStatus, 5000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [serverId]);
 

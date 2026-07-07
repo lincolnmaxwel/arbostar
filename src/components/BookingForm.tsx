@@ -63,17 +63,28 @@ export function BookingForm({ serverId, draftId }: { serverId: string; draftId: 
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/quotes/${serverId}/booking`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: BookingState | null) => {
-        if (!cancelled && body) setState(body);
-        else if (!cancelled) setLoadError('Could not load booking state.');
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError('Could not load booking state.');
-      });
+
+    // Polls every 5s rather than fetching once — the client can confirm or
+    // reject a proposed round at any time while staff is sitting on this
+    // page, and that only reaches this tab through polling, not a fetch
+    // that ran once on mount.
+    function loadState() {
+      fetch(`/api/quotes/${serverId}/booking`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body: BookingState | null) => {
+          if (!cancelled && body) setState(body);
+          else if (!cancelled) setLoadError('Could not load booking state.');
+        })
+        .catch(() => {
+          if (!cancelled) setLoadError('Could not load booking state.');
+        });
+    }
+
+    loadState();
+    const timer = setInterval(loadState, 5000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [serverId]);
 

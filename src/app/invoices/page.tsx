@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
 import { DeleteInvoiceButton } from '@/components/DeleteInvoiceButton';
+import { AutoRefresh } from '@/components/AutoRefresh';
 import styles from './invoices.module.css';
 
 // See src/app/clients/page.tsx for why this is required: a raw Prisma call
@@ -17,6 +18,7 @@ export default async function InvoicesPage() {
 
   return (
     <div>
+      <AutoRefresh />
       <div className={styles.header}>
         <h1 className={styles.title}>Invoices</h1>
       </div>

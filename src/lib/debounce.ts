@@ -1,7 +1,17 @@
-export function debounce<T extends (...args: never[]) => void>(fn: T, delayMs: number): T {
+export interface Debounced<T extends (...args: never[]) => void> {
+  (...args: Parameters<T>): void;
+  cancel(): void;
+}
+
+export function debounce<T extends (...args: never[]) => void>(fn: T, delayMs: number): Debounced<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  return ((...args: Parameters<T>) => {
+  const debounced = ((...args: Parameters<T>) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delayMs);
-  }) as T;
+  }) as Debounced<T>;
+  debounced.cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+  };
+  return debounced;
 }

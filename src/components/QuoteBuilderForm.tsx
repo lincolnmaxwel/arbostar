@@ -235,6 +235,11 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     // real internet (captive portal, ISP down), which would otherwise still
     // send this down the "online" path below and hit the same broken
     // navigation this whole check exists to avoid.
+    // Cancels any debounced persist() still pending from the last keystroke
+    // (within its 500ms window) — otherwise that timer fires after this
+    // .put() with a stale formState snapshot lacking pendingSend, silently
+    // reverting a "Save and Send" click into an unsent plain save.
+    persist.cancel();
     const online = await isReallyOnline();
     await localDb.drafts.put({ ...formState!, status: online ? 'syncing' : 'local', pendingSend, updatedAt: Date.now() });
     await enqueueSync(draftId);

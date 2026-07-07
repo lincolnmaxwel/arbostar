@@ -341,4 +341,39 @@ describe('sendInvoiceEmail', () => {
     const call = sendMailMock.mock.calls[0][0];
     expect(call.text).toContain('Thank you for your business!');
   });
+
+  it('attaches the PDF when pdfBuffer is provided', async () => {
+    const pdfBuffer = Buffer.from('%PDF-fake-content');
+    await sendInvoiceEmail({
+      to: 'nelson@example.com',
+      clientName: 'Nelson Costa',
+      invoiceNumber: 3,
+      items: [{ title: 'Hedges', price: 10 }],
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+      pdfBuffer,
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.attachments).toHaveLength(1);
+    expect(call.attachments[0]).toEqual({ filename: 'invoice-3.pdf', content: pdfBuffer, contentType: 'application/pdf' });
+  });
+
+  it('omits attachments entirely when no pdfBuffer is provided', async () => {
+    await sendInvoiceEmail({
+      to: 'nelson@example.com',
+      clientName: 'Nelson Costa',
+      invoiceNumber: 4,
+      items: [{ title: 'Hedges', price: 10 }],
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.attachments).toBeUndefined();
+  });
 });

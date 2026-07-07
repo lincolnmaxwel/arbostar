@@ -29,6 +29,7 @@ export default async function ClientsPage() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Email</th>
               <th>Phone</th>
               <th>Address</th>
               <th>Jobs</th>
@@ -37,10 +38,8 @@ export default async function ClientsPage() {
           <tbody>
             {clients.map((c) => (
               <tr key={c.id}>
-                <td>
-                  <div className={styles.clientName}>{c.name}</div>
-                  <div className={styles.clientEmail}>{c.email}</div>
-                </td>
+                <td className={styles.clientName}>{c.name}</td>
+                <td>{c.email}</td>
                 <td>{c.phone || '—'}</td>
                 <td>{c.address || '—'}</td>
                 <td>{c.quoteCount}</td>

@@ -323,6 +323,7 @@ export interface SendInvoiceEmailOptions {
   taxRate: number;
   taxAmount: number;
   total: number;
+  pdfBuffer?: Buffer;
 }
 
 // Sent once, right when staff marks a scheduled job Completed — reuses the
@@ -374,6 +375,9 @@ Thank you for your business${opts.companyName ? ` with ${opts.companyName}` : ''
     subject: `Invoice #${opts.invoiceNumber}`,
     text,
     html,
+    attachments: opts.pdfBuffer
+      ? [{ filename: `invoice-${opts.invoiceNumber}.pdf`, content: opts.pdfBuffer, contentType: 'application/pdf' }]
+      : undefined,
   });
 
   const previewUrl = nodemailer.getTestMessageUrl(info);

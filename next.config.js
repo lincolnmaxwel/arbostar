@@ -100,4 +100,18 @@ const withPWA = require('next-pwa')({
 
 module.exports = withPWA({
   reactStrictMode: true,
+  // pdfkit (invoice PDF generation, src/lib/invoicePdf.ts) loads its built-in
+  // font metrics (Helvetica.afm etc) via a path relative to its own
+  // `__dirname` at runtime. Webpack bundling a route handler for production
+  // rewrites `__dirname` to the BUNDLE's own emitted location, not pdfkit's
+  // real package directory — breaking that lookup with an ENOENT for a
+  // `data/Helvetica.afm` that doesn't exist there. Excluding it from the
+  // server bundle makes Node's native `require('pdfkit')` resolve it
+  // directly from node_modules at runtime instead, where its own `__dirname`
+  // is correct. Verified directly: without this, POST
+  // /api/quotes/[id]/complete 201s but silently produces no PDF (caught by
+  // this route's own try/catch) and logs exactly that ENOENT.
+  experimental: {
+    serverComponentsExternalPackages: ['pdfkit'],
+  },
 });

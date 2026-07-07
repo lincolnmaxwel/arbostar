@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { randomUUID } from 'crypto';
-import { existsSync, rmSync } from 'fs';
+import { existsSync, readdirSync, rmSync } from 'fs';
 import path from 'path';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
@@ -16,8 +16,18 @@ function patchReq(body: unknown) {
   return new Request('http://localhost/api/company', { method: 'PATCH', body: JSON.stringify(body) }) as any;
 }
 
+const uploadsDir = path.join(process.cwd(), 'uploads', 'company');
+
 describe('/api/company', () => {
   let userId: string;
+  // CompanyProfile is a real singleton (fixed id, the SAME row a real
+  // deployment's /profile page edits) and the logo lives in the SAME
+  // uploads/company/ directory a real logo would — snapshot both so every
+  // test can freely upsert/delete without a `deleteMany`/`rmSync` on the row
+  // or directory ever touching real data, and restore the snapshot in
+  // afterAll regardless of what the tests did in between.
+  let originalCompany: Awaited<ReturnType<typeof prisma.companyProfile.findUnique>>;
+  let originalFiles: string[];
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -25,20 +35,50 @@ describe('/api/company', () => {
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
+
+    originalCompany = await prisma.companyProfile.findUnique({ where: { id: COMPANY_PROFILE_ID } });
+    originalFiles = existsSync(uploadsDir) ? readdirSync(uploadsDir) : [];
   });
 
   afterAll(async () => {
     await prisma.user.delete({ where: { id: userId } });
-    await prisma.companyProfile.deleteMany({ where: { id: COMPANY_PROFILE_ID } });
-    const dir = path.join(process.cwd(), 'uploads', 'company');
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+
+    if (originalCompany) {
+      await prisma.companyProfile.update({
+        where: { id: COMPANY_PROFILE_ID },
+        data: {
+          name: originalCompany.name,
+          phone: originalCompany.phone,
+          email: originalCompany.email,
+          address: originalCompany.address,
+          logoPath: originalCompany.logoPath,
+        },
+      });
+    } else {
+      await prisma.companyProfile.deleteMany({ where: { id: COMPANY_PROFILE_ID } });
+    }
+
+    // Remove only the files this test run created, never anything that was
+    // already there.
+    if (existsSync(uploadsDir)) {
+      for (const file of readdirSync(uploadsDir)) {
+        if (!originalFiles.includes(file)) rmSync(path.join(uploadsDir, file), { force: true });
+      }
+    }
   });
 
   beforeEach(async () => {
-    await prisma.companyProfile.deleteMany({ where: { id: COMPANY_PROFILE_ID } });
+    // Blank slate for each test's own assertions — an update (never a
+    // delete), so the row this represents always still exists to be
+    // restored from the snapshot above no matter what a test does to it.
+    await prisma.companyProfile.upsert({
+      where: { id: COMPANY_PROFILE_ID },
+      update: { name: null, phone: null, email: null, address: null, logoPath: null },
+      create: { id: COMPANY_PROFILE_ID },
+    });
   });
 
-  it('GET creates the singleton row on first access and returns null fields', async () => {
+  it('GET returns the singleton row with null fields on a blank slate', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -58,12 +98,12 @@ describe('/api/company', () => {
 
   it('PATCH updates name/phone/email/address', async () => {
     const res = await PATCH(
-      patchReq({ name: 'Tip Top Tree Service Ltd', phone: '(250) 857-2420', email: 'info@tiptoptreesltd.com', address: '4115 Holland Ave, Victoria, BC' }),
+      patchReq({ name: 'Test Co', phone: '(555) 000-1111', email: 'test@example.com', address: '1 Test St' }),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.company.name).toBe('Tip Top Tree Service Ltd');
-    expect(body.company.address).toBe('4115 Holland Ave, Victoria, BC');
+    expect(body.company.name).toBe('Test Co');
+    expect(body.company.address).toBe('1 Test St');
   });
 
   it('PATCH rejects an invalid email', async () => {
@@ -80,7 +120,7 @@ describe('/api/company', () => {
     expect(body.company.logoUrl).toMatch(/^\/api\/uploads\/company\//);
 
     const fileName = body.company.logoUrl.split('/').pop();
-    const filePath = path.join(process.cwd(), 'uploads', 'company', fileName);
+    const filePath = path.join(uploadsDir, fileName);
     expect(existsSync(filePath)).toBe(true);
 
     const serveRes = await serveLogo(new Request('http://localhost/api/uploads/company/' + fileName) as any, { params: { filename: fileName } });
@@ -101,7 +141,7 @@ describe('/api/company', () => {
     const res1 = await uploadLogo(new Request('http://localhost/api/company/logo', { method: 'POST', body: form1 }) as any);
     const body1 = await res1.json();
     const fileName1 = body1.company.logoUrl.split('/').pop();
-    const filePath1 = path.join(process.cwd(), 'uploads', 'company', fileName1);
+    const filePath1 = path.join(uploadsDir, fileName1);
     expect(existsSync(filePath1)).toBe(true);
 
     const form2 = new FormData();

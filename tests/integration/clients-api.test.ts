@@ -23,7 +23,13 @@ describe('GET /api/clients', () => {
     const scheduledClient = await prisma.client.create({ data: { name: 'Scheduled Client', email: `sched-${randomUUID()}@example.com` } });
     scheduledClientId = scheduledClient.id;
     await prisma.quote.create({
-      data: { draftId: randomUUID(), clientId: scheduledClient.id, createdById: userId, status: 'scheduled' },
+      data: {
+        draftId: randomUUID(),
+        clientId: scheduledClient.id,
+        createdById: userId,
+        status: 'scheduled',
+        serviceAddress: '123 Oak St, Springfield',
+      },
     });
 
     const completedClient = await prisma.client.create({ data: { name: 'Completed Client', email: `comp-${randomUUID()}@example.com` } });
@@ -52,6 +58,14 @@ describe('GET /api/clients', () => {
     const names = body.clients.map((c: { name: string }) => c.name);
     expect(names).toContain('Scheduled Client');
     expect(names).toContain('Completed Client');
+  });
+
+  it('falls back to the most recent confirmed quote\'s service address when Client.address is empty', async () => {
+    const res = await GET();
+    const body = await res.json();
+    const scheduled = body.clients.find((c: { name: string }) => c.name === 'Scheduled Client');
+    expect(scheduled.address).toBe('123 Oak St, Springfield');
+    expect(scheduled.email).toBeTruthy();
   });
 
   it('excludes a client whose quotes never got past draft/sent/approved', async () => {

@@ -7,7 +7,21 @@ import { prisma } from '@/lib/db';
 export async function getConfirmedClients() {
   const clients = await prisma.client.findMany({
     where: { quotes: { some: { status: { in: ['scheduled', 'completed'] } } } },
-    include: { _count: { select: { quotes: true } } },
+    include: {
+      _count: { select: { quotes: true } },
+      // Client.address is only ever set if someone typed it directly against
+      // the Client record — the builder form has no "client address" input,
+      // only Service address (per-quote, since a client's job site can
+      // differ from their own address). In practice Client.address is
+      // almost always empty, so fall back to the most recent confirmed
+      // quote's service address rather than showing a blank column.
+      quotes: {
+        where: { status: { in: ['scheduled', 'completed'] } },
+        orderBy: { updatedAt: 'desc' },
+        take: 1,
+        select: { serviceAddress: true },
+      },
+    },
     orderBy: { name: 'asc' },
   });
 
@@ -16,7 +30,7 @@ export async function getConfirmedClients() {
     name: c.name,
     email: c.email,
     phone: c.phone,
-    address: c.address,
+    address: c.address || c.quotes[0]?.serviceAddress || null,
     quoteCount: c._count.quotes,
   }));
 }

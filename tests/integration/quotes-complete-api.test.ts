@@ -63,6 +63,12 @@ describe('POST /api/quotes/[id]/complete', () => {
 
     expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
     expect(sendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({ invoiceNumber: invoice!.number, total: 525 }));
+
+    // A PDF attachment (the on-screen invoice, laid out for A4) rides along
+    // with the email — not just the HTML body.
+    const call = (sendInvoiceEmail as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(Buffer.isBuffer(call.pdfBuffer)).toBe(true);
+    expect(call.pdfBuffer.subarray(0, 4).toString()).toBe('%PDF');
   });
 
   it('rejects completing a quote that is not scheduled', async () => {

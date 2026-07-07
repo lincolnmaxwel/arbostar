@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
+import { buildInvoicePdf } from '@/lib/invoicePdf';
 
 // Marks a scheduled job Completed and generates its (one and only) Invoice —
 // a snapshot of the quote's totals at that moment, not a live recompute, so
@@ -45,16 +46,41 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   try {
     const company = await getCompanyProfile();
+    const items = quote.items.map((item) => ({ title: item.title, description: item.description, price: Number(item.price) }));
+
+    // A PDF failure (a corrupt/missing logo file, say) shouldn't take the
+    // email down with it — fall back to sending without the attachment
+    // rather than losing the invoice notification entirely.
+    let pdfBuffer: Buffer | undefined;
+    try {
+      pdfBuffer = await buildInvoicePdf({
+        invoiceNumber: invoice.number,
+        quoteNumber: quote.number,
+        date: invoice.createdAt,
+        client: { name: quote.client.name, email: quote.client.email, phone: quote.client.phone, address: quote.client.address },
+        serviceAddress: quote.serviceAddress,
+        company: { name: company.name, phone: company.phone, email: company.email, address: company.address, logoPath: company.logoPath },
+        items,
+        subtotal: Number(quote.subtotal),
+        taxRate: Number(quote.taxRate),
+        taxAmount: Number(quote.taxAmount),
+        total: Number(quote.total),
+      });
+    } catch (err) {
+      console.error('[quotes/complete] buildInvoicePdf failed', err);
+    }
+
     await sendInvoiceEmail({
       to: quote.client.email,
       clientName: quote.client.name,
       invoiceNumber: invoice.number,
       companyName: company.name ?? undefined,
-      items: quote.items.map((item) => ({ title: item.title, description: item.description, price: Number(item.price) })),
+      items,
       subtotal: Number(quote.subtotal),
       taxRate: Number(quote.taxRate),
       taxAmount: Number(quote.taxAmount),
       total: Number(quote.total),
+      pdfBuffer,
     });
   } catch (err) {
     // The job is already marked completed and the invoice already exists —

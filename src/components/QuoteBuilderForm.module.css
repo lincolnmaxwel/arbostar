@@ -131,8 +131,13 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 0.875rem;
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
+}
+
+textarea.itemInput {
+  resize: vertical;
 }
 
 .itemInput:focus {

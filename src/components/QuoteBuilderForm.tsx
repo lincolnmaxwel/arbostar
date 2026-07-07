@@ -338,6 +338,16 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                 <label htmlFor={`title-${item.id}`}>Service title</label>
                 <input id={`title-${item.id}`} className={styles.itemInput} value={item.title} onChange={(e) => updateItem(item.id, { title: e.target.value })} />
               </div>
+              <div className={`${styles.itemField} ${styles.itemFieldFull}`}>
+                <label htmlFor={`description-${item.id}`}>Description</label>
+                <textarea
+                  id={`description-${item.id}`}
+                  className={styles.itemInput}
+                  rows={3}
+                  value={item.description ?? ''}
+                  onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                />
+              </div>
               <div className={styles.itemField}>
                 <label htmlFor={`price-${item.id}`}>Price ($)</label>
                 <input

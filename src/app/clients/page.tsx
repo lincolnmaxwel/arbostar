@@ -1,5 +1,6 @@
 import { getConfirmedClients } from '@/lib/clients';
 import { DeleteClientButton } from '@/components/DeleteClientButton';
+import { EditClientButton } from '@/components/EditClientButton';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import styles from './clients.module.css';
 
@@ -47,7 +48,8 @@ export default async function ClientsPage() {
                 <td>{c.phone || '—'}</td>
                 <td>{c.address || '—'}</td>
                 <td>{c.quoteCount}</td>
-                <td>
+                <td className={styles.actionsCell}>
+                  <EditClientButton client={c} className={styles.editButton} />
                   <DeleteClientButton clientId={c.id} clientName={c.name} className={styles.deleteButton} />
                 </td>
               </tr>

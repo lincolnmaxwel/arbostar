@@ -1,10 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rm } from 'fs/promises';
 import path from 'path';
+import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+
+const patchSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+});
+
+// Client.email is unique — the same constraint client-creation relies on
+// (see the upsert in POST /api/quotes) — so editing it into one that
+// collides with a different client fails with a clear 409 instead of a raw
+// Postgres unique-violation 500.
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const body = await req.json();
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const existing = await prisma.client.findUnique({ where: { id: params.id } });
+  if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  try {
+    const client = await prisma.client.update({ where: { id: params.id }, data: parsed.data });
+    return NextResponse.json({ client });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json({ error: 'email-taken', message: 'Another client already uses that email.' }, { status: 409 });
+    }
+    throw err;
+  }
+}
 
 // Quote.client now cascades (see schema.prisma), so deleting a Client
 // deletes all their quotes too (and, transitively, QuoteItems/QuotePhotos/

@@ -5,7 +5,7 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 
 import { getServerSession } from 'next-auth';
 import { GET } from '@/app/api/clients/route';
-import { DELETE } from '@/app/api/clients/[id]/route';
+import { DELETE, PATCH } from '@/app/api/clients/[id]/route';
 import { prisma } from '@/lib/db';
 
 describe('GET /api/clients', () => {
@@ -158,6 +158,81 @@ describe('DELETE /api/clients/[id]', () => {
     const res = await DELETE(new Request('http://localhost/api/clients/anything', { method: 'DELETE' }) as any, {
       params: { id: 'anything' },
     });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('PATCH /api/clients/[id]', () => {
+  let userId: string;
+
+  beforeAll(async () => {
+    const user = await prisma.user.create({
+      data: { name: 'Edit Client Test', email: `editclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+    });
+    userId = user.id;
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+  });
+
+  function patchRequest(body: unknown) {
+    return new Request('http://localhost/api/clients/x', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }) as any;
+  }
+
+  it('updates name/email/phone/address', async () => {
+    const client = await prisma.client.create({ data: { name: 'Old Name', email: `before-${randomUUID()}@example.com` } });
+
+    const res = await PATCH(
+      patchRequest({ name: 'New Name', email: `after-${randomUUID()}@example.com`, phone: '(555) 123-4567', address: '1 New St' }),
+      { params: { id: client.id } },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.client.name).toBe('New Name');
+    expect(body.client.phone).toBe('(555) 123-4567');
+    expect(body.client.address).toBe('1 New St');
+
+    await prisma.client.delete({ where: { id: client.id } });
+  });
+
+  it('returns 409 (not a raw 500) when the new email is already used by another client', async () => {
+    const clientA = await prisma.client.create({ data: { name: 'Client A', email: `a-${randomUUID()}@example.com` } });
+    const clientB = await prisma.client.create({ data: { name: 'Client B', email: `b-${randomUUID()}@example.com` } });
+
+    const res = await PATCH(patchRequest({ name: 'Client B', email: clientA.email }), { params: { id: clientB.id } });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe('email-taken');
+
+    // Untouched by the failed update.
+    const stillClientB = await prisma.client.findUnique({ where: { id: clientB.id } });
+    expect(stillClientB?.email).not.toBe(clientA.email);
+
+    await prisma.client.delete({ where: { id: clientA.id } });
+    await prisma.client.delete({ where: { id: clientB.id } });
+  });
+
+  it('returns 400 for an invalid email', async () => {
+    const client = await prisma.client.create({ data: { name: 'Client', email: `valid-${randomUUID()}@example.com` } });
+    const res = await PATCH(patchRequest({ name: 'Client', email: 'not-an-email' }), { params: { id: client.id } });
+    expect(res.status).toBe(400);
+    await prisma.client.delete({ where: { id: client.id } });
+  });
+
+  it('returns 404 for a client that does not exist', async () => {
+    const res = await PATCH(patchRequest({ name: 'X', email: `x-${randomUUID()}@example.com` }), { params: { id: 'does-not-exist' } });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const res = await PATCH(patchRequest({ name: 'X', email: 'x@example.com' }), { params: { id: 'anything' } });
     expect(res.status).toBe(401);
   });
 });

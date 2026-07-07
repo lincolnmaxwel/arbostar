@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, DraftQuote, DraftQuoteItem } from '@/lib/localDb';
@@ -44,6 +45,13 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const [clients, setClients] = useState<ExistingClient[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  // Set once an existing client is picked from the autocomplete below — locks
+  // name/email/phone so this quote can't accidentally end up attached to a
+  // different person than the one actually selected. Edits to that client's
+  // info belong on the Clients page (which updates the one shared Client
+  // row), not here. Purely local UI state, not persisted to the draft: a
+  // fresh page load always starts unlocked.
+  const [lockedClientId, setLockedClientId] = useState<string | null>(null);
   const router = useRouter();
 
   // Confirmed clients (at least one scheduled job — see /api/clients) a repeat
@@ -66,6 +74,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   useEffect(() => {
     let cancelled = false;
     setFormState(null);
+    setLockedClientId(null);
     localDb.drafts.get(draftId).then((existing) => {
       if (!cancelled) setFormState(existing ?? emptyDraft(draftId));
     });
@@ -173,6 +182,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     persist(next);
     setClientSearch('');
     setClientDropdownOpen(false);
+    setLockedClientId(client.id);
   }
 
   const clientMatches =
@@ -295,13 +305,36 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
             )}
           </div>
         )}
+        {lockedClientId && (
+          <div className={styles.lockedClientNotice}>
+            Locked to an existing client. To change their name/email/phone, edit them on the{' '}
+            <Link href="/clients">Clients page</Link> — or{' '}
+            <button type="button" className={styles.changeClientButton} onClick={() => setLockedClientId(null)}>
+              change client
+            </button>{' '}
+            to type in someone else's details instead.
+          </div>
+        )}
         <div className={styles.field}>
           <label htmlFor="clientName">Client name</label>
-          <input id="clientName" className={styles.input} value={formState.clientName} onChange={(e) => updateField('clientName', e.target.value)} />
+          <input
+            id="clientName"
+            className={styles.input}
+            value={formState.clientName}
+            disabled={lockedClientId !== null}
+            onChange={(e) => updateField('clientName', e.target.value)}
+          />
         </div>
         <div className={styles.field}>
           <label htmlFor="clientEmail">Client email</label>
-          <input id="clientEmail" type="email" className={styles.input} value={formState.clientEmail} onChange={(e) => updateField('clientEmail', e.target.value)} />
+          <input
+            id="clientEmail"
+            type="email"
+            className={styles.input}
+            value={formState.clientEmail}
+            disabled={lockedClientId !== null}
+            onChange={(e) => updateField('clientEmail', e.target.value)}
+          />
         </div>
         <div className={styles.field}>
           <label htmlFor="clientPhone">Client phone</label>
@@ -311,6 +344,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
             className={styles.input}
             placeholder="(555) 123-4567"
             value={formState.clientPhone ?? ''}
+            disabled={lockedClientId !== null}
             onChange={(e) => updateField('clientPhone', formatPhoneInput(e.target.value))}
           />
         </div>

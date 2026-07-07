@@ -38,6 +38,38 @@
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
+.input:disabled {
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.lockedClientNotice {
+  background: var(--color-primary-light);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.lockedClientNotice a {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.changeClientButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .clientDropdown {
   position: absolute;
   top: 100%;

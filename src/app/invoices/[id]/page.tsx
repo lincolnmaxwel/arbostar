@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
 import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
+import { DeleteInvoiceButton } from '@/components/DeleteInvoiceButton';
 import styles from './invoice.module.css';
 
 // Not strictly required (a dynamic route segment with no generateStaticParams
@@ -32,6 +33,10 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={company.name ?? 'Company logo'} className={styles.logo} />
           )}
+        </div>
+
+        <div className={styles.actions}>
+          <DeleteInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.number} className={styles.deleteButton} redirectTo="/invoices" />
         </div>
 
         <div className={styles.parties}>

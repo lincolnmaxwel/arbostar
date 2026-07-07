@@ -67,6 +67,27 @@
   font-size: 0.8125rem;
 }
 
+.deleteButton {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-error);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: var(--color-error-bg);
+}
+
+.deleteButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .priceCol {
   text-align: right;
   white-space: nowrap;

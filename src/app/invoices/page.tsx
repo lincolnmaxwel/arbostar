@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
+import { DeleteInvoiceButton } from '@/components/DeleteInvoiceButton';
 import styles from './invoices.module.css';
 
 // See src/app/clients/page.tsx for why this is required: a raw Prisma call
@@ -32,6 +33,7 @@ export default async function InvoicesPage() {
               <th>Client</th>
               <th>Sent</th>
               <th className={styles.priceCol}>Total</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -48,6 +50,9 @@ export default async function InvoicesPage() {
                 </td>
                 <td>{inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : '—'}</td>
                 <td className={styles.priceCol}>{formatMoney(Number(inv.total))}</td>
+                <td>
+                  <DeleteInvoiceButton invoiceId={inv.id} invoiceNumber={inv.number} className={styles.deleteButton} />
+                </td>
               </tr>
             ))}
           </tbody>

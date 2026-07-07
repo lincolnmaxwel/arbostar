@@ -46,6 +46,27 @@ describe('DELETE /api/quotes/[id]', () => {
     expect(await prisma.quotePhoto.findMany({ where: { quoteItemId: itemId } })).toHaveLength(0);
   });
 
+  it('returns 409 (not a raw 500) when the quote still has an invoice', async () => {
+    const client = await prisma.client.create({ data: { name: 'Invoiced Client', email: `client-${randomUUID()}@example.com` } });
+    const quote = await prisma.quote.create({
+      data: { draftId: randomUUID(), clientId: client.id, createdById: userId, status: 'completed' },
+    });
+    const invoice = await prisma.invoice.create({
+      data: { quoteId: quote.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
+    });
+
+    const res = await DELETE(new Request(`http://localhost/api/quotes/${quote.id}`, { method: 'DELETE' }) as any, {
+      params: { id: quote.id },
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe('has-invoice');
+
+    // Cleanup: delete the invoice first (the whole point of the 409), then the quote.
+    await prisma.invoice.delete({ where: { id: invoice.id } });
+    await prisma.quote.delete({ where: { id: quote.id } });
+  });
+
   it('returns 404 for a quote that does not exist', async () => {
     const res = await DELETE(new Request('http://localhost/api/quotes/does-not-exist', { method: 'DELETE' }) as any, {
       params: { id: 'does-not-exist' },

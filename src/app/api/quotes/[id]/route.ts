@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rm } from 'fs/promises';
 import path from 'path';
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -22,8 +23,17 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const quote = await prisma.quote.findUnique({ where: { id: params.id } });
   if (!quote) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  // QuoteItem/QuotePhoto rows cascade via the schema's onDelete: Cascade.
-  await prisma.quote.delete({ where: { id: params.id } });
+  // QuoteItem/QuotePhoto/ScheduleRound rows cascade via the schema's
+  // onDelete: Cascade. Invoice does not — delete it explicitly first
+  // (DELETE /api/invoices/[id]) or this fails with a 409.
+  try {
+    await prisma.quote.delete({ where: { id: params.id } });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      return NextResponse.json({ error: 'has-invoice', message: 'Delete this quote\'s invoice first.' }, { status: 409 });
+    }
+    throw err;
+  }
 
   const dir = path.join(process.cwd(), 'uploads', 'quotes', params.id);
   await rm(dir, { recursive: true, force: true }).catch(() => {});

@@ -83,7 +83,13 @@ model Quote {
   status      QuoteStatus @default(draft)
   draftId     String      @unique
   clientId    String
-  client      Client      @relation(fields: [clientId], references: [id])
+  // Cascade: deleting a Client removes all their quotes (and, transitively,
+  // QuoteItems/QuotePhotos/ScheduleRounds via their own Cascade rules) — but
+  // NOT their Invoice (Invoice.quote has no cascade, deliberately: an
+  // invoice is a frozen record the client already received by email, so
+  // deleting one requires an explicit DELETE /api/invoices/[id] first,
+  // rather than silently vanishing as a side effect of deleting the client).
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdById String
   createdBy   User        @relation(fields: [createdById], references: [id])
   subtotal    Decimal     @db.Decimal(10, 2) @default(0)

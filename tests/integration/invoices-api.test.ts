@@ -5,7 +5,7 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 
 import { getServerSession } from 'next-auth';
 import { GET as listInvoices } from '@/app/api/invoices/route';
-import { GET as getInvoice } from '@/app/api/invoices/[id]/route';
+import { GET as getInvoice, DELETE as deleteInvoice } from '@/app/api/invoices/[id]/route';
 import { prisma } from '@/lib/db';
 
 describe('/api/invoices', () => {
@@ -74,5 +74,42 @@ describe('/api/invoices', () => {
   it('GET detail returns 404 for an unknown invoice', async () => {
     const res = await getInvoice(new Request('http://localhost/api/invoices/does-not-exist') as any, { params: { id: 'does-not-exist' } });
     expect(res.status).toBe(404);
+  });
+
+  it('DELETE removes the invoice and unblocks deleting its quote afterward', async () => {
+    const client = await prisma.client.create({ data: { name: 'Delete Invoice Client', email: `delinv-${randomUUID()}@example.com` } });
+    const quote = await prisma.quote.create({
+      data: { draftId: randomUUID(), clientId: client.id, createdById: userId, status: 'completed' },
+    });
+    const invoice = await prisma.invoice.create({
+      data: { quoteId: quote.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
+    });
+
+    const res = await deleteInvoice(new Request(`http://localhost/api/invoices/${invoice.id}`, { method: 'DELETE' }) as any, {
+      params: { id: invoice.id },
+    });
+    expect(res.status).toBe(200);
+    expect(await prisma.invoice.findUnique({ where: { id: invoice.id } })).toBeNull();
+
+    // The quote itself is untouched by deleting its invoice.
+    expect(await prisma.quote.findUnique({ where: { id: quote.id } })).not.toBeNull();
+
+    await prisma.quote.delete({ where: { id: quote.id } });
+    await prisma.client.delete({ where: { id: client.id } });
+  });
+
+  it('DELETE returns 404 for an unknown invoice', async () => {
+    const res = await deleteInvoice(new Request('http://localhost/api/invoices/does-not-exist', { method: 'DELETE' }) as any, {
+      params: { id: 'does-not-exist' },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('DELETE returns 401 when unauthenticated', async () => {
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const res = await deleteInvoice(new Request('http://localhost/api/invoices/anything', { method: 'DELETE' }) as any, {
+      params: { id: 'anything' },
+    });
+    expect(res.status).toBe(401);
   });
 });

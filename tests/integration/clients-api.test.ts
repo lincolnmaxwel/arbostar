@@ -5,6 +5,7 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 
 import { getServerSession } from 'next-auth';
 import { GET } from '@/app/api/clients/route';
+import { DELETE } from '@/app/api/clients/[id]/route';
 import { prisma } from '@/lib/db';
 
 describe('GET /api/clients', () => {
@@ -78,6 +79,85 @@ describe('GET /api/clients', () => {
   it('returns 401 when unauthenticated', async () => {
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
     const res = await GET();
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('DELETE /api/clients/[id]', () => {
+  let userId: string;
+
+  beforeAll(async () => {
+    const user = await prisma.user.create({
+      data: { name: 'Delete Client Test', email: `delclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+    });
+    userId = user.id;
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+  });
+
+  it('deletes the client and cascades their quotes (and items)', async () => {
+    const client = await prisma.client.create({ data: { name: 'Cascade Client', email: `cascade-${randomUUID()}@example.com` } });
+    const quote = await prisma.quote.create({
+      data: {
+        draftId: randomUUID(),
+        clientId: client.id,
+        createdById: userId,
+        status: 'scheduled',
+        items: { create: [{ localItemId: randomUUID(), title: 'Hedges', price: 100, sortOrder: 0 }] },
+      },
+      include: { items: true },
+    });
+
+    const res = await DELETE(new Request(`http://localhost/api/clients/${client.id}`, { method: 'DELETE' }) as any, {
+      params: { id: client.id },
+    });
+    expect(res.status).toBe(200);
+
+    expect(await prisma.client.findUnique({ where: { id: client.id } })).toBeNull();
+    expect(await prisma.quote.findUnique({ where: { id: quote.id } })).toBeNull();
+    expect(await prisma.quoteItem.findUnique({ where: { id: quote.items[0].id } })).toBeNull();
+  });
+
+  it('returns 409 (not a raw 500) when a quote still has an invoice, leaving the client intact', async () => {
+    const client = await prisma.client.create({ data: { name: 'Invoiced Client', email: `invclient-${randomUUID()}@example.com` } });
+    const quote = await prisma.quote.create({
+      data: { draftId: randomUUID(), clientId: client.id, createdById: userId, status: 'completed' },
+    });
+    const invoice = await prisma.invoice.create({
+      data: { quoteId: quote.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
+    });
+
+    const res = await DELETE(new Request(`http://localhost/api/clients/${client.id}`, { method: 'DELETE' }) as any, {
+      params: { id: client.id },
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe('has-invoice');
+
+    // The client and quote must still be there — the delete was fully rolled back, not partial.
+    expect(await prisma.client.findUnique({ where: { id: client.id } })).not.toBeNull();
+    expect(await prisma.quote.findUnique({ where: { id: quote.id } })).not.toBeNull();
+
+    await prisma.invoice.delete({ where: { id: invoice.id } });
+    await prisma.quote.delete({ where: { id: quote.id } });
+    await prisma.client.delete({ where: { id: client.id } });
+  });
+
+  it('returns 404 for a client that does not exist', async () => {
+    const res = await DELETE(new Request('http://localhost/api/clients/does-not-exist', { method: 'DELETE' }) as any, {
+      params: { id: 'does-not-exist' },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const res = await DELETE(new Request('http://localhost/api/clients/anything', { method: 'DELETE' }) as any, {
+      params: { id: 'anything' },
+    });
     expect(res.status).toBe(401);
   });
 });

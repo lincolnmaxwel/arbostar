@@ -75,6 +75,8 @@ The invoice email carries a PDF attachment (`buildInvoicePdf()`, `src/lib/invoic
 
 **Both `/clients` and `/invoices` (and `/invoices/[id]`) declare `export const dynamic = 'force-dynamic'`.** A raw Prisma call gives Next.js's static-analysis no "dynamic" signal the way `fetch()` does — without this, Next silently prerenders the page ONCE at build time and serves that same stale snapshot to every request forever, so a new confirmed client or invoice would never appear without a full redeploy. Caught by inspecting the build output (`○` vs `ƒ` markers), not by anything failing loudly. Any future server-component page that queries Prisma directly (rather than being a `'use client'` page fetching from an API route, like the Dexie-backed `/quotes` pages) needs the same directive.
 
+Deleting: `DELETE /api/invoices/[id]` and `DELETE /api/clients/[id]` (buttons on `/invoices`, `/invoices/[id]`, `/clients`) exist mainly so staff (and whoever's testing) can reset state without going through Postgres directly. `Quote.client` cascades (deleting a `Client` deletes all their quotes, and transitively items/photos/schedule rounds) but `Invoice.quote` deliberately does NOT — an invoice is a record the client already received by email, so it should never vanish as a side effect of deleting the quote or client it's attached to. Deleting a client (or a quote) that still has an invoice fails with a 409 (`{ error: 'has-invoice' }`, not a raw Postgres FK-violation 500) telling staff to delete the invoice first — the order the request above described.
+
 ### Data model notes
 
 - `Quote.status` enum: `draft | sent | approved | declined | expired | scheduled | completed`. `sent` is the client-facing "Pending" state.

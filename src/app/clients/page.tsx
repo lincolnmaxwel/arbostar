@@ -1,4 +1,5 @@
 import { getConfirmedClients } from '@/lib/clients';
+import { DeleteClientButton } from '@/components/DeleteClientButton';
 import styles from './clients.module.css';
 
 // A raw Prisma call gives Next.js no "dynamic" signal (unlike fetch()), so
@@ -33,6 +34,7 @@ export default async function ClientsPage() {
               <th>Phone</th>
               <th>Address</th>
               <th>Jobs</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -43,6 +45,9 @@ export default async function ClientsPage() {
                 <td>{c.phone || '—'}</td>
                 <td>{c.address || '—'}</td>
                 <td>{c.quoteCount}</td>
+                <td>
+                  <DeleteClientButton clientId={c.id} clientName={c.name} className={styles.deleteButton} />
+                </td>
               </tr>
             ))}
           </tbody>

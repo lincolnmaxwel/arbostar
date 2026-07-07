@@ -14,6 +14,14 @@ import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
 import { formatPhoneInput } from '@/lib/formatPhone';
 import styles from './QuoteBuilderForm.module.css';
 
+interface ExistingClient {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+}
+
 function emptyDraft(draftId: string): DraftQuote {
   return {
     draftId,
@@ -33,7 +41,21 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [syncingNow, setSyncingNow] = useState(false);
   const [focusedPriceId, setFocusedPriceId] = useState<string | null>(null);
+  const [clients, setClients] = useState<ExistingClient[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const router = useRouter();
+
+  // Confirmed clients (at least one scheduled job — see /api/clients) a repeat
+  // customer's info can be reused from, instead of retyping it every time.
+  useEffect(() => {
+    fetch('/api/clients')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (body?.clients) setClients(body.clients);
+      })
+      .catch(() => {});
+  }, []);
 
   // Seed formState from an existing draft if one's already persisted, or from
   // an in-memory empty draft otherwise. Deliberately does NOT write anything
@@ -134,6 +156,30 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     persist(next);
   }
 
+  // A single merged update, not four updateField() calls — updateField reads
+  // `formState` from this render's closure, so four calls in a row would each
+  // spread from the SAME stale snapshot and only the last one would stick
+  // (the exact multi-field-edit race this file's persist() design exists to
+  // avoid elsewhere).
+  function selectClient(client: ExistingClient) {
+    const next: DraftQuote = {
+      ...formState!,
+      clientName: client.name,
+      clientEmail: client.email,
+      clientPhone: client.phone ?? undefined,
+      clientAddress: client.address ?? undefined,
+    };
+    setFormState(next);
+    persist(next);
+    setClientSearch('');
+    setClientDropdownOpen(false);
+  }
+
+  const clientMatches =
+    clientSearch.trim().length === 0
+      ? []
+      : clients.filter((c) => `${c.name} ${c.email}`.toLowerCase().includes(clientSearch.trim().toLowerCase())).slice(0, 8);
+
   function addItem() {
     const item: DraftQuoteItem = { id: crypto.randomUUID(), title: '', price: 0, photoIds: [] };
     updateField('items', [...formState!.items, item]);
@@ -215,6 +261,35 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Client details</h2>
+        {clients.length > 0 && (
+          <div className={styles.field} style={{ position: 'relative' }}>
+            <label htmlFor="clientSearch">Existing client</label>
+            <input
+              id="clientSearch"
+              className={styles.input}
+              placeholder="Search by name or email to reuse their info..."
+              value={clientSearch}
+              onChange={(e) => {
+                setClientSearch(e.target.value);
+                setClientDropdownOpen(true);
+              }}
+              onFocus={() => setClientDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setClientDropdownOpen(false), 150)}
+            />
+            {clientDropdownOpen && clientMatches.length > 0 && (
+              <ul className={styles.clientDropdown} role="listbox">
+                {clientMatches.map((c) => (
+                  <li key={c.id}>
+                    <button type="button" className={styles.clientOption} onMouseDown={() => selectClient(c)}>
+                      <span className={styles.clientOptionName}>{c.name}</span>
+                      <span className={styles.clientOptionEmail}>{c.email}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         <div className={styles.field}>
           <label htmlFor="clientName">Client name</label>
           <input id="clientName" className={styles.input} value={formState.clientName} onChange={(e) => updateField('clientName', e.target.value)} />

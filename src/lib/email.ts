@@ -312,3 +312,72 @@ View it here: ${opts.quoteUrl}
     console.log(`[email] booking decision notification preview: ${previewUrl}`);
   }
 }
+
+export interface SendInvoiceEmailOptions {
+  to: string;
+  clientName: string;
+  invoiceNumber: number;
+  companyName?: string;
+  items: SendQuoteApprovalEmailItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+}
+
+// Sent once, right when staff marks a scheduled job Completed — reuses the
+// same item-table builders as the quote-ready email since it's the same
+// "title/description/price" shape, just billed instead of proposed.
+export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<void> {
+  const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
+  const text = `Hi ${opts.clientName},
+
+The work is complete! Here is your invoice #${opts.invoiceNumber}.
+
+${buildItemsText(opts.items)}
+
+Subtotal: ${formatMoney(opts.subtotal)}
+Tax (${(opts.taxRate * 100).toFixed(1)}%): ${formatMoney(opts.taxAmount)}
+Total: ${formatMoney(opts.total)}
+
+Thank you for your business${opts.companyName ? ` with ${opts.companyName}` : ''}!
+`;
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+      <p>Hi ${escapeHtml(opts.clientName)},</p>
+      <p>The work is complete! Here is your invoice <strong>#${opts.invoiceNumber}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Description</th>
+            <th style="text-align:right;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${buildItemsHtml(opts.items)}</tbody>
+      </table>
+      <table style="width:100%;max-width:280px;margin-left:auto;font-size:14px;color:#6b7280;">
+        <tr><td style="padding:4px 0;">Subtotal</td><td style="text-align:right;">${formatMoney(opts.subtotal)}</td></tr>
+        <tr><td style="padding:4px 0;">Tax (${(opts.taxRate * 100).toFixed(1)}%)</td><td style="text-align:right;">${formatMoney(opts.taxAmount)}</td></tr>
+        <tr>
+          <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;">Total</td>
+          <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;text-align:right;">${formatMoney(opts.total)}</td>
+        </tr>
+      </table>
+      <p style="margin-top:24px;">Thank you for your business with ${from}!</p>
+    </div>
+  `;
+
+  const info = await getTransporter().sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to: opts.to,
+    subject: `Invoice #${opts.invoiceNumber}`,
+    text,
+    html,
+  });
+
+  const previewUrl = nodemailer.getTestMessageUrl(info);
+  if (previewUrl) {
+    console.log(`[email] invoice preview: ${previewUrl}`);
+  }
+}

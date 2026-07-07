@@ -15,6 +15,7 @@ import {
   sendBookingProposalEmail,
   sendQuoteDecisionNotificationEmail,
   sendBookingDecisionNotificationEmail,
+  sendInvoiceEmail,
 } from '@/lib/email';
 
 describe('sendQuoteApprovalEmail', () => {
@@ -270,5 +271,74 @@ describe('sendBookingDecisionNotificationEmail', () => {
     const call = sendMailMock.mock.calls[0][0];
     expect(call.subject).toContain('rejected');
     expect(call.text).toContain('None of these days work.');
+  });
+});
+
+describe('sendInvoiceEmail', () => {
+  beforeEach(() => {
+    sendMailMock.mockClear();
+    createTransportMock.mockClear();
+    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
+  });
+
+  it('sends the invoice number, itemized breakdown, and totals', async () => {
+    await sendInvoiceEmail({
+      to: 'nelson@example.com',
+      clientName: 'Nelson Costa',
+      invoiceNumber: 7,
+      companyName: 'Tip Top Tree Service Ltd',
+      items: [{ title: 'Tree removal', price: 500 }],
+      subtotal: 500,
+      taxRate: 0.05,
+      taxAmount: 25,
+      total: 525,
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.to).toBe('nelson@example.com');
+    expect(call.subject).toBe('Invoice #7');
+    expect(call.text).toContain('Nelson Costa');
+    expect(call.text).toContain('#7');
+    expect(call.text).toContain('Tree removal');
+    expect(call.text).toContain('$525.00');
+    expect(call.html).toContain('Tree removal');
+    expect(call.html).toContain('$525.00');
+    expect(call.html).toContain('Tip Top Tree Service Ltd');
+  });
+
+  it('escapes HTML in the client and company name', async () => {
+    await sendInvoiceEmail({
+      to: 'x@example.com',
+      clientName: '<b>Nelson</b>',
+      invoiceNumber: 1,
+      companyName: '<script>alert(1)</script>',
+      items: [{ title: 'Hedges', price: 10 }],
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.html).not.toContain('<b>Nelson</b>');
+    expect(call.html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
+    expect(call.html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('omits company branding gracefully when no company name is set', async () => {
+    await sendInvoiceEmail({
+      to: 'x@example.com',
+      clientName: 'Nelson Costa',
+      invoiceNumber: 2,
+      items: [{ title: 'Hedges', price: 10 }],
+      subtotal: 10,
+      taxRate: 0,
+      taxAmount: 0,
+      total: 10,
+    });
+
+    const call = sendMailMock.mock.calls[0][0];
+    expect(call.text).toContain('Thank you for your business!');
   });
 });

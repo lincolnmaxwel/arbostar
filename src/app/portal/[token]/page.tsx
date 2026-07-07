@@ -14,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   declined: 'Declined',
   expired: 'Expired',
   scheduled: 'Scheduled',
+  completed: 'Completed',
 };
 
 const WINDOW_LABEL: Record<string, string> = {

@@ -12,7 +12,7 @@ type BookingStatus = 'idle' | 'proposed' | 'rejected' | 'confirmed';
 type DayWindow = 'morning' | 'afternoon' | 'fullday';
 
 interface ApprovalStatus {
-  status: 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled';
+  status: 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled' | 'completed';
   publicToken: string;
 }
 
@@ -29,6 +29,7 @@ const APPROVAL_LABEL: Record<ApprovalStatus['status'], string> = {
   declined: 'Declined',
   expired: 'Expired',
   scheduled: 'Scheduled',
+  completed: 'Completed',
 };
 
 const WINDOW_LABEL: Record<DayWindow, string> = {
@@ -44,6 +45,8 @@ export function QuoteView({ draftId }: { draftId: string }) {
   const [approval, setApproval] = useState<ApprovalStatus | null>(null);
   const [booking, setBooking] = useState<BookingState | null>(null);
   const [copied, setCopied] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   const serverId = draft?.serverId;
 
@@ -76,6 +79,20 @@ export function QuoteView({ draftId }: { draftId: string }) {
       cancelled = true;
     };
   }, [serverId]);
+
+  async function handleMarkCompleted() {
+    if (!serverId) return;
+    if (!window.confirm('Mark this job as completed? This generates an invoice and emails it to the client.')) return;
+    setCompleting(true);
+    setCompleteError(null);
+    const res = await fetch(`/api/quotes/${serverId}/complete`, { method: 'POST' });
+    setCompleting(false);
+    if (!res.ok) {
+      setCompleteError('Could not mark as completed.');
+      return;
+    }
+    setApproval((a) => (a ? { ...a, status: 'completed' } : a));
+  }
 
   function copyClientLink() {
     if (!approval) return;
@@ -195,8 +212,14 @@ export function QuoteView({ draftId }: { draftId: string }) {
               Scheduled: {new Date(booking.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {WINDOW_LABEL[booking.scheduledWindow]}
             </span>
           )}
+          {booking.bookingStatus === 'confirmed' && approval.status === 'scheduled' && (
+            <button type="button" className={styles.bookingAction} onClick={handleMarkCompleted} disabled={completing}>
+              {completing ? 'Marking completed...' : 'Mark job completed'}
+            </button>
+          )}
         </div>
       )}
+      {completeError && <p className={styles.meta} role="alert">{completeError}</p>}
 
       <div className={styles.party}>
         <h2 className={styles.partyLabel}>To</h2>

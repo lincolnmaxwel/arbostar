@@ -9,6 +9,7 @@ const STYLES: Record<QuoteStatusVariant, React.CSSProperties> = {
   pendingScheduling: { background: '#eef2fa', color: '#268bd2', border: '1px solid #a0c4f0' },
   schedulingDeclined: { background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1px solid #f5a5a5' },
   scheduled: { background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid #a0e0d5' },
+  completed: { background: '#2c5f2d', color: '#fff', border: '1px solid #2c5f2d' },
 };
 
 export function QuoteStatusBadge({ approvalStatus, bookingStatus }: { approvalStatus?: ApprovalStatus; bookingStatus?: BookingStatus }) {

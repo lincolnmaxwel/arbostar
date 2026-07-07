@@ -78,6 +78,11 @@
   color: #fff;
 }
 
+.completed {
+  background: #1e4220;
+  color: #fff;
+}
+
 .logo {
   max-width: 120px;
   max-height: 72px;

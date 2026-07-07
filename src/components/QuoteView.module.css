@@ -101,6 +101,16 @@
   color: var(--color-text-secondary);
 }
 
+.scheduled {
+  background: #2c5f2d;
+  color: #fff;
+}
+
+.completed {
+  background: #1e4220;
+  color: #fff;
+}
+
 .party {
   margin-bottom: 32px;
 }

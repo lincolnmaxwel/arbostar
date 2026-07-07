@@ -34,6 +34,8 @@ export function Header() {
         <nav className={styles.nav}>
           <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
           <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
+          <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
+          <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
         </nav>
         <div className={styles.actions}>
           {userEmail ? (

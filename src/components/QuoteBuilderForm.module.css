@@ -38,6 +38,50 @@
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
+.clientDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  list-style: none;
+  padding: 4px;
+}
+
+.clientOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.clientOption:hover {
+  background: var(--color-bg);
+}
+
+.clientOptionName {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.clientOptionEmail {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
 .itemCard {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);

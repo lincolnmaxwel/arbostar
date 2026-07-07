@@ -35,4 +35,8 @@ describe('getQuoteStatusLabel', () => {
   it('shows Scheduling declined when the client rejects the proposed dates', () => {
     expect(getQuoteStatusLabel('approved', 'rejected')).toEqual({ label: 'Scheduling declined', variant: 'schedulingDeclined' });
   });
+
+  it('shows Completed once staff marks the job done', () => {
+    expect(getQuoteStatusLabel('completed', 'confirmed')).toEqual({ label: 'Completed', variant: 'completed' });
+  });
 });

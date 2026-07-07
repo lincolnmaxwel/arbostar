@@ -1,4 +1,4 @@
-export type ApprovalStatus = 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled';
+export type ApprovalStatus = 'draft' | 'sent' | 'approved' | 'declined' | 'expired' | 'scheduled' | 'completed';
 export type BookingStatus = 'idle' | 'proposed' | 'rejected' | 'confirmed';
 
 export type QuoteStatusVariant =
@@ -9,7 +9,8 @@ export type QuoteStatusVariant =
   | 'expired'
   | 'pendingScheduling'
   | 'schedulingDeclined'
-  | 'scheduled';
+  | 'scheduled'
+  | 'completed';
 
 // The quote's business status — where it stands with the CLIENT (pending
 // their approval, or their scheduling response) vs where it stands
@@ -25,6 +26,7 @@ export function getQuoteStatusLabel(
   if (approvalStatus === 'declined') return { label: 'Declined', variant: 'declined' };
   if (approvalStatus === 'expired') return { label: 'Expired', variant: 'expired' };
   if (approvalStatus === 'scheduled') return { label: 'Scheduled', variant: 'scheduled' };
+  if (approvalStatus === 'completed') return { label: 'Completed', variant: 'completed' };
 
   // approvalStatus === 'approved' — refine by where it stands on booking.
   if (bookingStatus === 'proposed') return { label: 'Pending scheduling', variant: 'pendingScheduling' };

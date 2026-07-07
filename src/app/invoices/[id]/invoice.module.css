@@ -164,6 +164,13 @@
   font-size: 0.9375rem;
 }
 
+.terms {
+  margin-top: 16px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .card {
     padding: 20px 16px;

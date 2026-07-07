@@ -96,6 +96,11 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
 
         <p className={styles.thanks}>Thank you for your business{company.name ? ` with ${company.name}` : ''}!</p>
+        <p className={styles.terms}>
+          Terms: Payments can be made by e-transfer{company.email ? ` to ${company.email}` : ''}, by cheque, or by credit card. Please
+          state invoice or estimate # on your payment. Receipt not valid until cheque has cleared bank. Interest will be applied at
+          2% per month on accounts outstanding more than 30 days.
+        </p>
       </div>
     </div>
   );

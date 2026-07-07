@@ -150,6 +150,15 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
     y,
     { width: contentWidth, align: 'center' },
   );
+  y = doc.y + 16;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+    `Terms: Payments can be made by e-transfer${opts.company.email ? ` to ${opts.company.email}` : ''}, by cheque, or by credit card. ` +
+      'Please state invoice or estimate # on your payment. Receipt not valid until cheque has cleared bank. Interest will be applied ' +
+      'at 2% per month on accounts outstanding more than 30 days.',
+    marginX,
+    y,
+    { width: contentWidth },
+  );
 
   doc.end();
   return finished;

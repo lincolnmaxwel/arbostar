@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const sendMailMock = vi.fn().mockResolvedValue({ messageId: 'abc' });
-const createTransportMock = vi.fn((_options: unknown) => ({ sendMail: sendMailMock }));
+const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url.includes('login.microsoftonline.com')) {
+    return {
+      ok: true,
+      json: async () => ({ access_token: 'test-token', expires_in: 3600 }),
+    } as Response;
+  }
+  return {
+    ok: true,
+    text: async () => '',
+  } as Response;
+});
 
-vi.mock('nodemailer', () => ({
-  default: {
-    createTransport: (options: unknown) => createTransportMock(options),
-    getTestMessageUrl: () => null,
-  },
-}));
+vi.stubGlobal('fetch', fetchMock);
 
 import {
   sendQuoteApprovalEmail,
@@ -18,13 +23,22 @@ import {
   sendInvoiceEmail,
 } from '@/lib/email';
 
-describe('sendQuoteApprovalEmail', () => {
-  beforeEach(() => {
-    sendMailMock.mockClear();
-    createTransportMock.mockClear();
-    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
-  });
+function lastSendMailCall() {
+  const call = fetchMock.mock.calls.find(([url]) => (url as string).includes('graph.microsoft.com'));
+  if (!call) throw new Error('sendMail was never called');
+  const [url, init] = call as [string, RequestInit];
+  return { url, body: JSON.parse(init.body as string).message as Record<string, unknown> };
+}
 
+beforeEach(() => {
+  fetchMock.mockClear();
+  process.env.AZURE_TENANT_ID = 'test-tenant';
+  process.env.AZURE_CLIENT_ID = 'test-client';
+  process.env.AZURE_CLIENT_SECRET = 'test-secret';
+  process.env.AZURE_SENDER_EMAIL = 'noreply@paschoini.adv.br';
+});
+
+describe('sendQuoteApprovalEmail', () => {
   it('sends an email with the client name, portal link, itemized proposal, and totals', async () => {
     await sendQuoteApprovalEmail({
       to: 'nelson@example.com',
@@ -40,20 +54,15 @@ describe('sendQuoteApprovalEmail', () => {
       total: 1837.5,
     });
 
-    expect(sendMailMock).toHaveBeenCalledTimes(1);
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.to).toBe('nelson@example.com');
-    expect(call.from).toBe('Arbostar Quotes <test@example.com>');
-    expect(call.text).toContain('Nelson Costa');
-    expect(call.text).toContain('http://localhost:3000/portal/abc-123');
-    expect(call.text).toContain('Hedges');
-    expect(call.text).toContain('Trim the top');
-    expect(call.text).toContain('$1,250.00');
-    expect(call.text).toContain('$1,837.50');
-    expect(call.html).toContain('http://localhost:3000/portal/abc-123');
-    expect(call.html).toContain('Hedges');
-    expect(call.html).toContain('Trim the top');
-    expect(call.html).toContain('$1,837.50');
+    const { url, body } = lastSendMailCall();
+    expect(url).toBe('https://graph.microsoft.com/v1.0/users/noreply@paschoini.adv.br/sendMail');
+    expect((body.toRecipients as { emailAddress: { address: string } }[])[0].emailAddress.address).toBe('nelson@example.com');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Nelson Costa');
+    expect(html).toContain('http://localhost:3000/portal/abc-123');
+    expect(html).toContain('Hedges');
+    expect(html).toContain('Trim the top');
+    expect(html).toContain('$1,837.50');
   });
 
   it('includes the service address when provided', async () => {
@@ -69,9 +78,9 @@ describe('sendQuoteApprovalEmail', () => {
       serviceAddress: '123 Oak St, Springfield',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.text).toContain('123 Oak St, Springfield');
-    expect(call.html).toContain('123 Oak St, Springfield');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('123 Oak St, Springfield');
   });
 
   it('escapes HTML in item titles/descriptions and client name', async () => {
@@ -86,20 +95,15 @@ describe('sendQuoteApprovalEmail', () => {
       total: 10,
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.html).not.toContain('<script>alert(1)</script>');
-    expect(call.html).toContain('&lt;script&gt;');
-    expect(call.html).not.toContain('<b>Nelson</b>');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<b>Nelson</b>');
   });
 });
 
 describe('sendBookingProposalEmail', () => {
-  beforeEach(() => {
-    sendMailMock.mockClear();
-    createTransportMock.mockClear();
-    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
-  });
-
   it('sends an email with the client name, portal link, round number, and date options', async () => {
     await sendBookingProposalEmail({
       to: 'maria@example.com',
@@ -112,22 +116,18 @@ describe('sendBookingProposalEmail', () => {
       ],
     });
 
-    expect(sendMailMock).toHaveBeenCalledTimes(1);
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.to).toBe('maria@example.com');
-    expect(call.from).toBe('Arbostar Quotes <test@example.com>');
-    expect(call.subject).toBe('Scheduling options for your approved estimate');
-    expect(call.text).toContain('Maria Silva');
-    expect(call.text).toContain('http://localhost:3000/portal/token-xyz');
-    expect(call.text).toContain('Round 1');
+    const { body } = lastSendMailCall();
+    expect((body.toRecipients as { emailAddress: { address: string } }[])[0].emailAddress.address).toBe('maria@example.com');
+    expect(body.subject).toBe('Scheduling options for your approved estimate');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Maria Silva');
+    expect(html).toContain('http://localhost:3000/portal/token-xyz');
+    expect(html).toContain('round 1');
     // Date formatting: 'Tuesday, July 15, 2026' (en-US locale default for toLocaleDateString)
-    expect(call.text).toMatch(/July 15, 2026/);
-    expect(call.text).toMatch(/July 17, 2026/);
-    expect(call.text).toContain('Morning');
-    expect(call.text).toContain('Full day');
-    expect(call.html).toContain('http://localhost:3000/portal/token-xyz');
-    expect(call.html).toContain('Morning');
-    expect(call.html).toContain('Full day');
+    expect(html).toMatch(/July 15, 2026/);
+    expect(html).toMatch(/July 17, 2026/);
+    expect(html).toContain('Morning');
+    expect(html).toContain('Full day');
   });
 
   it('escapes HTML in client name and does not repeat the line-item breakdown', async () => {
@@ -139,21 +139,16 @@ describe('sendBookingProposalEmail', () => {
       options: [{ date: '2026-07-15', window: 'afternoon' }],
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.html).not.toContain('<b>Maria</b>');
-    expect(call.html).toContain('&lt;b&gt;Maria&lt;/b&gt;');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).not.toContain('<b>Maria</b>');
+    expect(html).toContain('&lt;b&gt;Maria&lt;/b&gt;');
     // No price table — booking email never lists line items.
-    expect(call.html).not.toMatch(/\$\d+\.\d{2}/);
+    expect(html).not.toMatch(/\$\d+\.\d{2}/);
   });
 });
 
 describe('sendQuoteDecisionNotificationEmail', () => {
-  beforeEach(() => {
-    sendMailMock.mockClear();
-    createTransportMock.mockClear();
-    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
-  });
-
   it('notifies staff of an approval with the client name, quote number, and link', async () => {
     await sendQuoteDecisionNotificationEmail({
       to: 'staff@example.com',
@@ -163,13 +158,14 @@ describe('sendQuoteDecisionNotificationEmail', () => {
       quoteUrl: 'http://localhost:3000/quotes/draft-123',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.to).toBe('staff@example.com');
-    expect(call.subject).toContain('#42');
-    expect(call.subject).toContain('approved');
-    expect(call.text).toContain('Nelson Costa');
-    expect(call.text).toContain('approved');
-    expect(call.text).toContain('http://localhost:3000/quotes/draft-123');
+    const { body } = lastSendMailCall();
+    expect((body.toRecipients as { emailAddress: { address: string } }[])[0].emailAddress.address).toBe('staff@example.com');
+    expect(body.subject).toContain('#42');
+    expect(body.subject).toContain('approved');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Nelson Costa');
+    expect(html).toContain('approved');
+    expect(html).toContain('http://localhost:3000/quotes/draft-123');
   });
 
   it('notifies staff of a decline', async () => {
@@ -181,9 +177,10 @@ describe('sendQuoteDecisionNotificationEmail', () => {
       quoteUrl: 'http://localhost:3000/quotes/draft-456',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.subject).toContain('declined');
-    expect(call.text).toContain('declined');
+    const { body } = lastSendMailCall();
+    expect(body.subject).toContain('declined');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('declined');
   });
 
   it('escapes HTML in the client name', async () => {
@@ -195,9 +192,10 @@ describe('sendQuoteDecisionNotificationEmail', () => {
       quoteUrl: 'http://localhost:3000/quotes/draft-789',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.html).not.toContain('<b>Nelson</b>');
-    expect(call.html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).not.toContain('<b>Nelson</b>');
+    expect(html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
   });
 
   it('includes the client phone and service address when provided', async () => {
@@ -211,11 +209,10 @@ describe('sendQuoteDecisionNotificationEmail', () => {
       quoteUrl: 'http://localhost:3000/quotes/draft-5',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.text).toContain('(555) 123-4567');
-    expect(call.text).toContain('123 Oak St, Springfield');
-    expect(call.html).toContain('(555) 123-4567');
-    expect(call.html).toContain('123 Oak St, Springfield');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('(555) 123-4567');
+    expect(html).toContain('123 Oak St, Springfield');
   });
 
   it('omits the contact block entirely when phone and address are absent', async () => {
@@ -227,19 +224,13 @@ describe('sendQuoteDecisionNotificationEmail', () => {
       quoteUrl: 'http://localhost:3000/quotes/draft-6',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.text).not.toContain('Phone:');
-    expect(call.html).not.toContain('Phone:');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).not.toContain('Phone:');
   });
 });
 
 describe('sendBookingDecisionNotificationEmail', () => {
-  beforeEach(() => {
-    sendMailMock.mockClear();
-    createTransportMock.mockClear();
-    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
-  });
-
   it('notifies staff of a confirmed date/window', async () => {
     await sendBookingDecisionNotificationEmail({
       to: 'staff@example.com',
@@ -251,11 +242,12 @@ describe('sendBookingDecisionNotificationEmail', () => {
       scheduledWindow: 'morning',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.subject).toContain('confirmed');
-    expect(call.text).toContain('Maria Silva');
-    expect(call.text).toMatch(/July 15, 2026/);
-    expect(call.text).toContain('Morning');
+    const { body } = lastSendMailCall();
+    expect(body.subject).toContain('confirmed');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Maria Silva');
+    expect(html).toMatch(/July 15, 2026/);
+    expect(html).toContain('Morning');
   });
 
   it('notifies staff of a rejection with the client-provided reason', async () => {
@@ -268,19 +260,14 @@ describe('sendBookingDecisionNotificationEmail', () => {
       rejectionReason: 'None of these days work.',
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.subject).toContain('rejected');
-    expect(call.text).toContain('None of these days work.');
+    const { body } = lastSendMailCall();
+    expect(body.subject).toContain('rejected');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('None of these days work.');
   });
 });
 
 describe('sendInvoiceEmail', () => {
-  beforeEach(() => {
-    sendMailMock.mockClear();
-    createTransportMock.mockClear();
-    process.env.SMTP_FROM = 'Arbostar Quotes <test@example.com>';
-  });
-
   it('sends the invoice number, itemized breakdown, and totals', async () => {
     await sendInvoiceEmail({
       to: 'nelson@example.com',
@@ -294,17 +281,15 @@ describe('sendInvoiceEmail', () => {
       total: 525,
     });
 
-    expect(sendMailMock).toHaveBeenCalledTimes(1);
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.to).toBe('nelson@example.com');
-    expect(call.subject).toBe('Invoice #7');
-    expect(call.text).toContain('Nelson Costa');
-    expect(call.text).toContain('#7');
-    expect(call.text).toContain('Tree removal');
-    expect(call.text).toContain('$525.00');
-    expect(call.html).toContain('Tree removal');
-    expect(call.html).toContain('$525.00');
-    expect(call.html).toContain('Tip Top Tree Service Ltd');
+    const { body } = lastSendMailCall();
+    expect((body.toRecipients as { emailAddress: { address: string } }[])[0].emailAddress.address).toBe('nelson@example.com');
+    expect(body.subject).toBe('Invoice #7');
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Nelson Costa');
+    expect(html).toContain('#7');
+    expect(html).toContain('Tree removal');
+    expect(html).toContain('$525.00');
+    expect(html).toContain('Tip Top Tree Service Ltd');
   });
 
   it('escapes HTML in the client and company name', async () => {
@@ -320,10 +305,11 @@ describe('sendInvoiceEmail', () => {
       total: 10,
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.html).not.toContain('<b>Nelson</b>');
-    expect(call.html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
-    expect(call.html).not.toContain('<script>alert(1)</script>');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).not.toContain('<b>Nelson</b>');
+    expect(html).toContain('&lt;b&gt;Nelson&lt;/b&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
   });
 
   it('omits company branding gracefully when no company name is set', async () => {
@@ -338,8 +324,9 @@ describe('sendInvoiceEmail', () => {
       total: 10,
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.text).toContain('Thank you for your business!');
+    const { body } = lastSendMailCall();
+    const html = (body.body as { content: string }).content;
+    expect(html).toContain('Thank you for your business with us!');
   });
 
   it('attaches the PDF when pdfBuffer is provided', async () => {
@@ -356,9 +343,12 @@ describe('sendInvoiceEmail', () => {
       pdfBuffer,
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.attachments).toHaveLength(1);
-    expect(call.attachments[0]).toEqual({ filename: 'invoice-3.pdf', content: pdfBuffer, contentType: 'application/pdf' });
+    const { body } = lastSendMailCall();
+    const attachments = body.attachments as { name: string; contentType: string; contentBytes: string }[];
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0].name).toBe('invoice-3.pdf');
+    expect(attachments[0].contentType).toBe('application/pdf');
+    expect(attachments[0].contentBytes).toBe(pdfBuffer.toString('base64'));
   });
 
   it('omits attachments entirely when no pdfBuffer is provided', async () => {
@@ -373,7 +363,7 @@ describe('sendInvoiceEmail', () => {
       total: 10,
     });
 
-    const call = sendMailMock.mock.calls[0][0];
-    expect(call.attachments).toBeUndefined();
+    const { body } = lastSendMailCall();
+    expect(body.attachments).toBeUndefined();
   });
 });

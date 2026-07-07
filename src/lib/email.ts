@@ -1,19 +1,5 @@
-import nodemailer, { Transporter } from 'nodemailer';
 import { formatMoney } from '@/lib/quoteMath';
-
-let transporter: Transporter | null = null;
-
-function getTransporter(): Transporter {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-  }
-  return transporter;
-}
+import { sendGraphMail } from '@/lib/graphMail';
 
 function escapeHtml(value: string): string {
   return value
@@ -57,24 +43,7 @@ function buildItemsHtml(items: SendQuoteApprovalEmailItem[]): string {
     .join('');
 }
 
-function buildItemsText(items: SendQuoteApprovalEmailItem[]): string {
-  return items.map((item) => `- ${item.title}${item.description ? ` (${item.description})` : ''}: ${formatMoney(item.price)}`).join('\n');
-}
-
 export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions): Promise<void> {
-  const text = `Hi ${opts.clientName},
-
-Your estimate is ready for review.
-${opts.serviceAddress ? `\nService address: ${opts.serviceAddress}\n` : ''}
-${buildItemsText(opts.items)}
-
-Subtotal: ${formatMoney(opts.subtotal)}
-Tax (${(opts.taxRate * 100).toFixed(1)}%): ${formatMoney(opts.taxAmount)}
-Total: ${formatMoney(opts.total)}
-
-View and respond here: ${opts.portalUrl}
-`;
-
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
@@ -105,20 +74,11 @@ View and respond here: ${opts.portalUrl}
     </div>
   `;
 
-  const info = await getTransporter().sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendGraphMail({
     to: opts.to,
     subject: 'Your estimate is ready for review',
-    text,
     html,
   });
-
-  const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
-    // Ethereal (or any nodemailer test transport) doesn't deliver anywhere real;
-    // this URL is the only way to see what was "sent" during local development.
-    console.log(`[email] preview: ${previewUrl}`);
-  }
 }
 
 export interface SendBookingProposalEmailOptions {
@@ -143,10 +103,6 @@ function formatOptionDate(dateStr: string): string {
   return dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function buildOptionsText(options: SendBookingProposalEmailOptions['options']): string {
-  return options.map((o) => `- ${formatOptionDate(o.date)} — ${WINDOW_LABEL[o.window]}`).join('\n');
-}
-
 function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): string {
   return options
     .map(
@@ -162,15 +118,6 @@ function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): 
 }
 
 export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOptions): Promise<void> {
-  const text = `Hi ${opts.clientName},
-
-Your approved estimate is ready to schedule. Round ${opts.roundNumber} of date proposals:
-${opts.serviceAddress ? `\nService address: ${opts.serviceAddress}\n` : ''}
-${buildOptionsText(opts.options)}
-
-Pick the one that works for you here: ${opts.portalUrl}
-`;
-
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
@@ -187,18 +134,11 @@ Pick the one that works for you here: ${opts.portalUrl}
     </div>
   `;
 
-  const info = await getTransporter().sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendGraphMail({
     to: opts.to,
     subject: 'Scheduling options for your approved estimate',
-    text,
     html,
   });
-
-  const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
-    console.log(`[email] booking proposal preview: ${previewUrl}`);
-  }
 }
 
 // --- Staff notifications: the client responded to something, so whoever
@@ -216,13 +156,6 @@ export interface SendQuoteDecisionNotificationEmailOptions {
   quoteUrl: string;
 }
 
-function buildContactLinesText(clientPhone?: string, serviceAddress?: string): string {
-  const lines: string[] = [];
-  if (clientPhone) lines.push(`Phone: ${clientPhone}`);
-  if (serviceAddress) lines.push(`Service address: ${serviceAddress}`);
-  return lines.length > 0 ? `\n${lines.join('\n')}\n` : '';
-}
-
 function buildContactLinesHtml(clientPhone?: string, serviceAddress?: string): string {
   const lines: string[] = [];
   if (clientPhone) lines.push(`Phone: ${escapeHtml(clientPhone)}`);
@@ -234,10 +167,6 @@ function buildContactLinesHtml(clientPhone?: string, serviceAddress?: string): s
 
 export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecisionNotificationEmailOptions): Promise<void> {
   const verb = opts.decision === 'approved' ? 'approved' : 'declined';
-  const text = `${opts.clientName} just ${verb} quote #${opts.quoteNumber}.
-${buildContactLinesText(opts.clientPhone, opts.serviceAddress)}
-View it here: ${opts.quoteUrl}
-`;
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> just ${verb} quote #${opts.quoteNumber}.</p>
@@ -250,18 +179,11 @@ View it here: ${opts.quoteUrl}
     </div>
   `;
 
-  const info = await getTransporter().sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendGraphMail({
     to: opts.to,
     subject: `Quote #${opts.quoteNumber} was ${verb}`,
-    text,
     html,
   });
-
-  const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
-    console.log(`[email] quote decision notification preview: ${previewUrl}`);
-  }
 }
 
 export interface SendBookingDecisionNotificationEmailOptions {
@@ -283,10 +205,6 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
       ? `chose ${opts.scheduledDate ? formatOptionDate(opts.scheduledDate) : 'a date'}${opts.scheduledWindow ? ` (${WINDOW_LABEL[opts.scheduledWindow]})` : ''}`
       : `rejected the proposed dates${opts.rejectionReason ? `: "${opts.rejectionReason}"` : ''}`;
 
-  const text = `${opts.clientName} just ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${detail}.
-${buildContactLinesText(opts.clientPhone, opts.serviceAddress)}
-View it here: ${opts.quoteUrl}
-`;
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${escapeHtml(detail)}.</p>
@@ -299,18 +217,11 @@ View it here: ${opts.quoteUrl}
     </div>
   `;
 
-  const info = await getTransporter().sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendGraphMail({
     to: opts.to,
     subject: opts.decision === 'confirmed' ? `Scheduling confirmed for quote #${opts.quoteNumber}` : `Scheduling rejected for quote #${opts.quoteNumber}`,
-    text,
     html,
   });
-
-  const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
-    console.log(`[email] booking decision notification preview: ${previewUrl}`);
-  }
 }
 
 export interface SendInvoiceEmailOptions {
@@ -327,23 +238,10 @@ export interface SendInvoiceEmailOptions {
 }
 
 // Sent once, right when staff marks a scheduled job Completed — reuses the
-// same item-table builders as the quote-ready email since it's the same
+// same item-table builder as the quote-ready email since it's the same
 // "title/description/price" shape, just billed instead of proposed.
 export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<void> {
   const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
-  const text = `Hi ${opts.clientName},
-
-The work is complete! Here is your invoice #${opts.invoiceNumber}.
-
-${buildItemsText(opts.items)}
-
-Subtotal: ${formatMoney(opts.subtotal)}
-Tax (${(opts.taxRate * 100).toFixed(1)}%): ${formatMoney(opts.taxAmount)}
-Total: ${formatMoney(opts.total)}
-
-Thank you for your business${opts.companyName ? ` with ${opts.companyName}` : ''}!
-`;
-
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
@@ -369,19 +267,12 @@ Thank you for your business${opts.companyName ? ` with ${opts.companyName}` : ''
     </div>
   `;
 
-  const info = await getTransporter().sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await sendGraphMail({
     to: opts.to,
     subject: `Invoice #${opts.invoiceNumber}`,
-    text,
     html,
     attachments: opts.pdfBuffer
       ? [{ filename: `invoice-${opts.invoiceNumber}.pdf`, content: opts.pdfBuffer, contentType: 'application/pdf' }]
       : undefined,
   });
-
-  const previewUrl = nodemailer.getTestMessageUrl(info);
-  if (previewUrl) {
-    console.log(`[email] invoice preview: ${previewUrl}`);
-  }
 }

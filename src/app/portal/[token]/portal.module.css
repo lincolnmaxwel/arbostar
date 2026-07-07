@@ -14,15 +14,23 @@
   padding: 32px;
 }
 
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .topBar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   flex-direction: row-reverse;
   gap: 16px;
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--color-border);
+  flex: 1;
 }
 
 .title {
@@ -70,8 +78,21 @@
   color: #fff;
 }
 
-.party {
+.logo {
+  max-width: 120px;
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.parties {
+  display: flex;
+  gap: 32px;
   margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.party {
+  flex: 1 1 200px;
 }
 
 .partyLabel {
@@ -267,8 +288,13 @@
     padding: 20px 16px;
   }
 
+  .headerRow {
+    flex-direction: column-reverse;
+  }
+
   .topBar {
     flex-direction: column-reverse;
+    width: 100%;
   }
 
   .totals {

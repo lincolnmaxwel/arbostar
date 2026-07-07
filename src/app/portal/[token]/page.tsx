@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
+import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 import { PortalActions } from '@/components/PortalActions';
 import { PortalItemsTable } from '@/components/PortalItemsTable';
 import { BookingPicker } from '@/components/BookingPicker';
@@ -39,6 +40,9 @@ export default async function PortalPage({ params }: { params: { token: string }
 
   if (!quote) notFound();
 
+  const company = await getCompanyProfile();
+  const logoUrl = companyLogoUrl(company.logoPath);
+
   const activeRound =
     quote.status === 'approved' && quote.bookingStatus === 'proposed'
       ? await prisma.scheduleRound.findFirst({
@@ -55,20 +59,39 @@ export default async function PortalPage({ params }: { params: { token: string }
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.topBar}>
-          <span className={`${styles.statusBadge} ${styles[quote.status]}`}>{STATUS_LABEL[quote.status]}</span>
-          <div>
-            <h1 className={styles.title}>Estimate #{quote.number}</h1>
-            {quote.sentAt && <p className={styles.meta}>Sent {new Date(quote.sentAt).toLocaleDateString()}</p>}
+        <div className={styles.headerRow}>
+          <div className={styles.topBar}>
+            <span className={`${styles.statusBadge} ${styles[quote.status]}`}>{STATUS_LABEL[quote.status]}</span>
+            <div>
+              <h1 className={styles.title}>Estimate #{quote.number}</h1>
+              {quote.sentAt && <p className={styles.meta}>Sent {new Date(quote.sentAt).toLocaleDateString()}</p>}
+            </div>
           </div>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={company.name ?? 'Company logo'} className={styles.logo} />
+          )}
         </div>
 
-        <div className={styles.party}>
-          <h2 className={styles.partyLabel}>To</h2>
-          <p className={styles.partyName}>{quote.client.name}</p>
-          {quote.client.email && <p className={styles.partyLine}>{quote.client.email}</p>}
-          {quote.client.phone && <p className={styles.partyLine}>{quote.client.phone}</p>}
-          {quote.client.address && <p className={styles.partyLine}>{quote.client.address}</p>}
+        <div className={styles.parties}>
+          <div className={styles.party}>
+            <h2 className={styles.partyLabel}>To</h2>
+            <p className={styles.partyName}>{quote.client.name}</p>
+            {quote.client.email && <p className={styles.partyLine}>{quote.client.email}</p>}
+            {quote.client.phone && <p className={styles.partyLine}>{quote.client.phone}</p>}
+            {quote.client.address && <p className={styles.partyLine}>{quote.client.address}</p>}
+            {quote.serviceAddress && <p className={styles.partyLine}>Service address: {quote.serviceAddress}</p>}
+          </div>
+
+          {(company.name || company.phone || company.email || company.address) && (
+            <div className={styles.party}>
+              <h2 className={styles.partyLabel}>From</h2>
+              {company.name && <p className={styles.partyName}>{company.name}</p>}
+              {company.phone && <p className={styles.partyLine}>{company.phone}</p>}
+              {company.email && <p className={styles.partyLine}>{company.email}</p>}
+              {company.address && <p className={styles.partyLine}>{company.address}</p>}
+            </div>
+          )}
         </div>
 
         <PortalItemsTable

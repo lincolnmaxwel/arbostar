@@ -125,6 +125,20 @@ model QuotePhoto {
   sortOrder   Int       @default(0)
 }
 
+// Singleton — one deployment is one company (see CLAUDE.md), so there's
+// exactly one row, always looked up/created by the fixed id 'company'
+// (src/lib/companyProfile.ts), not Prisma's usual per-record uuid default.
+// Shown as the "From" party on the client-facing quote/portal page.
+model CompanyProfile {
+  id        String   @id
+  name      String?
+  phone     String?
+  email     String?
+  address   String?
+  logoPath  String?
+  updatedAt DateTime @updatedAt
+}
+
 model AuditLog {
   id         String   @id @default(uuid())
   entityType String

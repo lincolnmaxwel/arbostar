@@ -34,20 +34,26 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     data: { status, respondedAt: new Date() },
   });
 
-  try {
-    await sendQuoteDecisionNotificationEmail({
-      to: quote.createdBy.notificationEmail || quote.createdBy.email,
-      clientName: quote.client.name,
-      clientPhone: quote.client.phone ?? undefined,
-      serviceAddress: quote.serviceAddress ?? undefined,
-      quoteNumber: quote.number,
-      decision: status,
-      quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
-    });
-  } catch (err) {
-    // The client's decision is already persisted; a notification failure
-    // shouldn't turn into a 5xx for the client-facing portal.
-    console.error('[portal] sendQuoteDecisionNotificationEmail failed', err);
+  // A blank Notification email means the user opted out of these emails
+  // entirely — it does NOT fall back to their login email, which used to
+  // send every staff member notifications by default whether they wanted
+  // them or not.
+  if (quote.createdBy.notificationEmail) {
+    try {
+      await sendQuoteDecisionNotificationEmail({
+        to: quote.createdBy.notificationEmail,
+        clientName: quote.client.name,
+        clientPhone: quote.client.phone ?? undefined,
+        serviceAddress: quote.serviceAddress ?? undefined,
+        quoteNumber: quote.number,
+        decision: status,
+        quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+      });
+    } catch (err) {
+      // The client's decision is already persisted; a notification failure
+      // shouldn't turn into a 5xx for the client-facing portal.
+      console.error('[portal] sendQuoteDecisionNotificationEmail failed', err);
+    }
   }
 
   return NextResponse.json({ status });

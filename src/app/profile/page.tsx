@@ -216,7 +216,7 @@ export default function ProfilePage() {
       <div className={styles.card}>
         <h2 className={styles.sectionTitle}>Notification email</h2>
         <p className={styles.sectionHint}>
-          Sent here when a client approves or declines a quote, or confirms/rejects a scheduling date. Leave blank to use your login email ({user.email}).
+          Sent here when a client approves or declines a quote, or confirms/rejects a scheduling date. Leave blank to turn these notifications off entirely.
         </p>
         {notificationError && <div className={styles.error}>{notificationError}</div>}
         {notificationSaved && <div className={styles.success}>Saved.</div>}

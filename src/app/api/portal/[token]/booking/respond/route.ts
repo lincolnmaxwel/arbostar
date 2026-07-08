@@ -74,20 +74,24 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       }),
     ]);
 
-    try {
-      await sendBookingDecisionNotificationEmail({
-        to: quote.createdBy.notificationEmail || quote.createdBy.email,
-        clientName: quote.client.name,
-        clientPhone: quote.client.phone ?? undefined,
-        serviceAddress: quote.serviceAddress ?? undefined,
-        quoteNumber: quote.number,
-        quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
-        decision: 'confirmed',
-        scheduledDate: option.proposedDate.toISOString().slice(0, 10),
-        scheduledWindow: option.window,
-      });
-    } catch (err) {
-      console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+    // A blank Notification email means the user opted out — no fallback to
+    // their login email.
+    if (quote.createdBy.notificationEmail) {
+      try {
+        await sendBookingDecisionNotificationEmail({
+          to: quote.createdBy.notificationEmail,
+          clientName: quote.client.name,
+          clientPhone: quote.client.phone ?? undefined,
+          serviceAddress: quote.serviceAddress ?? undefined,
+          quoteNumber: quote.number,
+          quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+          decision: 'confirmed',
+          scheduledDate: option.proposedDate.toISOString().slice(0, 10),
+          scheduledWindow: option.window,
+        });
+      } catch (err) {
+        console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+      }
     }
 
     return NextResponse.json({ status: 'scheduled', bookingStatus: 'confirmed' });
@@ -106,19 +110,23 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     }),
   ]);
 
-  try {
-    await sendBookingDecisionNotificationEmail({
-      to: quote.createdBy.notificationEmail || quote.createdBy.email,
-      clientName: quote.client.name,
-      clientPhone: quote.client.phone ?? undefined,
-      serviceAddress: quote.serviceAddress ?? undefined,
-      quoteNumber: quote.number,
-      quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
-      decision: 'rejected',
-      rejectionReason: reason,
-    });
-  } catch (err) {
-    console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+  // A blank Notification email means the user opted out — no fallback to
+  // their login email.
+  if (quote.createdBy.notificationEmail) {
+    try {
+      await sendBookingDecisionNotificationEmail({
+        to: quote.createdBy.notificationEmail,
+        clientName: quote.client.name,
+        clientPhone: quote.client.phone ?? undefined,
+        serviceAddress: quote.serviceAddress ?? undefined,
+        quoteNumber: quote.number,
+        quoteUrl: `${process.env.NEXTAUTH_URL}/quotes/${quote.draftId}`,
+        decision: 'rejected',
+        rejectionReason: reason,
+      });
+    } catch (err) {
+      console.error('[portal] sendBookingDecisionNotificationEmail failed', err);
+    }
   }
 
   return NextResponse.json({ status: 'approved', bookingStatus: 'rejected' });

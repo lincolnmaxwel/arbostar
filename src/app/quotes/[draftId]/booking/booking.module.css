@@ -8,15 +8,15 @@
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 4px 0;
-  color: #111827;
+  color: var(--color-text);
 }
 
 .sub {
   margin: 0 0 24px 0;
-  color: #6b7280;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .loading {
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }

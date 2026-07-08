@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "title": "Design System: Arbostar",
+  "extensions": {
+    "colorMeta": {
+      "forest-primary": { "role": "primary", "displayName": "Deep Forest", "canonical": "oklch(42% 0.08 141)", "tonalRamp": ["oklch(18% 0.05 141)", "oklch(26% 0.06 141)", "oklch(34% 0.07 141)", "oklch(42% 0.08 141)", "oklch(55% 0.09 141)", "oklch(68% 0.08 141)", "oklch(82% 0.05 141)", "oklch(94% 0.02 141)"] },
+      "gold-accent": { "role": "secondary", "displayName": "Field Gold", "canonical": "oklch(72% 0.13 80)", "tonalRamp": ["oklch(25% 0.06 80)", "oklch(35% 0.09 80)", "oklch(48% 0.11 80)", "oklch(60% 0.13 80)", "oklch(72% 0.13 80)", "oklch(82% 0.1 80)", "oklch(90% 0.06 80)", "oklch(96% 0.02 80)"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Ledger Paper", "canonical": "oklch(95% 0.004 160)", "tonalRamp": ["oklch(20% 0.004 160)", "oklch(32% 0.004 160)", "oklch(45% 0.004 160)", "oklch(60% 0.004 160)", "oklch(75% 0.004 160)", "oklch(87% 0.004 160)", "oklch(95% 0.004 160)", "oklch(99% 0.002 160)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(22% 0.02 265)", "tonalRamp": ["oklch(15% 0.02 265)", "oklch(22% 0.02 265)", "oklch(35% 0.02 265)", "oklch(50% 0.02 265)", "oklch(63% 0.01 265)", "oklch(76% 0.01 265)", "oklch(88% 0.005 265)", "oklch(96% 0.002 265)"] }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Page and quote titles. 700 weight, no display face — hierarchy is weight + size only." },
+      "body": { "displayName": "Body", "purpose": "Form fields, paragraph content, 65-75ch cap where prose appears." },
+      "label": { "displayName": "Label", "purpose": "Uppercase tracked labels: totals, party blocks, table headers." }
+    },
+    "shadows": [
+      { "name": "ambient", "value": "0 1px 3px rgba(0,0,0,0.1)", "purpose": "Resting cards, header, buttons — barely-there separation from the page." },
+      { "name": "lifted", "value": "0 4px 12px rgba(0,0,0,0.1)", "purpose": "Dropdowns, popovers, modals, lightbox — transient above-page elements only." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for color/border/opacity transitions (buttons, inputs, nav)." },
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrance/reveal transitions — panels, dropdowns, page-section reveals." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Hover/focus color and border transitions." },
+      { "name": "duration-standard", "value": "220ms", "purpose": "Panel/dropdown/modal enter-exit." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call to action (Send, Approve). Deep Forest fill, white text.",
+      "html": "<button class=\"ds-btn-primary\">Save and Send</button>",
+      "css": ".ds-btn-primary { background: var(--color-primary, #2c5f2d); color: #fff; border: none; border-radius: 8px; padding: 12px 28px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: var(--color-primary-hover, #1e4220); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-primary-light, #e8f0e8); } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Save / Copy link — outlined, lower emphasis than primary.",
+      "html": "<button class=\"ds-btn-secondary\">Save</button>",
+      "css": ".ds-btn-secondary { background: #fff; color: #2c5f2d; border: 1px solid #2c5f2d; border-radius: 8px; padding: 12px 28px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover { background: #e8f0e8; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form field with focus halo, used across quote builder.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Client name\" />",
+      "css": ".ds-input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9375rem; outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-input:focus { border-color: #2c5f2d; box-shadow: 0 0 0 3px #e8f0e8; } .ds-input:disabled { background: #f0f2f0; color: #6b7280; cursor: not-allowed; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Quote approval/booking status pill (sent/approved/declined/scheduled/completed).",
+      "html": "<span class=\"ds-chip ds-chip-approved\">Approved</span>",
+      "css": ".ds-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; } .ds-chip-approved { background: #f0fdf9; color: #2aa198; } .ds-chip-sent { background: #fef9e7; color: #b58900; } .ds-chip-declined { background: #fef2f2; color: #dc322f; }"
+    },
+    {
+      "name": "Section Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Form section / quote view container — flat, hairline-separated internal headers.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Client Details</div><div class=\"ds-card-body\">Content</div></div>",
+      "css": ".ds-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; } .ds-card-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db; }"
+    },
+    {
+      "name": "Top Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Sticky header, Deep Forest fill, translucent links, gold underline on active.",
+      "html": "<header class=\"ds-header\"><span class=\"ds-brand\">Arbostar</span><nav class=\"ds-nav\"><a href=\"#\" class=\"ds-nav-link ds-nav-active\">Quotes</a><a href=\"#\" class=\"ds-nav-link\">Clients</a></nav></header>",
+      "css": ".ds-header { background: #2c5f2d; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; } .ds-brand { color: #fff; font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; } .ds-nav { display: flex; gap: 24px; } .ds-nav-link { color: rgba(255,255,255,0.8); font-size: 0.875rem; font-weight: 500; padding: 4px 0; border-bottom: 2px solid transparent; text-decoration: none; transition: color 150ms, border-color 150ms; } .ds-nav-link:hover { color: #fff; border-bottom-color: rgba(255,255,255,0.5); } .ds-nav-active { color: #fff; border-bottom-color: #d4a017; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Ledger",
+    "overview": "Arbostar is the digital version of the leather-bound estimate book a foreman used to carry in the truck: precise, unglamorous, trusted. The interface earns confidence through order and legibility, not through spectacle. Client-facing surfaces (portal, invoice PDF, emails) carry the same restraint with slightly more ceremony — clear totals, a confident single CTA, a solid party block.",
+    "keyCharacteristics": [
+      "Flat-by-default surfaces with restrained, purposeful shadows",
+      "One deep forest green carries authority; gold is a rare confirming accent, never decoration",
+      "Generous whitespace and clear section boundaries over dense card grids",
+      "System font stack — hierarchy comes from weight and size, not a personality font",
+      "Motion is a confirmation, not a performance"
+    ],
+    "rules": [
+      { "name": "The Single Accent Rule", "body": "Deep Forest is the only color allowed to signal \"primary action\" on any given screen. Field Gold marks confirmation/active state only.", "section": "colors" },
+      { "name": "The No-Display-Font Rule", "body": "Never introduce a decorative or serif display face to \"add personality.\" Confidence comes from restraint and precision.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "A card at rest never uses more than the Ambient shadow. Lifted only applies to transiently-above-page elements.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Deep Forest (#2c5f2d) as the single primary-action color on every screen.",
+      "Do use the 8px radius uniformly for cards, buttons, and inputs; pill radius only for status badges.",
+      "Do keep shadows to the Ambient/Lifted two-step vocabulary.",
+      "Do lead client-facing surfaces with the same restraint as staff screens.",
+      "Do respect prefers-reduced-motion with a crossfade-or-instant fallback."
+    ],
+    "donts": [
+      "Don't introduce purple/blue gradients or any gradient-filled surface.",
+      "Don't use bright, toy-like accent colors or cutesy/rounded-blob icons.",
+      "Don't add glassmorphism anywhere.",
+      "Don't use border-left/border-right colored stripes as a card accent.",
+      "Don't apply gradient text for emphasis.",
+      "Don't let Field Gold spread beyond its one job as active-state/confirmation accent."
+    ]
+  }
+}

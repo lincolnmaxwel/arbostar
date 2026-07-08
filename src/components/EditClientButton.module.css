@@ -7,15 +7,33 @@
   justify-content: center;
   z-index: 100;
   padding: 16px;
+  animation: backdrop-in var(--duration-fast) var(--ease-standard) both;
 }
 
 .modal {
   background: var(--color-surface);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   padding: 24px;
   width: 100%;
   max-width: 400px;
+  animation: modal-in var(--duration-standard) var(--ease-out-expo) both;
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .title {
@@ -53,12 +71,13 @@
   font-size: 0.875rem;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
+  box-shadow: var(--shadow-focus);
 }
 
 .actions {

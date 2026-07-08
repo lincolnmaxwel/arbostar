@@ -15,6 +15,15 @@
   box-shadow: var(--shadow);
   padding: 24px;
   margin-bottom: 24px;
+  animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
+}
+
+.page > .card:nth-of-type(2) {
+  animation-delay: 40ms;
+}
+
+.page > .card:nth-of-type(3) {
+  animation-delay: 80ms;
 }
 
 .sectionTitle {
@@ -48,12 +57,13 @@
   border-radius: var(--radius);
   font-size: 0.9375rem;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
+  box-shadow: var(--shadow-focus);
 }
 
 .button {
@@ -65,11 +75,12 @@
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .button:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .button:disabled {
@@ -84,6 +95,7 @@
   padding: 8px 12px;
   border-radius: var(--radius);
   margin-bottom: 16px;
+  animation: fade-in-up var(--duration-fast) var(--ease-out-expo) both;
 }
 
 .success {
@@ -93,6 +105,7 @@
   padding: 8px 12px;
   border-radius: var(--radius);
   margin-bottom: 16px;
+  animation: fade-in-up var(--duration-fast) var(--ease-out-expo) both;
 }
 
 .logoRow {

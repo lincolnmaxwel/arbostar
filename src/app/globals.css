@@ -3,18 +3,33 @@
   --color-primary-hover: #1e4220;
   --color-primary-light: #e8f0e8;
   --color-accent: #d4a017;
-  --color-bg: #f0f2f0;
+  --color-accent-hover: #b8860f;
+  --color-bg: #eef1ee;
   --color-surface: #ffffff;
   --color-text: #111827;
   --color-text-secondary: #6b7280;
-  --color-border: #d1d5db;
+  --color-border: #d8dcd8;
+  --color-border-strong: #c2c8c2;
   --color-error: #dc322f;
   --color-error-bg: #fef2f2;
   --color-success: #2aa198;
   --color-success-bg: #f0fdf9;
+
+  --radius-sm: 6px;
   --radius: 8px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Two-step elevation: ambient at rest, lifted for anything transiently above the page. */
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 2px 6px rgba(17, 24, 39, 0.06);
+  --shadow-lg: 0 8px 24px rgba(17, 24, 39, 0.12), 0 2px 8px rgba(17, 24, 39, 0.06);
+  --shadow-focus: 0 0 0 3px var(--color-primary-light);
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-standard: 220ms;
+
   --max-width: 960px;
 }
 
@@ -27,6 +42,7 @@
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -40,6 +56,7 @@ body {
 a {
   color: var(--color-primary);
   text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 a:hover {
@@ -57,4 +74,46 @@ label {
 input, button, select, textarea {
   font-family: inherit;
   font-size: inherit;
+}
+
+button {
+  transition: background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-out-expo);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Shared entrance animation: pages/cards fade and settle in, never bounce. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
+}
+
+.fade-in-up-stagger > * {
+  animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

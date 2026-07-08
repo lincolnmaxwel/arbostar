@@ -23,7 +23,6 @@
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .declineButton:hover:not(:disabled) {
@@ -39,11 +38,12 @@
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .approveButton:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
 }
 
 .declineButton:disabled,

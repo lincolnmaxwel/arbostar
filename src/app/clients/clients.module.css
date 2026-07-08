@@ -23,6 +23,15 @@
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
+  animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
+}
+
+.table tbody tr {
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.table tbody tr:hover td {
+  background: var(--color-primary-light);
 }
 
 .table th {
@@ -70,7 +79,6 @@
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .editButton:hover {
@@ -86,7 +94,6 @@
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .deleteButton:hover:not(:disabled) {

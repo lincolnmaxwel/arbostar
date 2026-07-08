@@ -30,7 +30,15 @@ export function Header() {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
-        <Link href="/quotes" className={styles.brand}>Arbostar</Link>
+        <Link href="/quotes" className={styles.brand}>
+          <svg className={styles.brandIcon} width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M12 2C8 2 5 5.5 5 9c0 2.2 1.2 3.9 2.8 5.1C6.7 15 6 16.4 6 18h5v4h2v-4h5c0-1.6-.7-3-1.8-3.9C17.8 12.9 19 11.2 19 9c0-3.5-3-7-7-7z"
+              fill="currentColor"
+            />
+          </svg>
+          Arbostar
+        </Link>
         <nav className={styles.nav}>
           <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
           <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>

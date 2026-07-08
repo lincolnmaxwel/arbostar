@@ -19,14 +19,17 @@ export function QuoteStatusBadge({ approvalStatus, bookingStatus }: { approvalSt
       data-testid="quote-status-badge"
       style={{
         ...STYLES[variant],
-        display: 'inline-block',
-        padding: '3px 10px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 12px',
         borderRadius: 999,
         fontSize: '0.75rem',
-        fontWeight: 600,
+        fontWeight: 700,
         lineHeight: 1.4,
       }}
     >
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
       {label}
     </span>
   );

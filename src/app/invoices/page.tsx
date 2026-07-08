@@ -52,7 +52,10 @@ export default async function InvoicesPage() {
                 </td>
                 <td>{inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : '—'}</td>
                 <td className={styles.priceCol}>{formatMoney(Number(inv.total))}</td>
-                <td>
+                <td className={styles.actionsCell}>
+                  <a href={`/api/invoices/${inv.id}/pdf`} download className={styles.downloadButton}>
+                    Download
+                  </a>
                   <DeleteInvoiceButton invoiceId={inv.id} invoiceNumber={inv.number} className={styles.deleteButton} />
                 </td>
               </tr>

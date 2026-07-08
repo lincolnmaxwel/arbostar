@@ -6,9 +6,9 @@
 
 .section {
   background: var(--color-surface);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 24px;
+  padding: 28px;
   animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
 }
 
@@ -25,10 +25,11 @@
 }
 
 .sectionTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -300,9 +301,9 @@ textarea.itemInput {
   display: flex;
   justify-content: flex-end;
   gap: 32px;
-  padding: 16px 24px;
+  padding: 20px 28px;
   background: var(--color-surface);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
 }
 

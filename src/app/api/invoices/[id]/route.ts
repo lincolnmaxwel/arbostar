@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
+import { sendPaymentReceivedEmail } from '@/lib/email';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -28,13 +30,39 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'invalid paymentStatus' }, { status: 400 });
   }
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id },
+    include: { quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } } },
+  });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  const justPaid = body.paymentStatus === 'paid' && invoice.paymentStatus !== 'paid';
 
   const updated = await prisma.invoice.update({
     where: { id: params.id },
     data: { paymentStatus: body.paymentStatus, paidAt: body.paymentStatus === 'paid' ? new Date() : null },
   });
+
+  if (justPaid) {
+    try {
+      const company = await getCompanyProfile();
+      const logoUrl = companyLogoUrl(company.logoPath);
+      await sendPaymentReceivedEmail({
+        to: invoice.quote.client.email,
+        clientName: invoice.quote.client.name,
+        invoiceNumber: invoice.number,
+        companyName: company.name ?? undefined,
+        logoUrl: logoUrl ? `${process.env.NEXTAUTH_URL}${logoUrl}` : undefined,
+        items: invoice.quote.items.map((item) => ({ title: item.title, price: Number(item.price) })),
+        total: Number(invoice.total),
+      });
+    } catch (err) {
+      // Marking the invoice paid already succeeded — a notification failure
+      // shouldn't undo that or surface as a 5xx to staff, same pattern as
+      // sendInvoiceEmail's own try/catch in complete/route.ts.
+      console.error('[invoices/[id] PATCH] sendPaymentReceivedEmail failed', err);
+    }
+  }
 
   return NextResponse.json({ invoice: updated });
 }

@@ -224,6 +224,58 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
   });
 }
 
+export interface SendPaymentReceivedEmailOptions {
+  to: string;
+  clientName: string;
+  invoiceNumber: number;
+  companyName?: string;
+  logoUrl?: string;
+  items: SendQuoteApprovalEmailItem[];
+  total: number;
+}
+
+// Sent once, right when staff flips an invoice Pending payment -> Paid — a
+// receipt-style confirmation, distinct from sendInvoiceEmail (sent when the
+// job is marked Completed, before any payment has happened).
+export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOptions): Promise<void> {
+  const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
+  const servicesHtml = opts.items
+    .map((item) => `<li style="padding:4px 0;">${escapeHtml(item.title)}</li>`)
+    .join('');
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px 24px;border-radius:12px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        ${opts.logoUrl ? `<img src="${opts.logoUrl}" alt="${opts.companyName ? escapeHtml(opts.companyName) : 'Company logo'}" style="max-height:64px;max-width:220px;object-fit:contain;margin-bottom:16px;" />` : ''}
+        <div style="display:inline-block;background:#2c5f2d;color:#fff;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:8px 20px;border-radius:999px;">
+          ✓ Payment received
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;">
+        <p style="margin-top:0;">Hi ${escapeHtml(opts.clientName)},</p>
+        <p>Thank you! We've received your payment for invoice <strong>#${opts.invoiceNumber}</strong>, covering the following services:</p>
+        <ul style="margin:16px 0;padding-left:20px;color:#374151;">
+          ${servicesHtml}
+        </ul>
+        <table style="width:100%;max-width:280px;margin:16px 0 0 auto;font-size:14px;color:#6b7280;">
+          <tr>
+            <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;">Amount paid</td>
+            <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;text-align:right;">${formatMoney(opts.total)}</td>
+          </tr>
+        </table>
+        <p style="margin-top:24px;margin-bottom:0;">Thank you for your business with ${from}!</p>
+      </div>
+    </div>
+  `;
+
+  await sendGraphMail({
+    to: opts.to,
+    subject: `Payment received — Invoice #${opts.invoiceNumber}`,
+    html,
+  });
+}
+
 export interface SendInvoiceEmailOptions {
   to: string;
   clientName: string;

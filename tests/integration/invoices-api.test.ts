@@ -5,7 +5,7 @@ vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 
 import { getServerSession } from 'next-auth';
 import { GET as listInvoices } from '@/app/api/invoices/route';
-import { GET as getInvoice, DELETE as deleteInvoice } from '@/app/api/invoices/[id]/route';
+import { GET as getInvoice, PATCH as patchInvoice, DELETE as deleteInvoice } from '@/app/api/invoices/[id]/route';
 import { prisma } from '@/lib/db';
 
 describe('/api/invoices', () => {
@@ -74,6 +74,74 @@ describe('/api/invoices', () => {
   it('GET detail returns 404 for an unknown invoice', async () => {
     const res = await getInvoice(new Request('http://localhost/api/invoices/does-not-exist') as any, { params: { id: 'does-not-exist' } });
     expect(res.status).toBe(404);
+  });
+
+  it('is created with pending payment status', async () => {
+    const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+    expect(invoice?.paymentStatus).toBe('pending');
+    expect(invoice?.paidAt).toBeNull();
+  });
+
+  it('PATCH marks an invoice as paid and sets paidAt', async () => {
+    const res = await patchInvoice(
+      new Request(`http://localhost/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'paid' }),
+      }) as any,
+      { params: { id: invoiceId } },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.invoice.paymentStatus).toBe('paid');
+    expect(body.invoice.paidAt).not.toBeNull();
+  });
+
+  it('PATCH reverts an invoice back to pending and clears paidAt', async () => {
+    const res = await patchInvoice(
+      new Request(`http://localhost/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'pending' }),
+      }) as any,
+      { params: { id: invoiceId } },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.invoice.paymentStatus).toBe('pending');
+    expect(body.invoice.paidAt).toBeNull();
+  });
+
+  it('PATCH rejects an invalid paymentStatus', async () => {
+    const res = await patchInvoice(
+      new Request(`http://localhost/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'bogus' }),
+      }) as any,
+      { params: { id: invoiceId } },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('PATCH returns 404 for an unknown invoice', async () => {
+    const res = await patchInvoice(
+      new Request('http://localhost/api/invoices/does-not-exist', {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'paid' }),
+      }) as any,
+      { params: { id: 'does-not-exist' } },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('PATCH returns 401 when unauthenticated', async () => {
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const res = await patchInvoice(
+      new Request('http://localhost/api/invoices/anything', {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'paid' }),
+      }) as any,
+      { params: { id: 'anything' } },
+    );
+    expect(res.status).toBe(401);
   });
 
   it('DELETE removes the invoice and unblocks deleting its quote afterward', async () => {

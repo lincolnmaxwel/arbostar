@@ -152,17 +152,24 @@ model CompanyProfile {
 // moment, not a live recompute, so later edits to the (by-then-completed)
 // quote can't silently change an invoice the client already received by
 // email. One invoice per quote (a redo/adjustment would be a new quote).
+enum InvoicePaymentStatus {
+  pending
+  paid
+}
+
 model Invoice {
-  id        String   @id @default(uuid())
-  number    Int      @unique @default(autoincrement())
-  quoteId   String   @unique
-  quote     Quote    @relation(fields: [quoteId], references: [id])
-  subtotal  Decimal  @db.Decimal(10, 2)
-  taxRate   Decimal  @db.Decimal(5, 4)
-  taxAmount Decimal  @db.Decimal(10, 2)
-  total     Decimal  @db.Decimal(10, 2)
-  sentAt    DateTime?
-  createdAt DateTime @default(now())
+  id            String               @id @default(uuid())
+  number        Int                  @unique @default(autoincrement())
+  quoteId       String               @unique
+  quote         Quote                @relation(fields: [quoteId], references: [id])
+  subtotal      Decimal              @db.Decimal(10, 2)
+  taxRate       Decimal              @db.Decimal(5, 4)
+  taxAmount     Decimal              @db.Decimal(10, 2)
+  total         Decimal              @db.Decimal(10, 2)
+  sentAt        DateTime?
+  paymentStatus InvoicePaymentStatus @default(pending)
+  paidAt        DateTime?
+  createdAt     DateTime             @default(now())
 }
 
 model AuditLog {

@@ -1,6 +1,5 @@
 import { getConfirmedClients } from '@/lib/clients';
-import { DeleteClientButton } from '@/components/DeleteClientButton';
-import { EditClientButton } from '@/components/EditClientButton';
+import { ClientListClient } from '@/components/ClientListClient';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import styles from './clients.module.css';
 
@@ -24,39 +23,7 @@ export default async function ClientsPage() {
         <h1 className={styles.title}>Clients</h1>
       </div>
 
-      {clients.length === 0 ? (
-        <div className={styles.empty}>
-          <p>No confirmed clients yet — a client shows up here once one of their quotes gets scheduled.</p>
-        </div>
-      ) : (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Address</th>
-              <th>Jobs</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((c) => (
-              <tr key={c.id}>
-                <td className={styles.clientName}>{c.name}</td>
-                <td>{c.email}</td>
-                <td>{c.phone || '—'}</td>
-                <td>{c.address || '—'}</td>
-                <td>{c.quoteCount}</td>
-                <td className={styles.actionsCell}>
-                  <EditClientButton client={c} className={styles.editButton} />
-                  <DeleteClientButton clientId={c.id} clientName={c.name} className={styles.deleteButton} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <ClientListClient clients={clients} />
     </div>
   );
 }

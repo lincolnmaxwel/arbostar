@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
 import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 import { DeleteInvoiceButton } from '@/components/DeleteInvoiceButton';
+import { PaymentStatusBadge } from '@/components/PaymentStatusBadge';
+import { MarkPaidButton } from '@/components/MarkPaidButton';
 import styles from './invoice.module.css';
 
 // Not strictly required (a dynamic route segment with no generateStaticParams
@@ -28,6 +30,9 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           <div>
             <h1 className={styles.title}>Invoice #{invoice.number}</h1>
             <p className={styles.meta}>Quote #{invoice.quote.number} · {invoice.sentAt ? new Date(invoice.sentAt).toLocaleDateString() : ''}</p>
+            <div className={styles.paymentRow}>
+              <PaymentStatusBadge status={invoice.paymentStatus} />
+            </div>
           </div>
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -36,6 +41,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
 
         <div className={styles.actions}>
+          <MarkPaidButton invoiceId={invoice.id} paymentStatus={invoice.paymentStatus} className={styles.markPaidButton} />
           <DeleteInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.number} className={styles.deleteButton} redirectTo="/invoices" />
         </div>
 

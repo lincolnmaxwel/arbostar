@@ -87,7 +87,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
                   <a href={`/api/invoices/${inv.id}/pdf`} download className={styles.downloadButton}>
                     Download
                   </a>
-                  <MarkPaidButton invoiceId={inv.id} paymentStatus={inv.paymentStatus} className={styles.downloadButton} />
+                  <MarkPaidButton invoiceId={inv.id} invoiceNumber={inv.number} paymentStatus={inv.paymentStatus} className={styles.downloadButton} />
                   <DeleteInvoiceButton invoiceId={inv.id} invoiceNumber={inv.number} className={styles.deleteButton} />
                 </td>
               </tr>

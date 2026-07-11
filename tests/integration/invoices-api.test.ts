@@ -96,7 +96,18 @@ describe('/api/invoices', () => {
     expect(body.invoice.paidAt).not.toBeNull();
   });
 
-  it('PATCH reverts an invoice back to pending and clears paidAt', async () => {
+  it('PATCH refuses to re-mark an already-paid invoice (one-way transition)', async () => {
+    const res = await patchInvoice(
+      new Request(`http://localhost/api/invoices/${invoiceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentStatus: 'paid' }),
+      }) as any,
+      { params: { id: invoiceId } },
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it('PATCH rejects "pending" as a target status — there is no path back once paid', async () => {
     const res = await patchInvoice(
       new Request(`http://localhost/api/invoices/${invoiceId}`, {
         method: 'PATCH',
@@ -104,10 +115,7 @@ describe('/api/invoices', () => {
       }) as any,
       { params: { id: invoiceId } },
     );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.invoice.paymentStatus).toBe('pending');
-    expect(body.invoice.paidAt).toBeNull();
+    expect(res.status).toBe(400);
   });
 
   it('PATCH rejects an invalid paymentStatus', async () => {

@@ -41,7 +41,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
 
         <div className={styles.actions}>
-          <MarkPaidButton invoiceId={invoice.id} paymentStatus={invoice.paymentStatus} className={styles.markPaidButton} />
+          <MarkPaidButton invoiceId={invoice.id} invoiceNumber={invoice.number} paymentStatus={invoice.paymentStatus} className={styles.markPaidButton} />
           <DeleteInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.number} className={styles.deleteButton} redirectTo="/invoices" />
         </div>
 

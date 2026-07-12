@@ -95,7 +95,7 @@ describe('QuoteBuilderForm', () => {
     const itemId = draft.items[0].id;
 
     const file = new File(['fake-bytes'], 'hedge.jpg', { type: 'image/jpeg' });
-    const input = screen.getByLabelText('+ Attach photo');
+    const input = screen.getByLabelText('+ Choose from gallery');
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));
@@ -114,7 +114,7 @@ describe('QuoteBuilderForm', () => {
     });
     const itemId = draft.items[0].id;
 
-    const input = screen.getByLabelText('+ Attach photo') as HTMLInputElement;
+    const input = screen.getByLabelText('+ Choose from gallery') as HTMLInputElement;
     expect(input.multiple).toBe(true);
 
     const fileA = new File(['a'], 'a.jpg', { type: 'image/jpeg' });
@@ -130,6 +130,32 @@ describe('QuoteBuilderForm', () => {
       },
       { timeout: 2000 },
     );
+  });
+
+  it('offers a dedicated camera-capture input separate from the gallery picker', async () => {
+    // A `multiple` file input hides the "take a photo" option in the native
+    // chooser on iOS Safari and many Android browsers — camera capture needs
+    // its own non-multiple input with `capture` set.
+    const draftId = 'test-draft-camera-photo';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.click(screen.getByRole('button', { name: /add service/i }));
+
+    const draft = await waitFor(async () => {
+      const d = await localDb.drafts.get(draftId);
+      if (!d || d.items.length === 0) throw new Error('item not added yet');
+      return d;
+    });
+    const itemId = draft.items[0].id;
+
+    const cameraInput = screen.getByLabelText('+ Take photo') as HTMLInputElement;
+    expect(cameraInput.multiple).toBe(false);
+    expect(cameraInput.getAttribute('capture')).toBe('environment');
+
+    const file = new File(['fake-bytes'], 'onsite.jpg', { type: 'image/jpeg' });
+    fireEvent.change(cameraInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByTestId(`photo-count-${itemId}`)).toHaveTextContent('1 photo'));
   });
 
   it('lets staff remove a service line item', async () => {

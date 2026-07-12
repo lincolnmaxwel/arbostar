@@ -402,8 +402,23 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
               <div className={`${styles.itemField} ${styles.itemFieldFull}`}>
                 <label>Photo</label>
                 <div className={styles.photoActions}>
+                  <label htmlFor={`photo-camera-${item.id}`} className={styles.photoButton}>
+                    + Take photo
+                  </label>
+                  <input
+                    id={`photo-camera-${item.id}`}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      if (!e.target.files || e.target.files.length === 0) return;
+                      await handlePhotoFiles(item.id, e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
                   <label htmlFor={`photo-${item.id}`} className={styles.photoButton}>
-                    + Attach photo
+                    + Choose from gallery
                   </label>
                   <input
                     id={`photo-${item.id}`}

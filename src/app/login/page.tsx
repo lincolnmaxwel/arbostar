@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
 
 function EyeIcon({ off }: { off: boolean }) {
@@ -30,7 +29,6 @@ function EyeIcon({ off }: { off: boolean }) {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +50,15 @@ export default function LoginPage() {
       setError('Invalid email or password');
       return;
     }
-    router.push('/quotes');
+    // A client-side router.push() here raced Safari (and some Edge
+    // configurations): the session cookie from the fetch() above isn't
+    // always guaranteed to be committed in time for the very next request
+    // if that request comes from an SPA transition instead of a full
+    // navigation, so middleware saw no session and bounced straight back to
+    // /login — even with correct credentials. A full navigation forces a
+    // fresh request that's guaranteed to carry the cookie, no race. Chrome
+    // never had this race, which is why it "only worked in Chrome."
+    window.location.href = '/quotes';
   }
 
   return (

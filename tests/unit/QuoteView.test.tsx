@@ -102,6 +102,39 @@ describe('QuoteView', () => {
     expect(screen.queryByTestId('photo-lightbox')).not.toBeInTheDocument();
   });
 
+  it('falls back to the server-side photo when this device never captured the blob (cross-device view)', async () => {
+    // No localDb.photos entry for 'p-remote' — simulates opening a synced
+    // quote on a device other than the one the photo was taken on.
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/server-quote-photo': {
+        ok: true,
+        json: async () => ({
+          quote: {
+            status: 'sent',
+            publicToken: 'tok',
+            items: [{ localItemId: 'i1', photos: [{ id: 'server-p1', filePath: '/api/uploads/quotes/q1/server-p1.jpg' }] }],
+          },
+        }),
+      },
+    });
+
+    await localDb.drafts.put({
+      draftId: 'view-cross-device',
+      serverId: 'server-quote-photo',
+      clientName: 'Cross Device Client',
+      clientEmail: 'crossdevice@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [{ id: 'i1', title: 'Hedges', price: 100, photoIds: ['p-remote'] }],
+    });
+
+    render(<QuoteView draftId="view-cross-device" />);
+
+    const thumb = await screen.findByLabelText('View photo for Hedges');
+    expect(thumb.querySelector('img')).toHaveAttribute('src', '/api/uploads/quotes/q1/server-p1.jpg');
+  });
+
   it('fetches and shows the approval status, and copies the client link', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     global.fetch = mockFetchRoutes({

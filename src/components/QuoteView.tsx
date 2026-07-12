@@ -41,6 +41,12 @@ const WINDOW_LABEL: Record<DayWindow, string> = {
 export function QuoteView({ draftId }: { draftId: string }) {
   const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  // Server-side photos for each item, keyed by localItemId (== DraftQuoteItem.id)
+  // — a fallback for when this device's IndexedDB never captured the photo
+  // blob itself (it was taken on a different device/browser). Populated by
+  // the same status-polling fetch below, since it's already hitting
+  // GET /api/quotes/[id] on an interval.
+  const [serverItemPhotos, setServerItemPhotos] = useState<Record<string, { id: string; filePath: string }[]>>({});
   const [openPhotoIndex, setOpenPhotoIndex] = useState<number | null>(null);
   const [approval, setApproval] = useState<ApprovalStatus | null>(null);
   const [booking, setBooking] = useState<BookingState | null>(null);
@@ -65,6 +71,13 @@ export function QuoteView({ draftId }: { draftId: string }) {
         .then((body) => {
           if (!cancelled && body?.quote) {
             setApproval({ status: body.quote.status, publicToken: body.quote.publicToken });
+            if (Array.isArray(body.quote.items)) {
+              const map: Record<string, { id: string; filePath: string }[]> = {};
+              for (const item of body.quote.items) {
+                map[item.localItemId] = item.photos ?? [];
+              }
+              setServerItemPhotos(map);
+            }
             if (body.quote.status === 'approved' || body.quote.status === 'scheduled') {
               fetch(`/api/quotes/${serverId}/booking`)
                 .then((res) => (res.ok ? res.json() : null))
@@ -142,10 +155,24 @@ export function QuoteView({ draftId }: { draftId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, draft?.items]);
 
-  const allPhotos = (draft?.items ?? []).flatMap((item) =>
-    item.photoIds
+  // Prefers this device's own local blobs (instant, no network); only falls
+  // back to the server's uploaded copies when a photoId doesn't resolve
+  // locally — i.e. it was captured on a different device/browser and this
+  // one never had the blob to begin with.
+  function getItemPhotos(item: { id: string; photoIds: string[]; title: string }) {
+    const localResolved = item.photoIds
       .filter((photoId) => photoUrls[photoId])
-      .map((photoId) => ({ photoId, url: photoUrls[photoId], itemTitle: item.title || 'Untitled service' })),
+      .map((photoId) => ({ key: photoId, url: photoUrls[photoId] }));
+    if (localResolved.length >= item.photoIds.length) return localResolved;
+
+    const serverPhotos = serverItemPhotos[item.id] ?? [];
+    if (serverPhotos.length > 0) return serverPhotos.map((p) => ({ key: p.id, url: p.filePath }));
+
+    return localResolved;
+  }
+
+  const allPhotos = (draft?.items ?? []).flatMap((item) =>
+    getItemPhotos(item).map((photo) => ({ photoId: photo.key, url: photo.url, itemTitle: item.title || 'Untitled service' })),
   );
 
   function closeGallery() {
@@ -273,21 +300,18 @@ export function QuoteView({ draftId }: { draftId: string }) {
                   {item.description && <div className={styles.itemDescription}>{item.description}</div>}
                   {item.photoIds.length > 0 && (
                     <div className={styles.photos}>
-                      {item.photoIds.map(
-                        (photoId) =>
-                          photoUrls[photoId] && (
-                            <button
-                              key={photoId}
-                              type="button"
-                              className={styles.photoThumbButton}
-                              onClick={() => openGalleryAt(photoId)}
-                              aria-label={`View photo for ${item.title || 'this service'}`}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={photoUrls[photoId]} className={styles.photoThumb} alt="" />
-                            </button>
-                          ),
-                      )}
+                      {getItemPhotos(item).map((photo) => (
+                        <button
+                          key={photo.key}
+                          type="button"
+                          className={styles.photoThumbButton}
+                          onClick={() => openGalleryAt(photo.key)}
+                          aria-label={`View photo for ${item.title || 'this service'}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo.url} className={styles.photoThumb} alt="" />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </td>

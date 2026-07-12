@@ -42,6 +42,38 @@ describe('GET /api/quotes/[id]', () => {
     expect(body.quote.publicToken).toBe(quote.publicToken);
   });
 
+  it('includes items (keyed by localItemId) with their photos, for cross-device photo fallback', async () => {
+    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const localItemId = randomUUID();
+    const quote = await prisma.quote.create({
+      data: {
+        draftId: randomUUID(),
+        clientId: client.id,
+        createdById: userId,
+        status: 'sent',
+        items: {
+          create: [
+            {
+              localItemId,
+              title: 'Hedges',
+              price: 100,
+              sortOrder: 0,
+              photos: { create: [{ filePath: '/api/uploads/quotes/x/y.jpg', sortOrder: 0 }] },
+            },
+          ],
+        },
+      },
+    });
+
+    const res = await GET(new Request(`http://localhost/api/quotes/${quote.id}`) as any, { params: { id: quote.id } });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.quote.items).toHaveLength(1);
+    expect(body.quote.items[0].localItemId).toBe(localItemId);
+    expect(body.quote.items[0].photos).toHaveLength(1);
+    expect(body.quote.items[0].photos[0].filePath).toBe('/api/uploads/quotes/x/y.jpg');
+  });
+
   it('returns 404 for a quote that does not exist', async () => {
     const res = await GET(new Request('http://localhost/api/quotes/does-not-exist') as any, { params: { id: 'does-not-exist' } });
     expect(res.status).toBe(404);

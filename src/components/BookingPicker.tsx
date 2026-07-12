@@ -102,15 +102,15 @@ export function BookingPicker({
       {rejecting ? (
         <div className={styles.rejectBox}>
           <label className={styles.reasonLabel} htmlFor="reject-reason">
-            Reason
+            Suggested date
           </label>
           <textarea
             id="reject-reason"
             className={styles.reasonInput}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            aria-label="Reason"
-            placeholder="Tell us why these dates don't work."
+            aria-label="Suggested date"
+            placeholder="Let us know what date would work better for you."
           />
           <button
             type="button"
@@ -118,7 +118,7 @@ export function BookingPicker({
             onClick={reject}
             disabled={reason.trim().length < 3 || submiting !== null}
           >
-            {submiting === 'reject' ? 'Submitting…' : 'Submit reason'}
+            {submiting === 'reject' ? 'Submitting…' : 'Submit'}
           </button>
         </div>
       ) : (

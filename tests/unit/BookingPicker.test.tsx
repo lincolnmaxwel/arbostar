@@ -52,25 +52,25 @@ describe('BookingPicker', () => {
     render(<BookingPicker token="tok" roundId="r1" options={options} />);
     fireEvent.click(screen.getByRole('button', { name: /reject all/i }));
 
-    const textarea = await screen.findByLabelText(/reason/i);
-    expect(screen.getByRole('button', { name: /submit reason/i })).toBeDisabled();
+    const textarea = await screen.findByLabelText(/suggested date/i);
+    expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
 
     fireEvent.change(textarea, { target: { value: 'no' } });
-    expect(screen.getByRole('button', { name: /submit reason/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
 
     fireEvent.change(textarea, { target: { value: 'None of those work.' } });
-    expect(screen.getByRole('button', { name: /submit reason/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled();
   });
 
-  it('submits reject with the reason and refreshes', async () => {
+  it('submits reject with the suggested date and refreshes', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'approved', bookingStatus: 'rejected' }) });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     render(<BookingPicker token="tok" roundId="r1" options={options} />);
     fireEvent.click(screen.getByRole('button', { name: /reject all/i }));
-    const textarea = await screen.findByLabelText(/reason/i);
+    const textarea = await screen.findByLabelText(/suggested date/i);
     fireEvent.change(textarea, { target: { value: 'None of those work.' } });
-    fireEvent.click(screen.getByRole('button', { name: /submit reason/i }));
+    fireEvent.click(screen.getByRole('button', { name: /submit/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);

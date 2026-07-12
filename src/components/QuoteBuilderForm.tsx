@@ -210,11 +210,24 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     const currentItem = formState!.items.find((i) => i.id === itemId);
     if (!currentItem) return;
     const newPhotoIds: string[] = [];
+    const failedNames: string[] = [];
     for (const file of Array.from(files)) {
-      const compressed = await compressImage(file);
-      newPhotoIds.push(await addPhotoToItem(draftId, compressed, file.name));
+      try {
+        const compressed = await compressImage(file);
+        newPhotoIds.push(await addPhotoToItem(draftId, compressed, file.name));
+      } catch (err) {
+        // One unreadable file (e.g. HEIC conversion failing) shouldn't lose
+        // the rest of a multi-photo selection.
+        console.error('[handlePhotoFiles] failed to process photo', file.name, err);
+        failedNames.push(file.name);
+      }
     }
-    updateItem(itemId, { photoIds: [...currentItem.photoIds, ...newPhotoIds] });
+    if (newPhotoIds.length > 0) {
+      updateItem(itemId, { photoIds: [...currentItem.photoIds, ...newPhotoIds] });
+    }
+    if (failedNames.length > 0) {
+      window.alert(`Could not add ${failedNames.length === 1 ? 'this photo' : 'these photos'}: ${failedNames.join(', ')}`);
+    }
   }
 
   function removePhoto(itemId: string, photoId: string) {

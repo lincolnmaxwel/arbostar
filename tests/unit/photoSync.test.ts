@@ -60,6 +60,43 @@ describe('photoSync', () => {
     expect(photo?.status).toBe('uploaded');
   });
 
+  it('retries a photo left stuck in a legacy "uploading" status from before this file stopped writing it', async () => {
+    // Simulates a photo whose upload was interrupted (tab closed, app
+    // backgrounded mid-request) under the old code, which persisted
+    // 'uploading' to Dexie and never retried it. This file no longer writes
+    // that status, but a real user's existing IndexedDB may still have one —
+    // it must be picked back up, not skipped forever.
+    await localDb.drafts.put({
+      draftId: 'd-stuck', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      items: [{ id: 'item-stuck', serverItemId: 'server-item-stuck', title: 'Hedges', price: 100, photoIds: [] }],
+    });
+    const photoId = await attachPhoto('d-stuck', 'item-stuck', new Blob(['x']), 'p.jpg');
+    await localDb.photos.update(photoId, { status: 'uploading' });
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    await uploadPendingPhotos('d-stuck');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const photo = await localDb.photos.get(photoId);
+    expect(photo?.status).toBe('uploaded');
+  });
+
+  it('leaves the photo pending (not stuck) so the next call retries it, after a failed upload', async () => {
+    await localDb.drafts.put({
+      draftId: 'd-retry', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      items: [{ id: 'item-retry', serverItemId: 'server-item-retry', title: 'Hedges', price: 100, photoIds: [] }],
+    });
+    const photoId = await attachPhoto('d-retry', 'item-retry', new Blob(['x']), 'p.jpg');
+
+    global.fetch = vi.fn().mockRejectedValueOnce(new Error('network down'));
+    await uploadPendingPhotos('d-retry');
+    expect((await localDb.photos.get(photoId))?.status).toBe('pending');
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    await uploadPendingPhotos('d-retry');
+    expect((await localDb.photos.get(photoId))?.status).toBe('uploaded');
+  });
+
   it('does not double-upload when called twice concurrently for the same draft (React StrictMode double-invoke)', async () => {
     await localDb.drafts.put({
       draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),

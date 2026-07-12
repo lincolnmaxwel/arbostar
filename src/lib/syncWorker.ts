@@ -2,6 +2,7 @@ import { localDb } from '@/lib/localDb';
 import { dueEntries, recordFailure, markStuck, clearEntry } from '@/lib/outbox';
 import { flushPendingDeletes } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
+import { uploadPendingPhotos } from '@/lib/photoSync';
 
 export async function isReallyOnline(): Promise<boolean> {
   try {
@@ -76,6 +77,20 @@ export async function runSyncCycle(): Promise<void> {
     } catch (err) {
       await recordFailure(entry.id!, (err as Error).message);
     }
+  }
+
+  // Photo uploads only ever got ONE shot before: a single useEffect in
+  // QuoteBuilderForm, fired once when a draft's status first transitioned to
+  // 'synced'. If that one attempt didn't finish — the tab closed, the app
+  // got backgrounded on mobile mid-request, a flaky connection dropped it —
+  // nothing ever retried it, so the photo stayed on this device forever and
+  // never reached the server (invisible to every other device and the
+  // public portal, even though the quote's text/pricing synced fine). Retry
+  // every cycle instead, for every locally-synced draft, so it recovers on
+  // its own the next time this device is online with the app open.
+  const syncedDrafts = await localDb.drafts.where('status').equals('synced').toArray();
+  for (const draft of syncedDrafts) {
+    await uploadPendingPhotos(draft.draftId);
   }
 }
 

@@ -1,5 +1,4 @@
 import { localDb } from '@/lib/localDb';
-import type { DraftPhoto } from '@/lib/localDb';
 
 export async function addPhotoToItem(draftId: string, blob: Blob, fileName: string): Promise<string> {
   const photoId = crypto.randomUUID();
@@ -16,6 +15,18 @@ export async function addPhotoToItem(draftId: string, blob: Blob, fileName: stri
   return photoId;
 }
 
+// Guards against double-upload within THIS page load only (e.g. React
+// StrictMode double-invoking the effect that kicks this off) — deliberately
+// in-memory, not persisted to Dexie as an 'uploading' status. An earlier
+// version persisted 'uploading' and treated it as un-retryable, which meant
+// a photo whose upload was interrupted (tab closed, app backgrounded mid-
+// request, a dropped connection that didn't reject cleanly) got stuck
+// there forever: nothing ever put it back to 'pending', and every future
+// call skipped it on sight. Since this set resets on every reload, a photo
+// can always be retried on the next sync cycle no matter how the previous
+// attempt died.
+const inFlight = new Set<string>();
+
 export async function uploadPendingPhotos(draftId: string): Promise<void> {
   const draft = await localDb.drafts.get(draftId);
   if (!draft) return;
@@ -23,33 +34,33 @@ export async function uploadPendingPhotos(draftId: string): Promise<void> {
   for (const item of draft.items) {
     if (!item.serverItemId) continue;
     for (const photoId of item.photoIds) {
-      // Atomically claim the photo for upload: the read-check-write happens inside a
-      // single readwrite transaction, so two concurrent calls (e.g. React StrictMode's
-      // double-invoked effect) can't both observe 'pending' before either write lands.
-      // IndexedDB serializes readwrite transactions on the same store, so the second
-      // call's transaction only runs after the first has committed the 'uploading' status.
-      const claimedPhoto: DraftPhoto | null = await localDb.transaction('rw', localDb.photos, async () => {
-        const current = await localDb.photos.get(photoId);
-        if (!current || current.status === 'uploaded' || current.status === 'uploading') return null;
-        await localDb.photos.update(photoId, { status: 'uploading' });
-        return current;
-      });
-      if (!claimedPhoto) continue;
-
-      const form = new FormData();
-      form.set('quoteItemId', item.serverItemId);
-      form.set('file', claimedPhoto.blob, claimedPhoto.fileName);
+      // Claimed synchronously, before any await, so two concurrent calls
+      // (e.g. React StrictMode's double-invoked effect) can't both pass this
+      // check for the same photoId — the second sees it already claimed.
+      if (inFlight.has(photoId)) continue;
+      inFlight.add(photoId);
 
       try {
+        const photo = await localDb.photos.get(photoId);
+        // Anything other than 'uploaded' is retryable — this also covers a
+        // legacy 'uploading' row left over from before this file stopped
+        // writing that status, self-healing a photo that got stuck under the
+        // old logic the next time this runs.
+        if (!photo || photo.status === 'uploaded') continue;
+
+        const form = new FormData();
+        form.set('quoteItemId', item.serverItemId);
+        form.set('file', photo.blob, photo.fileName);
+
         const res = await fetch('/api/quotes/photos', { method: 'POST', body: form });
         if (res.ok) {
           await localDb.photos.update(photoId, { status: 'uploaded' });
-        } else {
-          await localDb.photos.update(photoId, { status: 'pending' });
         }
+        // A non-ok response leaves status at 'pending' — retried next cycle.
       } catch {
-        // network error: revert to 'pending' so it's retried on the next call
-        await localDb.photos.update(photoId, { status: 'pending' });
+        // network error — leave at 'pending', retried next cycle.
+      } finally {
+        inFlight.delete(photoId);
       }
     }
   }

@@ -36,6 +36,7 @@ describe('runSyncCycle', () => {
     await localDb.drafts.clear();
     await localDb.outbox.clear();
     await localDb.pendingDeletes.clear();
+    await localDb.photos.clear();
   });
 
   it('syncs a due draft successfully and clears the outbox entry', async () => {
@@ -149,6 +150,52 @@ describe('runSyncCycle', () => {
     const draft = await localDb.drafts.get('d4');
     expect(draft?.status).toBe('syncing');
     expect(await getEntryForDraft('d4')).toBeDefined();
+  });
+
+  it('retries a pending photo upload for an already-synced draft every cycle, not just once', async () => {
+    // Previously photo upload only ran once, from a useEffect in
+    // QuoteBuilderForm keyed on the draft's status transitioning to
+    // 'synced' — if that one attempt didn't complete (tab closed, network
+    // drop), nothing ever retried it. runSyncCycle now retries on every
+    // cycle for every locally-synced draft, independent of whether the
+    // builder form is even open.
+    await localDb.drafts.put({
+      draftId: 'd8', serverId: 'server-8', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      items: [{ id: 'item-8', serverItemId: 'server-item-8', title: 'Hedges', price: 100, photoIds: ['photo-8'] }],
+    });
+    await localDb.photos.add({ id: 'photo-8', draftId: 'd8', blob: new Blob(['x']), fileName: 'p.jpg', status: 'pending' });
+
+    let photoUploadCalled = false;
+    global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
+      if (url === '/api/health') return { ok: true, status: 200 };
+      if (url === '/api/quotes' && (!opts || !opts.method)) {
+        // Must include this quote (matched by serverId) — otherwise
+        // pullServerQuotes treats an empty list as "deleted on another
+        // device" and removes the local draft (and its photos) before the
+        // retry logic under test ever runs.
+        return {
+          ok: true,
+          json: async () => ({
+            quotes: [{
+              id: 'server-8', draftId: 'd8', client: { name: 'A', email: 'a@x.com' },
+              taxRate: '0.05', status: 'draft', bookingStatus: 'idle',
+              items: [{ id: 'server-item-8', localItemId: 'item-8', title: 'Hedges', price: 100 }],
+              updatedAt: new Date(0).toISOString(),
+            }],
+          }),
+        };
+      }
+      if (url === '/api/quotes/photos') {
+        photoUploadCalled = true;
+        return { ok: true, status: 201 };
+      }
+      throw new Error(`unexpected fetch: ${url} ${opts?.method ?? 'GET'}`);
+    }) as any;
+
+    await runSyncCycle();
+
+    expect(photoUploadCalled).toBe(true);
+    expect((await localDb.photos.get('photo-8'))?.status).toBe('uploaded');
   });
 
   it('pulls and applies another device\'s edit within the same cycle', async () => {

@@ -25,6 +25,11 @@ function formatDate(iso: string): string {
   return dt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 export function BookingPicker({
   token,
   roundId,
@@ -37,7 +42,7 @@ export function BookingPicker({
   const router = useRouter();
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState('');
+  const [suggestedDate, setSuggestedDate] = useState('');
   const [submiting, setSubmitting] = useState<'confirm' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,13 +65,18 @@ export function BookingPicker({
   }
 
   async function reject() {
+    if (!suggestedDate) return;
     setSubmitting('reject');
     setError(null);
     try {
       const res = await fetch(`/api/portal/${token}/booking/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision: 'reject', reason }),
+        // The reason field is a free-text string server-side — sending the
+        // formatted date through it keeps the API/schema unchanged while
+        // staff still see a clear, readable suggestion instead of a raw
+        // ISO string in the notification email and quote view.
+        body: JSON.stringify({ decision: 'reject', reason: `Suggested: ${formatDate(suggestedDate)}` }),
       });
       if (!res.ok) throw new Error('failed');
       router.refresh();
@@ -101,22 +111,23 @@ export function BookingPicker({
 
       {rejecting ? (
         <div className={styles.rejectBox}>
-          <label className={styles.reasonLabel} htmlFor="reject-reason">
-            Suggested date
+          <label className={styles.reasonLabel} htmlFor="suggested-date">
+            What date works for you?
           </label>
-          <textarea
-            id="reject-reason"
+          <input
+            id="suggested-date"
+            type="date"
             className={styles.reasonInput}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            value={suggestedDate}
+            onChange={(e) => setSuggestedDate(e.target.value)}
             aria-label="Suggested date"
-            placeholder="Let us know what date would work better for you."
+            min={todayIso()}
           />
           <button
             type="button"
             className={styles.submitReason}
             onClick={reject}
-            disabled={reason.trim().length < 3 || submiting !== null}
+            disabled={!suggestedDate || submiting !== null}
           >
             {submiting === 'reject' ? 'Submitting…' : 'Submit'}
           </button>
@@ -137,7 +148,7 @@ export function BookingPicker({
             onClick={() => setRejecting(true)}
             disabled={submiting !== null}
           >
-            Reject all
+            Suggested date
           </button>
         </div>
       )}

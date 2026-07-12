@@ -48,33 +48,30 @@ describe('BookingPicker', () => {
     expect(refreshMock).toHaveBeenCalled();
   });
 
-  it('reveals a required textarea on "Reject all" and blocks submit until >= 3 chars', async () => {
+  it('reveals a required date picker on "Suggested date" and blocks submit until a date is chosen', async () => {
     render(<BookingPicker token="tok" roundId="r1" options={options} />);
-    fireEvent.click(screen.getByRole('button', { name: /reject all/i }));
+    fireEvent.click(screen.getByRole('button', { name: /suggested date/i }));
 
-    const textarea = await screen.findByLabelText(/suggested date/i);
+    const dateInput = await screen.findByLabelText(/suggested date/i);
     expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
 
-    fireEvent.change(textarea, { target: { value: 'no' } });
-    expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
-
-    fireEvent.change(textarea, { target: { value: 'None of those work.' } });
+    fireEvent.change(dateInput, { target: { value: '2099-08-01' } });
     expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled();
   });
 
-  it('submits reject with the suggested date and refreshes', async () => {
+  it('submits reject with the chosen date formatted into the reason field, and refreshes', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'approved', bookingStatus: 'rejected' }) });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     render(<BookingPicker token="tok" roundId="r1" options={options} />);
-    fireEvent.click(screen.getByRole('button', { name: /reject all/i }));
-    const textarea = await screen.findByLabelText(/suggested date/i);
-    fireEvent.change(textarea, { target: { value: 'None of those work.' } });
+    fireEvent.click(screen.getByRole('button', { name: /suggested date/i }));
+    const dateInput = await screen.findByLabelText(/suggested date/i);
+    fireEvent.change(dateInput, { target: { value: '2099-08-01' } });
     fireEvent.click(screen.getByRole('button', { name: /submit/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body).toEqual({ decision: 'reject', reason: 'None of those work.' });
+    expect(body).toEqual({ decision: 'reject', reason: 'Suggested: Saturday, August 1, 2099' });
     expect(refreshMock).toHaveBeenCalled();
   });
 

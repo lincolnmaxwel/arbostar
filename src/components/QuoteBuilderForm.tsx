@@ -177,6 +177,11 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       clientEmail: client.email,
       clientPhone: client.phone ?? undefined,
       clientAddress: client.address ?? undefined,
+      // Service address stays a separate, editable field (the job site can
+      // differ from the client's own address) — this only fills in a
+      // starting guess when nothing's been typed there yet, it doesn't lock
+      // the field the way name/email/phone do above.
+      serviceAddress: formState!.serviceAddress || client.address || undefined,
     };
     setFormState(next);
     persist(next);

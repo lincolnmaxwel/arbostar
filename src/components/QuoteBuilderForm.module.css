@@ -56,7 +56,15 @@
 .input:disabled {
   background: var(--color-bg);
   color: var(--color-text-secondary);
+  border-color: var(--color-border);
   cursor: not-allowed;
+  /* iOS Safari's UA stylesheet dims disabled form controls on top of
+     whatever background/color is set here, so locked fields render almost
+     blank compared to every other browser — overriding these forces our own
+     colors to actually show instead of Safari's washed-out default. */
+  opacity: 1;
+  -webkit-text-fill-color: var(--color-text-secondary);
+  -webkit-opacity: 1;
 }
 
 .lockedClientNotice {

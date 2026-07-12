@@ -246,7 +246,7 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px 24px;border-radius:12px;">
       <div style="text-align:center;margin-bottom:24px;">
-        ${opts.logoUrl ? `<img src="${opts.logoUrl}" alt="${opts.companyName ? escapeHtml(opts.companyName) : 'Company logo'}" style="max-height:64px;max-width:220px;object-fit:contain;margin-bottom:16px;" />` : ''}
+        ${opts.logoUrl ? `<img src="${opts.logoUrl}" alt="${opts.companyName ? escapeHtml(opts.companyName) : 'Company logo'}" style="display:block;margin:0 auto 16px;max-height:64px;max-width:220px;object-fit:contain;" />` : ''}
         <div style="display:inline-block;background:#2c5f2d;color:#fff;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:8px 20px;border-radius:999px;">
           ✓ Payment received
         </div>

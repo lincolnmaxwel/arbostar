@@ -245,4 +245,50 @@ describe('QuoteBuilderForm', () => {
       expect(draft?.pendingSend).toBe(true);
     });
   });
+
+  function mockFetchWithClients(clients: unknown[]) {
+    return vi.fn(async (url: string) => {
+      if (url === '/api/clients') return { ok: true, json: async () => ({ clients }) };
+      return { ok: true, status: 200 };
+    }) as unknown as typeof fetch;
+  }
+
+  it('prefills Service address from the selected existing client, leaving it editable', async () => {
+    global.fetch = mockFetchWithClients([
+      { id: 'c1', name: 'Nelson Costa', email: 'nelson@example.com', phone: null, address: '123 Maple St' },
+    ]);
+
+    const draftId = 'test-draft-reuse-client';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+
+    fireEvent.change(await screen.findByLabelText('Existing client'), { target: { value: 'Nelson' } });
+    fireEvent.mouseDown(await screen.findByText('Nelson Costa'));
+
+    const serviceAddress = screen.getByLabelText('Service address') as HTMLInputElement;
+    await waitFor(() => expect(serviceAddress.value).toBe('123 Maple St'));
+    expect(serviceAddress).toBeEnabled();
+
+    // Still just a starting guess, not locked — the job site can differ
+    // from the client's own address.
+    fireEvent.change(serviceAddress, { target: { value: '456 Oak Ave (job site)' } });
+    expect(serviceAddress.value).toBe('456 Oak Ave (job site)');
+  });
+
+  it('does not clobber a Service address the user already typed before picking a client', async () => {
+    global.fetch = mockFetchWithClients([
+      { id: 'c1', name: 'Nelson Costa', email: 'nelson@example.com', phone: null, address: '123 Maple St' },
+    ]);
+
+    const draftId = 'test-draft-reuse-client-2';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+
+    fireEvent.change(screen.getByLabelText('Service address'), { target: { value: 'Already typed address' } });
+    fireEvent.change(await screen.findByLabelText('Existing client'), { target: { value: 'Nelson' } });
+    fireEvent.mouseDown(await screen.findByText('Nelson Costa'));
+
+    await waitFor(() => expect(screen.getByLabelText('Client name')).toHaveValue('Nelson Costa'));
+    expect(screen.getByLabelText('Service address')).toHaveValue('Already typed address');
+  });
 });

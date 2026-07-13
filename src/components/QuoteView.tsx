@@ -298,7 +298,7 @@ export function QuoteView({ draftId }: { draftId: string }) {
                 <td>
                   <div className={styles.itemTitle}>{item.title || 'Untitled service'}</div>
                   {item.description && <div className={styles.itemDescription}>{item.description}</div>}
-                  {item.photoIds.length > 0 && (
+                  {getItemPhotos(item).length > 0 && (
                     <div className={styles.photos}>
                       {getItemPhotos(item).map((photo) => (
                         <button

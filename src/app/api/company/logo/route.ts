@@ -47,3 +47,21 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ company: { ...company, logoUrl: companyLogoUrl(company.logoPath) } });
 }
+
+export async function DELETE() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const existing = await getCompanyProfile();
+  const company = await prisma.companyProfile.update({
+    where: { id: COMPANY_PROFILE_ID },
+    data: { logoPath: null },
+  });
+
+  if (existing.logoPath) {
+    const dir = path.join(process.cwd(), 'uploads', 'company');
+    await unlink(path.join(dir, existing.logoPath)).catch(() => {});
+  }
+
+  return NextResponse.json({ company: { ...company, logoUrl: companyLogoUrl(company.logoPath) } });
+}

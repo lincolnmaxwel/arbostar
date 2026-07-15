@@ -121,6 +121,19 @@ export default function ProfilePage() {
     setCompany(body.company);
   }
 
+  async function handleRemoveLogo() {
+    setLogoUploading(true);
+    setLogoError(null);
+    const res = await fetch('/api/company/logo', { method: 'DELETE' });
+    setLogoUploading(false);
+    if (!res.ok) {
+      setLogoError('Could not remove logo.');
+      return;
+    }
+    const body = await res.json();
+    setCompany(body.company);
+  }
+
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError(null);
@@ -176,16 +189,22 @@ export default function ProfilePage() {
             ) : (
               <div className={styles.logoPlaceholder}>No logo</div>
             )}
-            <div>
+            <div className={styles.logoUpload}>
               <input
                 ref={logoInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handleLogoChange}
                 disabled={logoUploading}
+                className={styles.fileInput}
               />
               {logoUploading && <p className={styles.sectionHint}>Uploading...</p>}
               {logoError && <div className={styles.error}>{logoError}</div>}
+              {company.logoUrl && !logoUploading && (
+                <button type="button" className={styles.removeLogoButton} onClick={handleRemoveLogo}>
+                  Remove logo
+                </button>
+              )}
             </div>
           </div>
         </div>

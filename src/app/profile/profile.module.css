@@ -113,6 +113,58 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logoUpload {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileInput {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.fileInput::file-selector-button {
+  padding: 8px 16px;
+  margin-right: 12px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fileInput::file-selector-button:hover {
+  background: var(--color-primary-hover);
+}
+
+@media (max-width: 480px) {
+  .fileInput {
+    font-size: 0.75rem;
+  }
+}
+
+.removeLogoButton {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-error);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.removeLogoButton:hover {
+  text-decoration: underline;
 }
 
 .logoPreview {

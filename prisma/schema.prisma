@@ -17,6 +17,18 @@ enum Role {
   staff
 }
 
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+enum FeatureKey {
+  invoices
+  timesheet
+  clients_crm
+}
+
 enum QuoteStatus {
   draft
   sent
@@ -46,12 +58,24 @@ enum ScheduleRoundStatus {
   confirmed
 }
 
+enum InvoiceSource {
+  quote
+  timesheet
+}
+
+enum TimesheetEntryStatus {
+  open
+  invoiced
+}
+
 model User {
   id                String   @id @default(uuid())
   name              String
   email             String   @unique
   passwordHash      String
   role              Role     @default(staff)
+  status            UserStatus @default(active)
+  hourlyRate        Decimal  @db.Decimal(10, 2) @default(0)
   // Where client-response notifications (quote approved/declined, booking
   // date confirmed/rejected) get sent. Null means "use `email`" — kept
   // separate from the login email so a user can route notifications
@@ -59,15 +83,29 @@ model User {
   notificationEmail String?
   createdAt         DateTime @default(now())
   quotes            Quote[]
+  clients           Client[]
+  invoices          Invoice[]
+  timesheetEntries  TimesheetEntry[]
+  featureFlags      UserFeatureFlag[]
+  companyProfile    CompanyProfile?
+  auditLogTargets   AuditLog[]
 }
 
 model Client {
-  id      String  @id @default(uuid())
-  name    String
-  email   String  @unique
-  phone   String?
-  address String?
-  quotes  Quote[]
+  id               String            @id @default(uuid())
+  name             String
+  email            String
+  phone            String?
+  address          String?
+  // Owner of this client record; the same email may exist per user.
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
+  quotes           Quote[]
+  invoices         Invoice[]
+  timesheetEntries TimesheetEntry[]
+
+  @@unique([userId, email])
+  @@index([userId])
 }
 
 model ServiceCatalogItem {
@@ -91,6 +129,9 @@ model Quote {
   // rather than silently vanishing as a side effect of deleting the client).
   client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdById String
+  // Owner of the quote (also the invoice owner when this quote is completed).
+  // The future Tenant migration will add `tenantId` alongside this owner
+  // relation when the SaaS pivot lands.
   createdBy   User        @relation(fields: [createdById], references: [id])
   subtotal    Decimal     @db.Decimal(10, 2) @default(0)
   taxRate     Decimal     @db.Decimal(5, 4) @default(0)
@@ -111,6 +152,8 @@ model Quote {
   updatedAt   DateTime    @updatedAt
   items       QuoteItem[]
   invoice     Invoice?
+
+  @@index([createdById])
 }
 
 model QuoteItem {
@@ -133,12 +176,13 @@ model QuotePhoto {
   sortOrder   Int       @default(0)
 }
 
-// Singleton — one deployment is one company (see CLAUDE.md), so there's
-// exactly one row, always looked up/created by the fixed id 'company'
-// (src/lib/companyProfile.ts), not Prisma's usual per-record uuid default.
-// Shown as the "From" party on the client-facing quote/portal page.
+// Per-user billing/branding profile — shown as the "From" party on the
+// client-facing quote/portal page. One profile per user (the fixed-id
+// 'company' singleton was replaced by per-user ownership).
 model CompanyProfile {
-  id        String   @id
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
   name      String?
   phone     String?
   email     String?
@@ -148,10 +192,10 @@ model CompanyProfile {
 }
 
 // Created once, when staff marks a scheduled job Completed (POST
-// /api/quotes/[id]/complete) — a snapshot of the quote's totals at that
-// moment, not a live recompute, so later edits to the (by-then-completed)
-// quote can't silently change an invoice the client already received by
-// email. One invoice per quote (a redo/adjustment would be a new quote).
+// /api/quotes/[id]/complete) or generates a timesheet invoice (POST
+// /api/timesheet/invoice) — a snapshot of the totals at that moment, not a
+// live recompute, so later edits to the source can't silently change an
+// invoice the client already received by email.
 enum InvoicePaymentStatus {
   pending
   paid
@@ -160,8 +204,14 @@ enum InvoicePaymentStatus {
 model Invoice {
   id            String               @id @default(uuid())
   number        Int                  @unique @default(autoincrement())
-  quoteId       String               @unique
-  quote         Quote                @relation(fields: [quoteId], references: [id])
+  source        InvoiceSource        @default(quote)
+  quoteId       String?              @unique
+  quote         Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  userId        String
+  user          User                 @relation(fields: [userId], references: [id])
+  clientId      String
+  client        Client               @relation(fields: [clientId], references: [id])
+  serviceAddress String?
   subtotal      Decimal              @db.Decimal(10, 2)
   taxRate       Decimal              @db.Decimal(5, 4)
   taxAmount     Decimal              @db.Decimal(10, 2)
@@ -170,15 +220,82 @@ model Invoice {
   paymentStatus InvoicePaymentStatus @default(pending)
   paidAt        DateTime?
   createdAt     DateTime             @default(now())
+  lineItems     InvoiceLineItem[]
+  timesheetEntries TimesheetEntry[]
+
+  @@index([userId])
+  @@index([clientId])
+}
+
+model InvoiceLineItem {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sourceEntryId String?
+  description   String
+  quantity      Decimal  @db.Decimal(10, 3)
+  unitPrice     Decimal  @db.Decimal(10, 2)
+  amount        Decimal  @db.Decimal(10, 2)
+  sortOrder     Int      @default(0)
+}
+
+model TimesheetEntry {
+  id              String               @id @default(uuid())
+  userId          String
+  user            User                 @relation(fields: [userId], references: [id])
+  clientId        String
+  client          Client               @relation(fields: [clientId], references: [id])
+  workDate        DateTime             @db.Date
+  startedAt       DateTime
+  endedAt         DateTime
+  durationMinutes Int
+  hourlyRate      Decimal              @db.Decimal(10, 2)
+  status          TimesheetEntryStatus @default(open)
+  invoiceId       String?
+  invoice         Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  products        TimesheetProduct[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([userId, workDate])
+  @@index([clientId, workDate])
+  @@index([invoiceId])
+}
+
+model TimesheetProduct {
+  id               String         @id @default(uuid())
+  timesheetEntryId String
+  timesheetEntry   TimesheetEntry @relation(fields: [timesheetEntryId], references: [id], onDelete: Cascade)
+  name             String
+  quantity         Decimal        @db.Decimal(10, 3)
+  unitPrice        Decimal        @db.Decimal(10, 2)
+  lineTotal        Decimal        @db.Decimal(10, 2)
+}
+
+model UserFeatureFlag {
+  id      String     @id @default(uuid())
+  userId  String
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature FeatureKey
+  enabled Boolean    @default(false)
+
+  @@unique([userId, feature])
+  @@index([userId])
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  entityType String
-  entityId   String
-  action     String
-  actorId    String?
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  entityType   String
+  entityId     String
+  action       String
+  actorId      String?
+  targetUserId String?
+  targetUser   User?    @relation(fields: [targetUserId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([createdAt])
 }
 
 model ScheduleRound {

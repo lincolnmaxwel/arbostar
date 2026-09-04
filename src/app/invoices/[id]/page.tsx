@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
+import { isFeatureEnabled } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { formatMoney } from '@/lib/quoteMath';
 import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
@@ -14,14 +16,46 @@ import styles from './invoice.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) return null;
+    throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
+    return <p className={styles.featureDisabled}>This feature is not enabled for your account.</p>;
+  }
+
   const invoice = await prisma.invoice.findUnique({
-    where: { id: params.id },
-    include: { quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } } },
+    where: { id: params.id, userId: scope.ownerUserId },
+    include: {
+      client: true,
+      quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } },
+      lineItems: { orderBy: { sortOrder: 'asc' } },
+    },
   });
   if (!invoice) notFound();
 
   const company = await getCompanyProfile(invoice.userId);
   const logoUrl = companyLogoUrl(company.logoPath);
+
+  const isTimesheet = invoice.source === 'timesheet';
+  const items =
+    invoice.source === 'timesheet'
+      ? invoice.lineItems.map((l) => ({
+          id: l.id,
+          title: l.description,
+          description: null,
+          amount: Number(l.amount),
+        }))
+      : (invoice.quote?.items.map((item) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          amount: Number(item.price),
+        })) ?? []);
 
   return (
     <div className={styles.page}>
@@ -29,7 +63,10 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         <div className={styles.headerRow}>
           <div>
             <h1 className={styles.title}>Invoice #{invoice.number}</h1>
-            <p className={styles.meta}>Quote #{invoice.quote.number} · {invoice.sentAt ? new Date(invoice.sentAt).toLocaleDateString() : ''}</p>
+            <p className={styles.meta}>
+              {invoice.quote ? `Quote #${invoice.quote.number} · ` : ''}
+              {invoice.sentAt ? new Date(invoice.sentAt).toLocaleDateString() : ''}
+            </p>
             <div className={styles.paymentRow}>
               <PaymentStatusBadge status={invoice.paymentStatus} />
             </div>
@@ -42,17 +79,19 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
 
         <div className={styles.actions}>
           <MarkPaidButton invoiceId={invoice.id} invoiceNumber={invoice.number} paymentStatus={invoice.paymentStatus} className={styles.markPaidButton} />
-          <DeleteInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.number} className={styles.deleteButton} redirectTo="/invoices" />
+          {!isTimesheet && (
+            <DeleteInvoiceButton invoiceId={invoice.id} invoiceNumber={invoice.number} className={styles.deleteButton} redirectTo="/invoices" />
+          )}
         </div>
 
         <div className={styles.parties}>
           <div className={styles.party}>
             <h2 className={styles.partyLabel}>To</h2>
-            <p className={styles.partyName}>{invoice.quote.client.name}</p>
-            {invoice.quote.client.email && <p className={styles.partyLine}>{invoice.quote.client.email}</p>}
-            {invoice.quote.client.phone && <p className={styles.partyLine}>{invoice.quote.client.phone}</p>}
-            {invoice.quote.client.address && <p className={styles.partyLine}>{invoice.quote.client.address}</p>}
-            {invoice.quote.serviceAddress && <p className={styles.partyLine}>Service address: {invoice.quote.serviceAddress}</p>}
+            <p className={styles.partyName}>{invoice.client.name}</p>
+            {invoice.client.email && <p className={styles.partyLine}>{invoice.client.email}</p>}
+            {invoice.client.phone && <p className={styles.partyLine}>{invoice.client.phone}</p>}
+            {invoice.client.address && <p className={styles.partyLine}>{invoice.client.address}</p>}
+            {invoice.serviceAddress && <p className={styles.partyLine}>Service address: {invoice.serviceAddress}</p>}
           </div>
 
           {(company.name || company.phone || company.email || company.address) && (
@@ -74,13 +113,13 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             </tr>
           </thead>
           <tbody>
-            {invoice.quote.items.map((item) => (
+            {items.map((item) => (
               <tr key={item.id}>
                 <td>
                   <div className={styles.itemTitle}>{item.title}</div>
                   {item.description && <div className={styles.itemDescription}>{item.description}</div>}
                 </td>
-                <td className={styles.priceCol}>{formatMoney(Number(item.price))}</td>
+                <td className={styles.priceCol}>{formatMoney(item.amount)}</td>
               </tr>
             ))}
           </tbody>

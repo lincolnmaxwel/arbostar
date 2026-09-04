@@ -573,7 +573,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
             disabled={syncingNow}
             onClick={async () => {
               setSyncingNow(true);
-              await runSyncCycle();
+              await runSyncCycle(ownerUserId!);
               setSyncingNow(false);
             }}
           >
@@ -591,7 +591,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
               className={styles.retryButton}
               onClick={async () => {
                 await retryStuckEntry(outboxEntry.id!);
-                await runSyncCycle();
+                await runSyncCycle(ownerUserId!);
               }}
             >
               Retry

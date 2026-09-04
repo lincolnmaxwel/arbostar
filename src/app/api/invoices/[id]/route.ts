@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 import { sendPaymentReceivedEmail } from '@/lib/email';
 
+const INVOICE_INCLUDE = {
+  client: true,
+  quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } },
+  lineItems: { orderBy: { sortOrder: 'asc' } },
+} as const;
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
+    return featureDisabledResponse();
+  }
 
   const invoice = await prisma.invoice.findUnique({
-    where: { id: params.id },
-    include: { quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } } },
+    where: { id: params.id, userId: scope.ownerUserId },
+    include: INVOICE_INCLUDE,
   });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
@@ -24,8 +41,19 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // lie. Confirmation lives in the UI (MarkPaidButton's window.confirm) since
 // this can't be undone.
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
+    return featureDisabledResponse();
+  }
 
   const body = await req.json().catch(() => null);
   if (body?.paymentStatus !== 'paid') {
@@ -33,8 +61,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const invoice = await prisma.invoice.findUnique({
-    where: { id: params.id },
-    include: { quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } } },
+    where: { id: params.id, userId: scope.ownerUserId },
+    include: INVOICE_INCLUDE,
   });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
@@ -47,16 +75,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data: { paymentStatus: 'paid', paidAt: new Date() },
   });
 
+  await auditScopedMutation(scope, 'Invoice', updated.id, 'mark-paid');
+
   try {
     const company = await getCompanyProfile(invoice.userId);
     const logoUrl = companyLogoUrl(company.logoPath);
+    // Source-neutral line data: quote invoices use the quote's items,
+    // timesheet invoices use the frozen line-item rows.
+    const items =
+      invoice.source === 'timesheet'
+        ? invoice.lineItems.map((l) => ({ title: l.description, price: Number(l.amount) }))
+        : invoice.quote?.items.map((item) => ({ title: item.title, price: Number(item.price) })) ?? [];
     await sendPaymentReceivedEmail({
-      to: invoice.quote.client.email,
-      clientName: invoice.quote.client.name,
+      to: invoice.client.email,
+      clientName: invoice.client.name,
       invoiceNumber: invoice.number,
       companyName: company.name ?? undefined,
       logoUrl: logoUrl ? `${process.env.NEXTAUTH_URL}${logoUrl}` : undefined,
-      items: invoice.quote.items.map((item) => ({ title: item.title, price: Number(item.price) })),
+      items,
       total: Number(invoice.total),
     });
   } catch (err) {
@@ -73,15 +109,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 // since an invoice is a record the client already received by email, not
 // something that should vanish as a side effect of deleting its quote or
 // client. Deleting it here is the explicit step that unblocks deleting the
-// quote/client afterward.
+// quote/client afterward. A timesheet invoice is permanent: its entries are
+// frozen into the invoice, so it can never be deleted.
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
-  const invoice = await prisma.invoice.findUnique({ where: { id: params.id } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: params.id, userId: scope.ownerUserId },
+  });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
+  if (invoice.source === 'timesheet') {
+    return NextResponse.json(
+      { error: 'timesheet-invoice-locked', message: 'Timesheet invoices cannot be deleted.' },
+      { status: 409 },
+    );
+  }
+
   await prisma.invoice.delete({ where: { id: params.id } });
+
+  await auditScopedMutation(scope, 'Invoice', invoice.id, 'delete');
 
   return NextResponse.json({ ok: true });
 }

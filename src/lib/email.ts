@@ -280,6 +280,8 @@ export interface SendInvoiceEmailOptions {
   to: string;
   clientName: string;
   invoiceNumber: number;
+  /** Present only for quote-sourced invoices. */
+  quoteNumber?: number;
   companyName?: string;
   items: SendQuoteApprovalEmailItem[];
   subtotal: number;
@@ -289,15 +291,17 @@ export interface SendInvoiceEmailOptions {
   pdfBuffer?: Buffer;
 }
 
-// Sent once, right when staff marks a scheduled job Completed — reuses the
-// same item-table builder as the quote-ready email since it's the same
-// "title/description/price" shape, just billed instead of proposed.
+// Sent once, right when staff marks a scheduled job Completed (or generates a
+// timesheet invoice) — reuses the same item-table builder as the quote-ready
+// email since it's the same "title/description/price" shape, just billed
+// instead of proposed. Renders both invoice sources (quote vs timesheet).
 export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<void> {
   const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
+  const reference = opts.quoteNumber !== undefined ? ` from quote #${opts.quoteNumber}` : '';
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
-      <p>The work is complete! Here is your invoice <strong>#${opts.invoiceNumber}</strong>.</p>
+      <p>The work is complete! Here is your invoice <strong>#${opts.invoiceNumber}</strong>${reference}.</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <thead>
           <tr>

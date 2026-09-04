@@ -63,6 +63,10 @@ describe('POST /api/quotes/[id]/complete', () => {
     const invoice = await prisma.invoice.findUnique({ where: { quoteId: quote.id } });
     expect(invoice).not.toBeNull();
     expect(Number(invoice!.subtotal)).toBe(500);
+    // Quote invoices carry the source, owner, client, and service address.
+    expect(invoice!.source).toBe('quote');
+    expect(invoice!.userId).toBe(userId);
+    expect(invoice!.clientId).toBe(quote.clientId);
 
     expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
     expect(sendInvoiceEmail).toHaveBeenCalledWith(expect.objectContaining({ invoiceNumber: invoice!.number, total: 525 }));

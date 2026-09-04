@@ -40,6 +40,14 @@ describe('buildInvoicePdf', () => {
     expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
   });
 
+  it('renders a timesheet invoice without a quote number', async () => {
+    const opts = baseOptions();
+    opts.quoteNumber = undefined;
+    opts.items = [{ title: 'Labor — hedge trimming', quantity: 8, unitPrice: 100, price: 800 }];
+    const buffer = await buildInvoicePdf(opts);
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
   it('skips a missing logo file instead of throwing', async () => {
     const opts = baseOptions();
     opts.company.logoPath = 'this-file-does-not-exist.png';

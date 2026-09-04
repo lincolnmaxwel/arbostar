@@ -35,7 +35,7 @@ describe('photoSync', () => {
 
   it('skips items with no serverItemId yet', async () => {
     await localDb.drafts.put({
-      draftId: 'd2', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
+      draftId: 'd2', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
       items: [{ id: 'item-2', title: 'Hedges', price: 100, photoIds: [] }],
     });
     await attachPhoto('d2', 'item-2', new Blob(['x']), 'p.jpg');
@@ -47,7 +47,7 @@ describe('photoSync', () => {
 
   it('uploads a pending photo once the item has a serverItemId, then marks it uploaded', async () => {
     await localDb.drafts.put({
-      draftId: 'd3', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd3', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-3', serverItemId: 'server-item-3', title: 'Hedges', price: 100, photoIds: [] }],
     });
     await attachPhoto('d3', 'item-3', new Blob(['x']), 'p.jpg');
@@ -67,7 +67,7 @@ describe('photoSync', () => {
     // that status, but a real user's existing IndexedDB may still have one —
     // it must be picked back up, not skipped forever.
     await localDb.drafts.put({
-      draftId: 'd-stuck', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd-stuck', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-stuck', serverItemId: 'server-item-stuck', title: 'Hedges', price: 100, photoIds: [] }],
     });
     const photoId = await attachPhoto('d-stuck', 'item-stuck', new Blob(['x']), 'p.jpg');
@@ -83,7 +83,7 @@ describe('photoSync', () => {
 
   it('leaves the photo pending (not stuck) so the next call retries it, after a failed upload', async () => {
     await localDb.drafts.put({
-      draftId: 'd-retry', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd-retry', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-retry', serverItemId: 'server-item-retry', title: 'Hedges', price: 100, photoIds: [] }],
     });
     const photoId = await attachPhoto('d-retry', 'item-retry', new Blob(['x']), 'p.jpg');
@@ -99,7 +99,7 @@ describe('photoSync', () => {
 
   it('does not double-upload when called twice concurrently for the same draft (React StrictMode double-invoke)', async () => {
     await localDb.drafts.put({
-      draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd4', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-4', serverItemId: 'server-item-4', title: 'Hedges', price: 100, photoIds: [] }],
     });
     await attachPhoto('d4', 'item-4', new Blob(['x']), 'p.jpg');

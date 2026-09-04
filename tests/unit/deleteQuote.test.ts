@@ -14,13 +14,13 @@ describe('deleteDraft', () => {
 
   it('removes a never-synced local draft without calling the server', async () => {
     await localDb.drafts.put({
-      draftId: 'd1', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
+      draftId: 'd1', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'local', updatedAt: Date.now(),
       items: [{ id: 'item-1', title: 'Hedges', price: 100, photoIds: [] }],
     });
 
     global.fetch = vi.fn();
     const draft = await localDb.drafts.get('d1');
-    await deleteDraft(draft!);
+    await deleteDraft(draft!, 'user-a');
 
     expect(global.fetch).not.toHaveBeenCalled();
     expect(await localDb.drafts.get('d1')).toBeUndefined();
@@ -28,13 +28,13 @@ describe('deleteDraft', () => {
 
   it('deletes the server-side quote when the draft has synced (has a serverId)', async () => {
     await localDb.drafts.put({
-      draftId: 'd2', serverId: 'server-quote-2', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd2', ownerUserId: 'user-a', serverId: 'server-quote-2', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-2', serverItemId: 'server-item-2', title: 'Hedges', price: 100, photoIds: [] }],
     });
 
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     const draft = await localDb.drafts.get('d2');
-    await deleteDraft(draft!);
+    await deleteDraft(draft!, 'user-a');
 
     expect(global.fetch).toHaveBeenCalledWith('/api/quotes/server-quote-2', { method: 'DELETE' });
     expect(await localDb.drafts.get('d2')).toBeUndefined();
@@ -43,14 +43,14 @@ describe('deleteDraft', () => {
   it('removes attached photo blobs and any pending outbox entry', async () => {
     await localDb.photos.add({ id: 'photo-1', draftId: 'd3', blob: new Blob(['x']), fileName: 'p.jpg', status: 'pending' });
     await localDb.drafts.put({
-      draftId: 'd3', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'error', updatedAt: Date.now(),
+      draftId: 'd3', ownerUserId: 'user-a', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'error', updatedAt: Date.now(),
       items: [{ id: 'item-3', title: 'Hedges', price: 100, photoIds: ['photo-1'] }],
     });
-    await enqueueSync('d3');
+    await enqueueSync('d3', 'user-a');
 
     global.fetch = vi.fn();
     const draft = await localDb.drafts.get('d3');
-    await deleteDraft(draft!);
+    await deleteDraft(draft!, 'user-a');
 
     expect(await localDb.photos.get('photo-1')).toBeUndefined();
     expect(await getEntryForDraft('d3')).toBeUndefined();
@@ -58,13 +58,13 @@ describe('deleteDraft', () => {
 
   it('marks pending-delete and keeps the row visible when offline, then removes it once the flush succeeds', async () => {
     await localDb.drafts.put({
-      draftId: 'd4', serverId: 'server-quote-4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd4', ownerUserId: 'user-a', serverId: 'server-quote-4', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-4', serverItemId: 'server-item-4', title: 'Hedges', price: 100, photoIds: [] }],
     });
 
     global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     const draft = await localDb.drafts.get('d4');
-    await deleteDraft(draft!);
+    await deleteDraft(draft!, 'user-a');
 
     // Offline: the row stays put, flagged pending-delete, not removed yet.
     const pendingRow = await localDb.drafts.get('d4');
@@ -73,7 +73,7 @@ describe('deleteDraft', () => {
 
     // Connectivity returns; the queued delete flushes and the row is removed.
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    await flushPendingDeletes();
+    await flushPendingDeletes('user-a');
 
     expect(global.fetch).toHaveBeenCalledWith('/api/quotes/server-quote-4', { method: 'DELETE' });
     expect(await localDb.pendingDeletes.get('server-quote-4')).toBeUndefined();
@@ -82,13 +82,13 @@ describe('deleteDraft', () => {
 
   it('cancelPendingDelete restores the row and drops the queued delete', async () => {
     await localDb.drafts.put({
-      draftId: 'd5', serverId: 'server-quote-5', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+      draftId: 'd5', ownerUserId: 'user-a', serverId: 'server-quote-5', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [],
     });
 
     global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     const draft = await localDb.drafts.get('d5');
-    await deleteDraft(draft!);
+    await deleteDraft(draft!, 'user-a');
     expect((await localDb.drafts.get('d5'))?.pendingDelete).toBe(true);
 
     await cancelPendingDelete('server-quote-5', 'd5');
@@ -98,7 +98,7 @@ describe('deleteDraft', () => {
 
     // A later flush must not touch it — the delete was cancelled.
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    await flushPendingDeletes();
+    await flushPendingDeletes('user-a');
     expect(global.fetch).not.toHaveBeenCalled();
     expect(await localDb.drafts.get('d5')).toBeDefined();
   });

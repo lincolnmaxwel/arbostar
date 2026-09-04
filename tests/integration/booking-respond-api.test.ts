@@ -13,7 +13,7 @@ describe('POST /api/portal/[token]/booking/respond', () => {
     });
     userId = user.id;
     const client = await prisma.client.create({
-      data: { name: 'Portal Client', email: `pc-${randomUUID()}@example.com` },
+      data: { userId, name: 'Portal Client', email: `pc-${randomUUID()}@example.com` },
     });
     clientId = client.id;
   });

@@ -92,6 +92,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       to: quote.client.email,
       clientName: quote.client.name,
       invoiceNumber: invoice.number,
+      quoteNumber: quote.number,
       companyName: company.name ?? undefined,
       items,
       subtotal: Number(quote.subtotal),

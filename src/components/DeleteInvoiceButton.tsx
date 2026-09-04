@@ -26,7 +26,8 @@ export function DeleteInvoiceButton({
     const res = await fetch(`/api/invoices/${invoiceId}`, { method: 'DELETE' });
     setDeleting(false);
     if (!res.ok) {
-      window.alert('Could not delete this invoice.');
+      const body = await res.json().catch(() => null);
+      window.alert(body?.message ?? 'Could not delete this invoice.');
       return;
     }
     if (redirectTo) {

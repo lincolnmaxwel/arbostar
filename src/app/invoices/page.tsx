@@ -1,3 +1,5 @@
+import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
+import { isFeatureEnabled } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { InvoiceListClient } from '@/components/InvoiceListClient';
 import { AutoRefresh } from '@/components/AutoRefresh';
@@ -9,16 +11,35 @@ import styles from './invoices.module.css';
 export const dynamic = 'force-dynamic';
 
 export default async function InvoicesPage() {
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) return null;
+    throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
+    return (
+      <div>
+        <p className={styles.featureDisabled}>This feature is not enabled for your account.</p>
+      </div>
+    );
+  }
+
   const invoices = await prisma.invoice.findMany({
-    include: { quote: { include: { client: true } } },
+    where: { userId: scope.ownerUserId },
+    include: { client: true, quote: { select: { number: true } } },
     orderBy: { number: 'desc' },
   });
 
   const rows = invoices.map((inv) => ({
     id: inv.id,
     number: inv.number,
-    clientName: inv.quote.client.name,
-    clientEmail: inv.quote.client.email,
+    source: inv.source,
+    quoteNumber: inv.quote?.number ?? null,
+    clientName: inv.client.name,
+    clientEmail: inv.client.email,
     sentAt: inv.sentAt ? inv.sentAt.toISOString() : null,
     total: Number(inv.total),
     paymentStatus: inv.paymentStatus,

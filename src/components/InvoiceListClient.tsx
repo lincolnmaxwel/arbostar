@@ -12,6 +12,8 @@ import styles from '@/app/invoices/invoices.module.css';
 interface InvoiceRow {
   id: string;
   number: number;
+  source: 'quote' | 'timesheet';
+  quoteNumber: number | null;
   clientName: string;
   clientEmail: string;
   sentAt: string | null;
@@ -26,7 +28,13 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
     const q = search.trim().toLowerCase();
     if (!q) return invoices;
     return invoices.filter((inv) => {
-      const haystack = [`#${inv.number}`, inv.clientName, inv.clientEmail, getPaymentStatusLabel(inv.paymentStatus)]
+      const haystack = [
+        `#${inv.number}`,
+        inv.clientName,
+        inv.clientEmail,
+        getPaymentStatusLabel(inv.paymentStatus),
+        inv.source === 'timesheet' ? 'timesheet' : 'quote',
+      ]
         .join(' ')
         .toLowerCase();
       return haystack.includes(q);
@@ -48,7 +56,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
 
       {invoices.length === 0 ? (
         <div className={styles.empty}>
-          <p>No invoices yet — mark a scheduled job Completed to generate one.</p>
+          <p>No invoices yet — mark a scheduled job Completed or generate a timesheet invoice.</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>
@@ -73,6 +81,11 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
                   <Link href={`/invoices/${inv.id}`} className={styles.invoiceLink}>
                     #{inv.number}
                   </Link>
+                  <span
+                    className={`${styles.sourceBadge} ${inv.source === 'timesheet' ? styles.sourceBadgeTimesheet : styles.sourceBadgeQuote}`}
+                  >
+                    {inv.source === 'timesheet' ? 'Timesheet' : inv.quoteNumber ? `Quote #${inv.quoteNumber}` : 'Quote'}
+                  </span>
                 </td>
                 <td>
                   <div>{inv.clientName}</div>
@@ -88,7 +101,9 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
                     Download
                   </a>
                   <MarkPaidButton invoiceId={inv.id} invoiceNumber={inv.number} paymentStatus={inv.paymentStatus} className={styles.downloadButton} />
-                  <DeleteInvoiceButton invoiceId={inv.id} invoiceNumber={inv.number} className={styles.deleteButton} />
+                  {inv.source !== 'timesheet' && (
+                    <DeleteInvoiceButton invoiceId={inv.id} invoiceNumber={inv.number} className={styles.deleteButton} />
+                  )}
                 </td>
               </tr>
             ))}

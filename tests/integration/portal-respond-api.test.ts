@@ -15,11 +15,12 @@ describe('POST /api/portal/[token]/respond', () => {
 
   afterAll(async () => {
     await prisma.quote.deleteMany({ where: { createdById: userId } });
+    await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 
   async function createSentQuote() {
-    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
     return prisma.quote.create({
       data: {
         draftId: randomUUID(),

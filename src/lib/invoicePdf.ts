@@ -7,11 +7,16 @@ export interface InvoicePdfItem {
   title: string;
   description?: string | null;
   price: number;
+  // Timesheet-derived lines carry a quantity × unit price; quote-derived
+  // lines are plain amounts (price only).
+  quantity?: number;
+  unitPrice?: number;
 }
 
 export interface InvoicePdfOptions {
   invoiceNumber: number;
-  quoteNumber: number;
+  /** Present only for quote-sourced invoices. */
+  quoteNumber?: number;
   date: Date;
   client: { name: string; email?: string | null; phone?: string | null; address?: string | null };
   serviceAddress?: string | null;
@@ -47,7 +52,9 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   const contentWidth = pageWidth - marginX * 2;
 
   doc.fillColor(DARK).font('Helvetica-Bold').fontSize(22).text(`Invoice #${opts.invoiceNumber}`, marginX, 50);
-  doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(`Quote #${opts.quoteNumber} · ${opts.date.toLocaleDateString()}`, marginX, 78);
+  const metaParts = [`${opts.date.toLocaleDateString()}`];
+  if (opts.quoteNumber !== undefined) metaParts.unshift(`Quote #${opts.quoteNumber}`);
+  doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(metaParts.join(' · '), marginX, 78);
 
   if (opts.company.logoPath) {
     try {
@@ -115,7 +122,11 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
       doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(item.description, marginX + 8, descY, { width: descColWidth });
       textBottom = descY + doc.heightOfString(item.description, { width: descColWidth });
     }
-    doc.font('Helvetica').fontSize(10).fillColor(DARK).text(formatMoney(item.price), marginX + 8 + descColWidth, rowTop, {
+    const amount =
+      item.quantity !== undefined && item.unitPrice !== undefined
+        ? `${item.quantity} × ${formatMoney(item.unitPrice)} = ${formatMoney(item.price)}`
+        : formatMoney(item.price);
+    doc.font('Helvetica').fontSize(10).fillColor(DARK).text(amount, marginX + 8 + descColWidth, rowTop, {
       width: totalColWidth,
       align: 'right',
     });

@@ -172,7 +172,7 @@ export function BookingForm({ serverId, draftId }: { serverId: string; draftId: 
       {rejectedRound?.rejectionReason && (
         <div className={styles.rejection}>
           <p className={styles.rejectionLabel}>Client rejected round {rejectedRound.roundNumber}</p>
-          <p className={styles.rejectionReason}>"{rejectedRound.rejectionReason}"</p>
+          <p className={styles.rejectionReason}>&quot;{rejectedRound.rejectionReason}&quot;</p>
         </div>
       )}
 

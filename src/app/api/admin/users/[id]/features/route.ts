@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { FeatureKey } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction } from '@/lib/userScope';
-import { adminAuthErrorResponse } from '../../route';
+import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
 const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm'];
 

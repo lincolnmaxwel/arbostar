@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { FeatureKey, Role, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction, UnauthorizedError, ForbiddenError } from '@/lib/userScope';
+import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
 const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm'];
 const ROLES: Role[] = ['admin', 'staff'];
@@ -130,14 +131,4 @@ function serializeUser(u: {
       FEATURES.map((f) => [f, u.featureFlags?.find((ff) => ff.feature === f)?.enabled ?? false]),
     ),
   };
-}
-
-export function adminAuthErrorResponse(err: unknown) {
-  if (err instanceof UnauthorizedError) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-  if (err instanceof ForbiddenError) {
-    return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
-  }
-  throw err;
 }

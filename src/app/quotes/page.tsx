@@ -16,18 +16,18 @@ import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
-  const allDrafts =
-    useLiveQuery(
-      () =>
-        ownerUserId
-          ? localDb.drafts
-              .orderBy('updatedAt')
-              .reverse()
-              .filter((d) => d.ownerUserId === ownerUserId)
-              .toArray()
-          : [],
-      [ownerUserId],
-    ) ?? [];
+  const liveDrafts = useLiveQuery(
+    () =>
+      ownerUserId
+        ? localDb.drafts
+            .orderBy('updatedAt')
+            .reverse()
+            .filter((d) => d.ownerUserId === ownerUserId)
+            .toArray()
+        : [],
+    [ownerUserId],
+  );
+  const allDrafts = useMemo(() => liveDrafts ?? [], [liveDrafts]);
   const [search, setSearch] = useState('');
 
   // Bootstrap the effective owner so the list is namespaced to the current

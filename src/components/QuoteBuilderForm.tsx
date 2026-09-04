@@ -374,7 +374,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
             <button type="button" className={styles.changeClientButton} onClick={() => setLockedClientId(null)}>
               change client
             </button>{' '}
-            to type in someone else's details instead.
+            to type in someone else&apos;s details instead.
           </div>
         )}
         <div className={styles.field}>

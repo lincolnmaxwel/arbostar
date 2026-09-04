@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction, VIEW_AS_COOKIE_NAME } from '@/lib/userScope';
-import { adminAuthErrorResponse } from '../users/route';
+import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 

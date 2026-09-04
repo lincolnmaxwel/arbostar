@@ -8,8 +8,26 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'admin@tiptoptreesltd.com' },
     update: {},
-    create: { name: 'Admin', email: 'admin@tiptoptreesltd.com', passwordHash, role: 'admin' },
+    create: { name: 'Admin', email: 'admin@tiptoptreesltd.com', passwordHash, role: 'admin', status: 'active', hourlyRate: 0 },
   });
+
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@tiptoptreesltd.com' } });
+
+  // Per-user billing profile (idempotent — never duplicates).
+  await prisma.companyProfile.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: { userId: admin.id },
+  });
+
+  // All optional features enabled for the seeded admin (idempotent).
+  for (const feature of ['invoices', 'timesheet', 'clients_crm'] as const) {
+    await prisma.userFeatureFlag.upsert({
+      where: { userId_feature: { userId: admin.id, feature } },
+      update: { enabled: true },
+      create: { userId: admin.id, feature, enabled: true },
+    });
+  }
 }
 
 main()

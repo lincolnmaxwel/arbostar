@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { Role, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction } from '@/lib/userScope';
-import { adminAuthErrorResponse } from '../route';
+import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
 interface PatchUserBody {
   name?: unknown;

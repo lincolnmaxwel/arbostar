@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
 
   try {
-    const company = await getCompanyProfile();
+    const company = await getCompanyProfile(invoice.userId);
     const logoUrl = companyLogoUrl(company.logoPath);
     await sendPaymentReceivedEmail({
       to: invoice.quote.client.email,

@@ -7,6 +7,7 @@ interface ProfileUser {
   name: string;
   email: string;
   notificationEmail: string | null;
+  hourlyRate: number;
 }
 
 interface CompanyProfile {
@@ -31,6 +32,11 @@ export default function ProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
 
+  const [hourlyRate, setHourlyRate] = useState('0');
+  const [hourlyRateSaving, setHourlyRateSaving] = useState(false);
+  const [hourlyRateError, setHourlyRateError] = useState<string | null>(null);
+  const [hourlyRateSaved, setHourlyRateSaved] = useState(false);
+
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
@@ -50,6 +56,7 @@ export default function ProfilePage() {
       .then((body) => {
         setUser(body.user);
         setNotificationEmail(body.user.notificationEmail ?? '');
+        setHourlyRate(String(body.user.hourlyRate ?? 0));
       });
     fetch('/api/company')
       .then((res) => res.json())
@@ -132,6 +139,31 @@ export default function ProfilePage() {
     }
     const body = await res.json();
     setCompany(body.company);
+  }
+
+  async function handleSaveHourlyRate(e: React.FormEvent) {
+    e.preventDefault();
+    const rate = Number(hourlyRate);
+    if (!Number.isFinite(rate) || rate < 0) {
+      setHourlyRateError('Enter a valid non-negative hourly rate.');
+      return;
+    }
+    setHourlyRateSaving(true);
+    setHourlyRateError(null);
+    setHourlyRateSaved(false);
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hourlyRate: rate }),
+    });
+    setHourlyRateSaving(false);
+    if (!res.ok) {
+      setHourlyRateError('Could not save hourly rate.');
+      return;
+    }
+    const body = await res.json();
+    setHourlyRate(String(body.user.hourlyRate ?? 0));
+    setHourlyRateSaved(true);
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -228,6 +260,35 @@ export default function ProfilePage() {
           </div>
           <button type="submit" className={styles.button} disabled={companySaving}>
             {companySaving ? 'Saving...' : 'Save'}
+          </button>
+        </form>
+      </div>
+
+      <div className={styles.card}>
+        <h2 className={styles.sectionTitle}>Default hourly rate</h2>
+        <p className={styles.sectionHint}>
+          Used when new timesheet entries are created — each entry snapshots this value, so changing it does not affect existing entries.
+        </p>
+        {hourlyRateError && <div className={styles.error}>{hourlyRateError}</div>}
+        {hourlyRateSaved && <div className={styles.success}>Saved.</div>}
+        <form onSubmit={handleSaveHourlyRate}>
+          <div className={styles.field}>
+            <label htmlFor="hourlyRate">Hourly rate ($)</label>
+            <input
+              id="hourlyRate"
+              type="number"
+              step="0.01"
+              min="0"
+              className={styles.input}
+              value={hourlyRate}
+              onChange={(e) => {
+                setHourlyRate(e.target.value);
+                setHourlyRateSaved(false);
+              }}
+            />
+          </div>
+          <button type="submit" className={styles.button} disabled={hourlyRateSaving}>
+            {hourlyRateSaving ? 'Saving...' : 'Save'}
           </button>
         </form>
       </div>

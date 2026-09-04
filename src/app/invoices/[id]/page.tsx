@@ -20,7 +20,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
   });
   if (!invoice) notFound();
 
-  const company = await getCompanyProfile();
+  const company = await getCompanyProfile(invoice.userId);
   const logoUrl = companyLogoUrl(company.logoPath);
 
   return (

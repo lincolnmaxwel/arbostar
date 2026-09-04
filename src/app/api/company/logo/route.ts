@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getCompanyProfile, companyLogoUrl, COMPANY_PROFILE_ID } from '@/lib/companyProfile';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
+import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 
 const EXT_BY_TYPE: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -14,8 +13,15 @@ const EXT_BY_TYPE: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
   const formData = await req.formData();
   const file = formData.get('file');
@@ -35,11 +41,13 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(dir, fileName), buffer);
 
-  const existing = await getCompanyProfile();
+  const existing = await getCompanyProfile(scope.ownerUserId);
   const company = await prisma.companyProfile.update({
-    where: { id: COMPANY_PROFILE_ID },
+    where: { userId: scope.ownerUserId },
     data: { logoPath: fileName },
   });
+
+  await auditScopedMutation(scope, 'CompanyProfile', company.id, 'logo-upload');
 
   if (existing.logoPath) {
     await unlink(path.join(dir, existing.logoPath)).catch(() => {});
@@ -49,14 +57,23 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
-  const existing = await getCompanyProfile();
+  const existing = await getCompanyProfile(scope.ownerUserId);
   const company = await prisma.companyProfile.update({
-    where: { id: COMPANY_PROFILE_ID },
+    where: { userId: scope.ownerUserId },
     data: { logoPath: null },
   });
+
+  await auditScopedMutation(scope, 'CompanyProfile', company.id, 'logo-remove');
 
   if (existing.logoPath) {
     const dir = path.join(process.cwd(), 'uploads', 'company');

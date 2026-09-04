@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const company = await getCompanyProfile();
+  const company = await getCompanyProfile(invoice.userId);
   const items = invoice.quote.items.map((item) => ({
     title: item.title,
     description: item.description,

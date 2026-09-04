@@ -1,15 +1,15 @@
 import { prisma } from '@/lib/db';
 
-// Singleton row — one deployment is one company, so there's exactly one
-// CompanyProfile, always keyed by this fixed id rather than Prisma's usual
-// per-record uuid default.
-export const COMPANY_PROFILE_ID = 'company';
-
-export async function getCompanyProfile() {
+/**
+ * Per-user billing/branding profile — the "From" party on quote/invoice
+ * documents. Upserts by the owner's userId (the fixed-id 'company' singleton
+ * is gone): the future Tenant migration will add `tenantId` to this lookup.
+ */
+export async function getCompanyProfile(userId: string) {
   return prisma.companyProfile.upsert({
-    where: { id: COMPANY_PROFILE_ID },
+    where: { userId },
     update: {},
-    create: { id: COMPANY_PROFILE_ID },
+    create: { userId },
   });
 }
 

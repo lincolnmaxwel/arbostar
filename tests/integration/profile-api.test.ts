@@ -2,12 +2,17 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 
-vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next-auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next-auth')>();
+  return { ...actual, getServerSession: vi.fn() };
+});
 
 import { getServerSession } from 'next-auth';
 import { GET, PATCH } from '@/app/api/profile/route';
 import { POST as changePassword } from '@/app/api/profile/password/route';
 import { prisma } from '@/lib/db';
+
+const sessionMock = getServerSession as unknown as ReturnType<typeof vi.fn>;
 
 function req(body: unknown) {
   return new Request('http://localhost/api/profile', { method: 'PATCH', body: JSON.stringify(body) }) as any;
@@ -26,22 +31,23 @@ describe('/api/profile', () => {
       data: { name: 'Profile Test', email: `profile-${randomUUID()}@example.com`, passwordHash, role: 'staff' },
     });
     userId = user.id;
-    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
+    sessionMock.mockResolvedValue({ user: { id: userId } });
   });
 
   afterAll(async () => {
     await prisma.user.delete({ where: { id: userId } });
   });
 
-  it('GET returns the current user profile with a null notificationEmail by default', async () => {
+  it('GET returns the current user profile with a null notificationEmail and hourlyRate 0 by default', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.user.notificationEmail).toBeNull();
+    expect(body.user.hourlyRate).toBe(0);
   });
 
   it('GET returns 401 when unauthenticated', async () => {
-    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    sessionMock.mockResolvedValueOnce(null);
     const res = await GET();
     expect(res.status).toBe(401);
   });
@@ -67,6 +73,21 @@ describe('/api/profile', () => {
     const body = await res.json();
     expect(body.user.notificationEmail).toBeNull();
   });
+
+  it('PATCH sets the default hourly rate', async () => {
+    const res = await PATCH(req({ hourlyRate: 65.5 }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.user.hourlyRate).toBe(65.5);
+
+    const updated = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(Number(updated.hourlyRate)).toBe(65.5);
+  });
+
+  it('PATCH rejects a negative hourly rate', async () => {
+    const res = await PATCH(req({ hourlyRate: -5 }));
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/profile/password', () => {
@@ -78,7 +99,7 @@ describe('POST /api/profile/password', () => {
       data: { name: 'Password Test', email: `password-${randomUUID()}@example.com`, passwordHash, role: 'staff' },
     });
     userId = user.id;
-    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
+    sessionMock.mockResolvedValue({ user: { id: userId } });
   });
 
   afterAll(async () => {
@@ -105,7 +126,7 @@ describe('POST /api/profile/password', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    sessionMock.mockResolvedValueOnce(null);
     const res = await changePassword(passwordReq({ currentPassword: 'x', newPassword: 'brandNewPass456' }));
     expect(res.status).toBe(401);
   });

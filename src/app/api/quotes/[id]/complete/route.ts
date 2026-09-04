@@ -45,7 +45,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   ]);
 
   try {
-    const company = await getCompanyProfile();
+    const company = await getCompanyProfile(quote.createdById);
     const items = quote.items.map((item) => ({ title: item.title, description: item.description, price: Number(item.price) }));
 
     // A PDF failure (a corrupt/missing logo file, say) shouldn't take the

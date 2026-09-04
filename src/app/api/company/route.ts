@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getCompanyProfile, companyLogoUrl, COMPANY_PROFILE_ID } from '@/lib/companyProfile';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
+import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
-  const company = await getCompanyProfile();
+  const company = await getCompanyProfile(scope.ownerUserId);
   return NextResponse.json({ company: { ...company, logoUrl: companyLogoUrl(company.logoPath) } });
 }
 
@@ -21,8 +27,15 @@ const patchSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
@@ -30,11 +43,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await getCompanyProfile(); // ensure the singleton row exists before updating it
+  await getCompanyProfile(scope.ownerUserId); // ensure the row exists before updating it
   const company = await prisma.companyProfile.update({
-    where: { id: COMPANY_PROFILE_ID },
+    where: { userId: scope.ownerUserId },
     data: parsed.data,
   });
+
+  await auditScopedMutation(scope, 'CompanyProfile', company.id, 'update');
 
   return NextResponse.json({ company: { ...company, logoUrl: companyLogoUrl(company.logoPath) } });
 }

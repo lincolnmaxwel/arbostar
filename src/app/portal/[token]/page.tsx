@@ -41,7 +41,10 @@ export default async function PortalPage({ params }: { params: { token: string }
 
   if (!quote) notFound();
 
-  const company = await getCompanyProfile();
+  // Public portal stays sessionless — the token is the credential. The
+  // branding profile is resolved through the quote's owner, so each user's
+  // documents carry their own company identity.
+  const company = await getCompanyProfile(quote.createdById);
   const logoUrl = companyLogoUrl(company.logoPath);
 
   const activeRound =

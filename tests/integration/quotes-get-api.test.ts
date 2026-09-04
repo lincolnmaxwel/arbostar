@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 
 import { getServerSession } from 'next-auth';
 import { GET } from '@/app/api/quotes/[id]/route';
@@ -20,11 +21,12 @@ describe('GET /api/quotes/[id]', () => {
 
   afterAll(async () => {
     await prisma.quote.deleteMany({ where: { createdById: userId } });
+    await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 
   it('returns the quote with its status and publicToken', async () => {
-    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: {
         draftId: randomUUID(),
@@ -43,7 +45,7 @@ describe('GET /api/quotes/[id]', () => {
   });
 
   it('includes items (keyed by localItemId) with their photos, for cross-device photo fallback', async () => {
-    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
     const localItemId = randomUUID();
     const quote = await prisma.quote.create({
       data: {

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { prisma } from '@/lib/db';
 import { sendBookingProposalEmail } from '@/lib/email';
 
@@ -18,8 +17,15 @@ const roundSchema = z.object({
 });
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
   const body = await req.json();
   const parsed = roundSchema.safeParse(body);
@@ -28,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const quote = await prisma.quote.findUnique({
-    where: { id: params.id },
+    where: { id: params.id, createdById: scope.ownerUserId },
     include: { client: true },
   });
   if (!quote) return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -71,6 +77,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     return created;
   });
+
+  await auditScopedMutation(scope, 'ScheduleRound', round.id, 'propose');
 
   const portalUrl = `${process.env.NEXTAUTH_URL}/portal/${quote.publicToken}`;
   try {

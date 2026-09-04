@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
@@ -11,11 +11,23 @@ import { buildInvoicePdf } from '@/lib/invoicePdf';
 // later edits to the quote can't silently change an invoice the client
 // already received by email.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
+
+  // Completion creates an invoice, which requires the invoices feature.
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
+    return featureDisabledResponse();
+  }
 
   const quote = await prisma.quote.findUnique({
-    where: { id: params.id },
+    where: { id: params.id, createdById: scope.ownerUserId },
     include: { client: true, items: { orderBy: { sortOrder: 'asc' } }, invoice: true },
   });
   if (!quote) return NextResponse.json({ error: 'not found' }, { status: 404 });
@@ -34,7 +46,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     prisma.quote.update({ where: { id: quote.id }, data: { status: 'completed' } }),
     prisma.invoice.create({
       data: {
+        source: 'quote',
         quoteId: quote.id,
+        userId: quote.createdById,
+        clientId: quote.clientId,
+        serviceAddress: quote.serviceAddress,
         subtotal: quote.subtotal,
         taxRate: quote.taxRate,
         taxAmount: quote.taxAmount,
@@ -43,6 +59,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       },
     }),
   ]);
+
+  await auditScopedMutation(scope, 'Invoice', invoice.id, 'create');
 
   try {
     const company = await getCompanyProfile(quote.createdById);

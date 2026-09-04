@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vites
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 vi.mock('@/lib/email', () => ({
   sendQuoteApprovalEmail: vi.fn().mockResolvedValue(undefined),
   sendBookingProposalEmail: vi.fn().mockResolvedValue(undefined),
@@ -25,7 +26,7 @@ describe('Staff booking API', () => {
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
 
     const client = await prisma.client.create({
-      data: { name: 'Booking Client', email: `booking-client-${randomUUID()}@example.com` },
+      data: { userId, name: 'Booking Client', email: `booking-client-${randomUUID()}@example.com` },
     });
     clientId = client.id;
   });

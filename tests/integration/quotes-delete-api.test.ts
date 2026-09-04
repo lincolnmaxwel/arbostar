@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 
 import { getServerSession } from 'next-auth';
 import { DELETE } from '@/app/api/quotes/[id]/route';
@@ -19,11 +20,12 @@ describe('DELETE /api/quotes/[id]', () => {
   });
 
   afterAll(async () => {
+    await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 
   it('deletes a quote and cascades its items and photos', async () => {
-    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: {
         draftId: randomUUID(),
@@ -47,12 +49,12 @@ describe('DELETE /api/quotes/[id]', () => {
   });
 
   it('returns 409 (not a raw 500) when the quote still has an invoice', async () => {
-    const client = await prisma.client.create({ data: { name: 'Invoiced Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Invoiced Client', email: `client-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: { draftId: randomUUID(), clientId: client.id, createdById: userId, status: 'completed' },
     });
     const invoice = await prisma.invoice.create({
-      data: { quoteId: quote.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
+      data: { quoteId: quote.id, userId, clientId: client.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
     });
 
     const res = await DELETE(new Request(`http://localhost/api/quotes/${quote.id}`, { method: 'DELETE' }) as any, {
@@ -62,9 +64,10 @@ describe('DELETE /api/quotes/[id]', () => {
     const body = await res.json();
     expect(body.error).toBe('has-invoice');
 
-    // Cleanup: delete the invoice first (the whole point of the 409), then the quote.
+    // Cleanup: delete the invoice first (the whole point of the 409), then the quote and client.
     await prisma.invoice.delete({ where: { id: invoice.id } });
     await prisma.quote.delete({ where: { id: quote.id } });
+    await prisma.client.delete({ where: { id: client.id } });
   });
 
   it('returns 404 for a quote that does not exist', async () => {

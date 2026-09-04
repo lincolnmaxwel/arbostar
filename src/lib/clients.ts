@@ -3,10 +3,14 @@ import { prisma } from '@/lib/db';
 // A "real" client — one whose scheduling was actually confirmed at least
 // once, not just anyone who ever got a quote drafted (most of which never go
 // anywhere). Shared by the Clients page and the new-quote form's client
-// picker (GET /api/clients), so both agree on the same definition.
-export async function getConfirmedClients() {
+// picker (GET /api/clients), so both agree on the same definition. Scoped by
+// the effective owner so each user sees only their own confirmed clients.
+export async function getConfirmedClients(ownerUserId: string) {
   const clients = await prisma.client.findMany({
-    where: { quotes: { some: { status: { in: ['scheduled', 'completed'] } } } },
+    where: {
+      userId: ownerUserId,
+      quotes: { some: { status: { in: ['scheduled', 'completed'] } } },
+    },
     include: {
       _count: { select: { quotes: true } },
       // Client.address is only ever set if someone typed it directly against

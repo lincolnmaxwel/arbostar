@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/db';
-import { authOptions } from '@/lib/auth';
+import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { calculateTotals } from '@/lib/quoteMath';
 import { sendQuoteApprovalEmail } from '@/lib/email';
 
@@ -34,8 +33,16 @@ const upsertQuoteSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
+  const ownerUserId = scope.ownerUserId;
 
   const body = await req.json();
   const parsed = upsertQuoteSchema.safeParse(body);
@@ -45,23 +52,25 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
   const totals = calculateTotals(data.items, data.taxRate);
 
-  const existing = await prisma.quote.findUnique({ where: { draftId: data.draftId } });
+  // The draft lookup is scoped by owner: a draftId that belongs to another
+  // user is treated as unknown (404), never updated or exposed.
+  const unscoped = await prisma.quote.findUnique({ where: { draftId: data.draftId } });
+  const existing = unscoped && unscoped.createdById === ownerUserId ? unscoped : null;
+  if (unscoped && !existing) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
   if (existing && data.clientUpdatedAt !== undefined && existing.updatedAt.getTime() > data.clientUpdatedAt) {
     return NextResponse.json({ error: 'conflict', serverUpdatedAt: existing.updatedAt }, { status: 409 });
   }
 
-  // update (not {}) so an edited name/phone/address actually sticks server-side.
-  // Previously a no-op update meant a plain "Save" never persisted a client-detail
-  // edit at all: the next pull of this draft's own data (cross-device refresh, or
-  // even just re-reading the server after a resync) would show the client's
-  // original name forever, silently reverting the edit.
+  // Per-user client identity: the same email may exist once per owner. The
+  // server derives the owner from the authenticated scope — never trust a
+  // client-supplied owner.
   const client = await prisma.client.upsert({
-    where: { email: data.clientEmail },
+    where: { userId_email: { userId: ownerUserId, email: data.clientEmail } },
     update: { name: data.clientName, phone: data.clientPhone, address: data.clientAddress },
-    create: { name: data.clientName, email: data.clientEmail, phone: data.clientPhone, address: data.clientAddress },
+    create: { name: data.clientName, email: data.clientEmail, phone: data.clientPhone, address: data.clientAddress, userId: ownerUserId },
   });
-
-  const userId = session.user.id;
 
   let quoteId: string;
   try {
@@ -71,7 +80,7 @@ export async function POST(req: NextRequest) {
         create: {
           draftId: data.draftId,
           clientId: client.id,
-          createdById: userId,
+          createdById: ownerUserId,
           subtotal: totals.subtotal,
           taxRate: data.taxRate,
           taxAmount: totals.taxAmount,
@@ -83,7 +92,7 @@ export async function POST(req: NextRequest) {
         update: {
           // Without this, editing the client's email into one that doesn't
           // match an existing Client row creates/finds a *different* Client
-          // above (client.upsert is keyed by email) but left this quote
+          // above (client.upsert is keyed by owner+email) but left this quote
           // pointed at its old clientId — the edit appeared to save, but the
           // next pull (GET /api/quotes, which includes the still-old
           // `client` relation) silently reverted it back.
@@ -149,6 +158,10 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  if (scope.isViewAs) {
+    await auditScopedMutation(scope, 'Quote', quoteId, 'upsert');
+  }
+
   const quote = await prisma.quote.findUniqueOrThrow({
     where: { id: quoteId },
     include: { items: { orderBy: { sortOrder: 'asc' } } },
@@ -175,10 +188,18 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
 
   const quotes = await prisma.quote.findMany({
+    where: { createdById: scope.ownerUserId },
     include: { client: true, items: true },
     orderBy: { updatedAt: 'desc' },
   });

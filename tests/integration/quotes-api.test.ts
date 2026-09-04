@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 vi.mock('@/lib/email', () => ({ sendQuoteApprovalEmail: vi.fn().mockResolvedValue(undefined) }));
 
 import { getServerSession } from 'next-auth';
@@ -22,6 +23,7 @@ describe('/api/quotes', () => {
 
   afterAll(async () => {
     await prisma.quote.deleteMany({ where: { createdById: userId } });
+    await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 

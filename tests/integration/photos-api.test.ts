@@ -4,6 +4,7 @@ import { existsSync, rmSync } from 'fs';
 import path from 'path';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 
 import { getServerSession } from 'next-auth';
 import { POST } from '@/app/api/quotes/photos/route';
@@ -19,7 +20,7 @@ describe('/api/quotes/photos', () => {
       data: { name: 'Photo Test', email: `photo-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
     });
     userId = user.id;
-    const client = await prisma.client.create({ data: { name: 'Client', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: {
         draftId: randomUUID(),
@@ -36,6 +37,7 @@ describe('/api/quotes/photos', () => {
 
   afterAll(async () => {
     await prisma.quote.delete({ where: { id: quoteId } });
+    await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
     const dir = path.join(process.cwd(), 'uploads', 'quotes', quoteId);
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });

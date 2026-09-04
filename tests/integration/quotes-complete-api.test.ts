@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 vi.mock('@/lib/email', () => ({ sendInvoiceEmail: vi.fn().mockResolvedValue(undefined) }));
 
 import { getServerSession } from 'next-auth';
@@ -14,7 +15,7 @@ describe('POST /api/quotes/[id]/complete', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Complete Test', email: `complete-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: { name: 'Complete Test', email: `complete-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: { feature: 'invoices', enabled: true } } },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
@@ -23,11 +24,13 @@ describe('POST /api/quotes/[id]/complete', () => {
   afterAll(async () => {
     await prisma.invoice.deleteMany({ where: { quote: { createdById: userId } } });
     await prisma.quote.deleteMany({ where: { createdById: userId } });
+    await prisma.client.deleteMany({ where: { userId } });
+    await prisma.companyProfile.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 
   async function createScheduledQuote() {
-    const client = await prisma.client.create({ data: { name: 'Nelson Costa', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Nelson Costa', email: `client-${randomUUID()}@example.com` } });
     return prisma.quote.create({
       data: {
         draftId: randomUUID(),
@@ -72,7 +75,7 @@ describe('POST /api/quotes/[id]/complete', () => {
   });
 
   it('rejects completing a quote that is not scheduled', async () => {
-    const client = await prisma.client.create({ data: { name: 'Not Scheduled', email: `client-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId, name: 'Not Scheduled', email: `client-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: {
         draftId: randomUUID(),

@@ -1,4 +1,7 @@
+import { redirect } from 'next/navigation';
 import { getConfirmedClients } from '@/lib/clients';
+import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
+import { isFeatureEnabled } from '@/lib/features';
 import { ClientListClient } from '@/components/ClientListClient';
 import { AutoRefresh } from '@/components/AutoRefresh';
 import styles from './clients.module.css';
@@ -9,12 +12,29 @@ import styles from './clients.module.css';
 // clients would never show up without a fresh deploy.
 export const dynamic = 'force-dynamic';
 
-// Session gating is handled by middleware.ts (matcher includes /clients/:path*)
-// — every authenticated staff user has equal access to all data (see
-// CLAUDE.md), so this page doesn't re-check session itself, same as the
-// other staff-facing pages.
+// Session gating is handled by middleware.ts (matcher includes /clients/:path*).
+// The effective owner scopes the list; the clients_crm feature flag gates the
+// whole surface (quotes always work without it).
 export default async function ClientsPage() {
-  const clients = await getConfirmedClients();
+  let scope;
+  try {
+    scope = await requireUserScope();
+  } catch (err) {
+    if (err instanceof UnauthorizedError) redirect('/login');
+    throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'clients_crm'))) {
+    return (
+      <div className={styles.page}>
+        <p className={styles.featureDisabled}>
+          This feature is not enabled for your account.
+        </p>
+      </div>
+    );
+  }
+
+  const clients = await getConfirmedClients(scope.ownerUserId);
 
   return (
     <div>

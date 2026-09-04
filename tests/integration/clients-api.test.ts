@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => undefined }) }));
 
 import { getServerSession } from 'next-auth';
 import { GET } from '@/app/api/clients/route';
@@ -16,12 +17,12 @@ describe('GET /api/clients', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Clients Test', email: `clientsapi-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: { name: 'Clients Test', email: `clientsapi-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: { feature: 'clients_crm', enabled: true } } },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
 
-    const scheduledClient = await prisma.client.create({ data: { name: 'Scheduled Client', email: `sched-${randomUUID()}@example.com` } });
+    const scheduledClient = await prisma.client.create({ data: { userId: userId, name: 'Scheduled Client', email: `sched-${randomUUID()}@example.com` } });
     scheduledClientId = scheduledClient.id;
     await prisma.quote.create({
       data: {
@@ -33,13 +34,13 @@ describe('GET /api/clients', () => {
       },
     });
 
-    const completedClient = await prisma.client.create({ data: { name: 'Completed Client', email: `comp-${randomUUID()}@example.com` } });
+    const completedClient = await prisma.client.create({ data: { userId: userId, name: 'Completed Client', email: `comp-${randomUUID()}@example.com` } });
     completedClientId = completedClient.id;
     await prisma.quote.create({
       data: { draftId: randomUUID(), clientId: completedClient.id, createdById: userId, status: 'completed' },
     });
 
-    const draftOnlyClient = await prisma.client.create({ data: { name: 'Draft Only Client', email: `draft-${randomUUID()}@example.com` } });
+    const draftOnlyClient = await prisma.client.create({ data: { userId: userId, name: 'Draft Only Client', email: `draft-${randomUUID()}@example.com` } });
     draftOnlyClientId = draftOnlyClient.id;
     await prisma.quote.create({
       data: { draftId: randomUUID(), clientId: draftOnlyClient.id, createdById: userId, status: 'sent' },
@@ -88,7 +89,7 @@ describe('DELETE /api/clients/[id]', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Delete Client Test', email: `delclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: { name: 'Delete Client Test', email: `delclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: { feature: 'clients_crm', enabled: true } } },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
@@ -99,7 +100,7 @@ describe('DELETE /api/clients/[id]', () => {
   });
 
   it('deletes the client and cascades their quotes (and items)', async () => {
-    const client = await prisma.client.create({ data: { name: 'Cascade Client', email: `cascade-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId: userId, name: 'Cascade Client', email: `cascade-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: {
         draftId: randomUUID(),
@@ -122,12 +123,12 @@ describe('DELETE /api/clients/[id]', () => {
   });
 
   it('returns 409 (not a raw 500) when a quote still has an invoice, leaving the client intact', async () => {
-    const client = await prisma.client.create({ data: { name: 'Invoiced Client', email: `invclient-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId: userId, name: 'Invoiced Client', email: `invclient-${randomUUID()}@example.com` } });
     const quote = await prisma.quote.create({
       data: { draftId: randomUUID(), clientId: client.id, createdById: userId, status: 'completed' },
     });
     const invoice = await prisma.invoice.create({
-      data: { quoteId: quote.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
+      data: { quoteId: quote.id, userId, clientId: client.id, subtotal: 100, taxRate: 0.05, taxAmount: 5, total: 105 },
     });
 
     const res = await DELETE(new Request(`http://localhost/api/clients/${client.id}`, { method: 'DELETE' }) as any, {
@@ -167,7 +168,7 @@ describe('PATCH /api/clients/[id]', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Edit Client Test', email: `editclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: { name: 'Edit Client Test', email: `editclient-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: { feature: 'clients_crm', enabled: true } } },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
@@ -186,7 +187,7 @@ describe('PATCH /api/clients/[id]', () => {
   }
 
   it('updates name/email/phone/address', async () => {
-    const client = await prisma.client.create({ data: { name: 'Old Name', email: `before-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId: userId, name: 'Old Name', email: `before-${randomUUID()}@example.com` } });
 
     const res = await PATCH(
       patchRequest({ name: 'New Name', email: `after-${randomUUID()}@example.com`, phone: '(555) 123-4567', address: '1 New St' }),
@@ -202,8 +203,8 @@ describe('PATCH /api/clients/[id]', () => {
   });
 
   it('returns 409 (not a raw 500) when the new email is already used by another client', async () => {
-    const clientA = await prisma.client.create({ data: { name: 'Client A', email: `a-${randomUUID()}@example.com` } });
-    const clientB = await prisma.client.create({ data: { name: 'Client B', email: `b-${randomUUID()}@example.com` } });
+    const clientA = await prisma.client.create({ data: { userId: userId, name: 'Client A', email: `a-${randomUUID()}@example.com` } });
+    const clientB = await prisma.client.create({ data: { userId: userId, name: 'Client B', email: `b-${randomUUID()}@example.com` } });
 
     const res = await PATCH(patchRequest({ name: 'Client B', email: clientA.email }), { params: { id: clientB.id } });
     expect(res.status).toBe(409);
@@ -219,7 +220,7 @@ describe('PATCH /api/clients/[id]', () => {
   });
 
   it('returns 400 for an invalid email', async () => {
-    const client = await prisma.client.create({ data: { name: 'Client', email: `valid-${randomUUID()}@example.com` } });
+    const client = await prisma.client.create({ data: { userId: userId, name: 'Client', email: `valid-${randomUUID()}@example.com` } });
     const res = await PATCH(patchRequest({ name: 'Client', email: 'not-an-email' }), { params: { id: client.id } });
     expect(res.status).toBe(400);
     await prisma.client.delete({ where: { id: client.id } });

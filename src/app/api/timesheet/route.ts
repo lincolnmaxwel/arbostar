@@ -49,7 +49,9 @@ export async function GET(req: NextRequest) {
       userId: scope.ownerUserId,
       ...(clientId ? { clientId } : {}),
       ...(dateFrom ? { workDate: { gte: new Date(dateFrom + 'T00:00:00.000Z') } } : {}),
-      ...(dateTo ? { workDate: { lte: new Date(dateTo + 'T00:00:00.000Z') } } : {}),
+      // Inclusive end-of-day: entries are stored at noon, so a bare midnight
+      // cutoff would drop same-day entries.
+      ...(dateTo ? { workDate: { lte: new Date(dateTo + 'T23:59:59.999Z') } } : {}),
     },
     include: { client: { select: { id: true, name: true } }, products: { orderBy: { id: 'asc' } } },
     orderBy: { workDate: 'desc' },

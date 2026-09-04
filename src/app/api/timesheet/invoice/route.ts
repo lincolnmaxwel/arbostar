@@ -68,7 +68,9 @@ export async function POST(req: NextRequest) {
       status: 'open',
       ...(data.entryIds ? { id: { in: data.entryIds } } : {}),
       ...(data.dateFrom ? { workDate: { gte: new Date(data.dateFrom + 'T00:00:00.000Z') } } : {}),
-      ...(data.dateTo ? { workDate: { lte: new Date(data.dateTo + 'T00:00:00.000Z') } } : {}),
+      // Inclusive end-of-day: entries are stored at noon, so a bare midnight
+      // cutoff would drop same-day entries.
+      ...(data.dateTo ? { workDate: { lte: new Date(data.dateTo + 'T23:59:59.999Z') } } : {}),
     },
     include: { products: true },
     orderBy: { workDate: 'asc' },

@@ -279,6 +279,10 @@
     gap: 16px;
     order: 3;
     width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    padding-bottom: 4px;
   }
 
   .signOutButton {

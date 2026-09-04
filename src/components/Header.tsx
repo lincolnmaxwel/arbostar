@@ -24,6 +24,7 @@ export function Header() {
   const [actorRole, setActorRole] = useState<string | null>(null);
   const [isViewAs, setIsViewAs] = useState(false);
   const [targetName, setTargetName] = useState<string | null>(null);
+  const [features, setFeatures] = useState<{ invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
   const [users, setUsers] = useState<HeaderUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [viewAsOpen, setViewAsOpen] = useState(false);
@@ -36,6 +37,11 @@ export function Header() {
       setActorRole(ctx.actorRole);
       setIsViewAs(ctx.isViewAs);
       setTargetName(ctx.targetName);
+      setFeatures({
+        invoices: ctx.features.invoices,
+        timesheet: ctx.features.timesheet,
+        clients_crm: ctx.features.clients_crm,
+      });
     });
     return () => {
       cancelled = true;
@@ -122,8 +128,15 @@ export function Header() {
         <nav className={styles.nav}>
           <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
           <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
-          <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
-          <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
+          {features?.clients_crm && (
+            <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
+          )}
+          {features?.timesheet && (
+            <Link href="/timesheet" className={pathname.startsWith('/timesheet') ? styles.active : ''}>Timesheet</Link>
+          )}
+          {features?.invoices && (
+            <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
+          )}
           {actorRole === 'admin' && (
             <Link href="/admin/users" className={pathname.startsWith('/admin') ? styles.active : ''}>Users</Link>
           )}
@@ -147,11 +160,12 @@ export function Header() {
                 onClick={() => setViewAsOpen((v) => !v)}
                 aria-expanded={viewAsOpen}
                 aria-haspopup="menu"
+                aria-controls="view-as-menu"
               >
                 View as
               </button>
               {viewAsOpen && (
-                <div className={styles.viewAsDropdown} role="menu">
+                <div id="view-as-menu" className={styles.viewAsDropdown} role="menu">
                   {usersLoading && <div className={styles.viewAsEmpty}>Loading users...</div>}
                   {!usersLoading && users.length === 0 && <div className={styles.viewAsEmpty}>No users</div>}
                   {!usersLoading &&
@@ -177,11 +191,13 @@ export function Header() {
                 className={styles.userMenuButton}
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-controls="user-menu"
               >
                 {userEmail}
               </button>
               {menuOpen && (
-                <div className={styles.userMenuDropdown} role="menu">
+                <div id="user-menu" className={styles.userMenuDropdown} role="menu">
                   <Link href="/profile" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     Profile
                   </Link>

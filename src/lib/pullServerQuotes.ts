@@ -37,7 +37,10 @@ interface ServerQuote {
 // Photos aren't backfilled — they live only as local blobs on whichever
 // device captured them, so a pulled/refreshed quote shows its text/pricing
 // but not photos captured on another device.
-export async function pullServerQuotes(): Promise<void> {
+//
+// Everything is filtered by the effective owner: an admin viewing user B
+// pulls and reconciles only B's local drafts, never another owner's rows.
+export async function pullServerQuotes(ownerUserId: string): Promise<void> {
   let res: Response;
   try {
     res = await fetch('/api/quotes', { cache: 'no-store' });
@@ -50,7 +53,11 @@ export async function pullServerQuotes(): Promise<void> {
   const quotes = body?.quotes;
   if (!Array.isArray(quotes)) return;
 
-  const pendingDeleteServerIds = new Set((await localDb.pendingDeletes.toArray()).map((p) => p.serverId));
+  const pendingDeleteServerIds = new Set(
+    (await localDb.pendingDeletes.filter((p) => p.ownerUserId === ownerUserId).toArray()).map(
+      (p) => p.serverId,
+    ),
+  );
   const serverIds = new Set(quotes.map((q) => q.id));
 
   // A quote deleted on another device (or by this one, once its own
@@ -59,7 +66,9 @@ export async function pullServerQuotes(): Promise<void> {
   // server-side gets removed here too. Only 'synced' drafts qualify — a draft
   // with its own unsynced local edits keeps existing until that edit resolves
   // (same "don't clobber pending local work" rule as the refresh path below).
-  const localSynced = await localDb.drafts.where('status').equals('synced').toArray();
+  const localSynced = await localDb.drafts
+    .filter((d) => d.ownerUserId === ownerUserId && d.status === 'synced')
+    .toArray();
   for (const local of localSynced) {
     if (local.serverId && !serverIds.has(local.serverId)) {
       const photoIds = local.items.flatMap((i) => i.photoIds);
@@ -74,6 +83,9 @@ export async function pullServerQuotes(): Promise<void> {
     const existing = await localDb.drafts.get(q.draftId);
     const serverUpdatedAt = new Date(q.updatedAt).getTime();
     if (existing) {
+      // A draft owned by someone else (or a legacy, unclaimed row) is never
+      // touched by this owner's pull.
+      if (existing.ownerUserId !== ownerUserId) continue;
       if (existing.status !== 'synced') continue;
       if (serverUpdatedAt <= existing.updatedAt) continue;
     }
@@ -91,6 +103,7 @@ export async function pullServerQuotes(): Promise<void> {
     const draft: DraftQuote = {
       draftId: q.draftId,
       serverId: q.id,
+      ownerUserId,
       clientName: q.client.name,
       clientEmail: q.client.email,
       clientPhone: q.client.phone ?? undefined,

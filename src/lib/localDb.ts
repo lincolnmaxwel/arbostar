@@ -13,6 +13,11 @@ export interface DraftQuoteItem {
 export interface DraftQuote {
   draftId: string;
   serverId?: string;
+  // Effective owner of this local draft — the user whose server data it
+  // belongs to (the real user normally; the viewed user while an admin
+  // browses in view-as mode). Legacy pre-isolation rows carry '' until the
+  // first authenticated load claims them for the current owner.
+  ownerUserId: string;
   clientName: string;
   clientEmail: string;
   clientPhone?: string;
@@ -56,6 +61,7 @@ export interface DraftPhoto {
 export interface OutboxEntry {
   id?: number;
   draftId: string;
+  ownerUserId: string;
   attempts: number;
   lastError?: string;
   nextAttemptAt: number;
@@ -71,6 +77,7 @@ export interface OutboxEntry {
 export interface PendingDelete {
   serverId: string;
   draftId: string;
+  ownerUserId: string;
   createdAt: number;
 }
 
@@ -90,6 +97,39 @@ class LocalDb extends Dexie {
     this.version(2).stores({
       pendingDeletes: 'serverId, draftId',
     });
+    this.version(3)
+      .stores({
+        drafts: 'draftId, status, updatedAt, ownerUserId',
+        photos: 'id, draftId',
+        outbox: '++id, draftId, nextAttemptAt, ownerUserId',
+        pendingDeletes: 'serverId, draftId, ownerUserId',
+      })
+      // Legacy pre-isolation rows have no owner. Mark them with '' instead
+      // of guessing an owner inside the database migration — the first
+      // authenticated load claims them for the current effective owner
+      // (see clientUserContext.claimLegacyRows).
+      .upgrade((tx) =>
+        Promise.all([
+          tx
+            .table('drafts')
+            .toCollection()
+            .modify((d: DraftQuote) => {
+              if (!d.ownerUserId) d.ownerUserId = '';
+            }),
+          tx
+            .table('outbox')
+            .toCollection()
+            .modify((e: OutboxEntry) => {
+              if (!e.ownerUserId) e.ownerUserId = '';
+            }),
+          tx
+            .table('pendingDeletes')
+            .toCollection()
+            .modify((p: PendingDelete) => {
+              if (!p.ownerUserId) p.ownerUserId = '';
+            }),
+        ]),
+      );
   }
 }
 

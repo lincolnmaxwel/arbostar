@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
+import { getViewContext } from '@/lib/clientUserContext';
 import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import styles from './QuoteView.module.css';
@@ -39,7 +40,17 @@ const WINDOW_LABEL: Record<DayWindow, string> = {
 };
 
 export function QuoteView({ draftId }: { draftId: string }) {
-  const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [foreignDraft, setForeignDraft] = useState(false);
+  const draft = useLiveQuery(
+    () => {
+      if (!ownerUserId) return undefined;
+      return localDb.drafts
+        .filter((d) => d.draftId === draftId && d.ownerUserId === ownerUserId)
+        .first();
+    },
+    [draftId, ownerUserId],
+  );
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   // Server-side photos for each item, keyed by localItemId (== DraftQuoteItem.id)
   // — a fallback for when this device's IndexedDB never captured the photo
@@ -55,6 +66,26 @@ export function QuoteView({ draftId }: { draftId: string }) {
   const [completeError, setCompleteError] = useState<string | null>(null);
 
   const serverId = draft?.serverId;
+
+  // Bootstrap the effective owner so a draft URL owned by another user
+  // renders "Draft not found" instead of exposing its contents.
+  useEffect(() => {
+    let cancelled = false;
+    getViewContext().then((ctx) => {
+      if (!cancelled) setOwnerUserId(ctx?.ownerUserId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ownerUserId) return;
+    localDb.drafts.get(draftId).then((existing) => {
+      if (existing && existing.ownerUserId !== ownerUserId) setForeignDraft(true);
+      else setForeignDraft(false);
+    });
+  }, [draftId, ownerUserId]);
 
   useEffect(() => {
     if (!serverId) return;
@@ -198,6 +229,9 @@ export function QuoteView({ draftId }: { draftId: string }) {
     return () => document.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPhotoIndex, allPhotos.length]);
+
+  if (!ownerUserId) return <p className={styles.loading}>Loading...</p>;
+  if (foreignDraft) return <p className={styles.loading}>Draft not found</p>;
 
   if (!draft) return <p className={styles.loading}>Loading...</p>;
 

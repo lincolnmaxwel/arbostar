@@ -14,7 +14,25 @@ global.URL.revokeObjectURL = vi.fn();
 
 import { QuoteBuilderForm } from '@/components/QuoteBuilderForm';
 import { localDb } from '@/lib/localDb';
+import { resetViewContext } from '@/lib/clientUserContext';
 import { enqueueSync, markStuck, getEntryForDraft } from '@/lib/outbox';
+
+const OWNER = 'user-a';
+const OTHER_OWNER = 'user-b';
+
+function viewContextResponse(ownerUserId: string) {
+  return {
+    ok: true,
+    json: async () => ({
+      actorUserId: ownerUserId,
+      actorRole: 'staff',
+      ownerUserId,
+      isViewAs: false,
+      targetName: null,
+      features: { quotes: true, invoices: true, timesheet: true, clients_crm: true },
+    }),
+  };
+}
 
 describe('QuoteBuilderForm', () => {
   afterEach(cleanup);
@@ -22,11 +40,16 @@ describe('QuoteBuilderForm', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.outbox.clear();
+    resetViewContext();
     // submit() checks real connectivity (isReallyOnline(), a HEAD to
     // /api/health) before deciding whether to mark the draft 'syncing' and
     // navigate — these tests exercise the "online" path, so answer that
-    // check the same way the sync worker's own tests do.
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as any;
+    // check the same way the sync worker's own tests do. The builder also
+    // bootstraps its effective owner from /api/view-context on mount.
+    global.fetch = vi.fn(async (url: string) => {
+      if (url === '/api/view-context') return viewContextResponse(OWNER) as Response;
+      return { ok: true, status: 200 } as Response;
+    }) as any;
   });
 
   it('autosaves the client name locally after the debounce window', async () => {
@@ -62,9 +85,9 @@ describe('QuoteBuilderForm', () => {
   it('shows a sync-error banner with Retry/Discard when the outbox entry is stuck', async () => {
     const draftId = 'test-draft-3';
     await localDb.drafts.put({
-      draftId, clientName: 'Stuck Client', clientEmail: 'x@x.com', items: [], taxRate: 0.05, status: 'error', updatedAt: Date.now(),
+      draftId, ownerUserId: OWNER, clientName: 'Stuck Client', clientEmail: 'x@x.com', items: [], taxRate: 0.05, status: 'error', updatedAt: Date.now(),
     });
-    await enqueueSync(draftId);
+    await enqueueSync(draftId, OWNER);
     const entry = await getEntryForDraft(draftId);
     await markStuck(entry!.id!, 'sync failed: HTTP 409');
 
@@ -182,6 +205,7 @@ describe('QuoteBuilderForm', () => {
     const draftId = 'test-draft-5';
     await localDb.drafts.put({
       draftId,
+      ownerUserId: OWNER,
       serverId: 'server-quote-5',
       clientName: 'Nelson Costa',
       clientEmail: 'nelson@example.com',
@@ -248,6 +272,7 @@ describe('QuoteBuilderForm', () => {
 
   function mockFetchWithClients(clients: unknown[]) {
     return vi.fn(async (url: string) => {
+      if (url === '/api/view-context') return viewContextResponse(OWNER);
       if (url === '/api/clients') return { ok: true, json: async () => ({ clients }) };
       return { ok: true, status: 200 };
     }) as unknown as typeof fetch;
@@ -290,5 +315,53 @@ describe('QuoteBuilderForm', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Client name')).toHaveValue('Nelson Costa'));
     expect(screen.getByLabelText('Service address')).toHaveValue('Already typed address');
+  });
+
+  it('renders "Draft not found" for a draft row owned by another user, exposing no contents', async () => {
+    const draftId = 'test-draft-foreign';
+    await localDb.drafts.put({
+      draftId, ownerUserId: OTHER_OWNER, clientName: 'Someone Else\'s Client', clientEmail: 'other@example.com',
+      items: [{ id: 'item-x', title: 'Secret Service', price: 9999, photoIds: [] }], taxRate: 0.05,
+      status: 'synced', updatedAt: Date.now(),
+    });
+
+    render(<QuoteBuilderForm draftId={draftId} />);
+
+    await waitFor(() => expect(screen.getByText('Draft not found')).toBeInTheDocument());
+    expect(screen.queryByLabelText('Client name')).not.toBeInTheDocument();
+    expect(screen.queryByText('Secret Service')).not.toBeInTheDocument();
+  });
+
+  it('claims a legacy owner-less draft for the current owner on first load', async () => {
+    const draftId = 'test-draft-legacy';
+    await localDb.drafts.put({
+      draftId, clientName: 'Legacy Client', clientEmail: 'legacy@example.com',
+      items: [], taxRate: 0.05, status: 'local', updatedAt: Date.now(),
+    } as never);
+
+    render(<QuoteBuilderForm draftId={draftId} />);
+
+    await waitFor(async () => {
+      const saved = await localDb.drafts.get(draftId);
+      expect(saved?.ownerUserId).toBe(OWNER);
+    });
+    // The claimed draft is now editable by its new owner.
+    await screen.findByLabelText('Client name');
+  });
+
+  it('autosaves with the owner set on every persisted row', async () => {
+    const draftId = 'test-draft-owner-persist';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    await screen.findByLabelText('Client name');
+    fireEvent.change(screen.getByLabelText('Client name'), { target: { value: 'Nelson Costa' } });
+
+    await waitFor(
+      async () => {
+        const saved = await localDb.drafts.get(draftId);
+        expect(saved?.clientName).toBe('Nelson Costa');
+        expect(saved?.ownerUserId).toBe(OWNER);
+      },
+      { timeout: 2000 },
+    );
   });
 });

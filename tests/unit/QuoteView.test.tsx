@@ -4,6 +4,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { QuoteView } from '@/components/QuoteView';
 import { localDb } from '@/lib/localDb';
+import { resetViewContext } from '@/lib/clientUserContext';
+
+const OWNER = 'user-a';
 
 // jsdom doesn't implement createObjectURL/revokeObjectURL.
 let mockUrlCounter = 0;
@@ -17,6 +20,19 @@ global.URL.revokeObjectURL = vi.fn();
 // doesn't shift a positional mock sequence out of order.
 function mockFetchRoutes(routes: Record<string, unknown>) {
   return vi.fn(async (url: string) => {
+    if (url === '/api/view-context') {
+      return {
+        ok: true,
+        json: async () => ({
+          actorUserId: OWNER,
+          actorRole: 'staff',
+          ownerUserId: OWNER,
+          isViewAs: false,
+          targetName: null,
+          features: { quotes: true, invoices: true, timesheet: true, clients_crm: true },
+        }),
+      };
+    }
     if (url in routes) return routes[url];
     if (url === '/api/quotes') return { ok: true, json: async () => ({ quotes: [] }) };
     throw new Error(`unexpected fetch: ${url}`);
@@ -27,6 +43,8 @@ describe('QuoteView', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
     await localDb.photos.clear();
+    resetViewContext();
+    global.fetch = mockFetchRoutes({});
   });
 
   afterEach(cleanup);
@@ -34,6 +52,7 @@ describe('QuoteView', () => {
   it('renders client details, line items, and computed totals', async () => {
     await localDb.drafts.put({
       draftId: 'view-1',
+      ownerUserId: OWNER,
       clientName: 'Nelson Costa',
       clientEmail: 'nelson@example.com',
       clientPhone: '(250) 216-1006',
@@ -60,6 +79,7 @@ describe('QuoteView', () => {
   it('shows an empty-items message when the quote has no services yet', async () => {
     await localDb.drafts.put({
       draftId: 'view-2',
+      ownerUserId: OWNER,
       clientName: 'Empty Client',
       clientEmail: 'empty@example.com',
       taxRate: 0.05,
@@ -78,6 +98,7 @@ describe('QuoteView', () => {
     await localDb.photos.add({ id: 'p2', draftId: 'view-3', blob: new Blob(['b']), fileName: 'b.jpg', status: 'uploaded' });
     await localDb.drafts.put({
       draftId: 'view-3',
+      ownerUserId: OWNER,
       clientName: 'Photo Client',
       clientEmail: 'photo@example.com',
       taxRate: 0.05,
@@ -120,6 +141,7 @@ describe('QuoteView', () => {
 
     await localDb.drafts.put({
       draftId: 'view-cross-device',
+      ownerUserId: OWNER,
       serverId: 'server-quote-photo',
       clientName: 'Cross Device Client',
       clientEmail: 'crossdevice@example.com',
@@ -143,6 +165,7 @@ describe('QuoteView', () => {
 
     await localDb.drafts.put({
       draftId: 'view-4',
+      ownerUserId: OWNER,
       serverId: 'server-quote-4',
       clientName: 'Approval Client',
       clientEmail: 'approval@example.com',
@@ -173,6 +196,7 @@ describe('QuoteView', () => {
 
     await localDb.drafts.put({
       draftId: 'view-5',
+      ownerUserId: OWNER,
       serverId: 'server-quote-5',
       clientName: 'Draft Client',
       clientEmail: 'draft@example.com',
@@ -191,6 +215,7 @@ describe('QuoteView', () => {
   it('keeps the Edit link for a quote that has never synced (no serverId yet)', async () => {
     await localDb.drafts.put({
       draftId: 'view-6',
+      ownerUserId: OWNER,
       clientName: 'Never Synced Client',
       clientEmail: 'neversynced@example.com',
       taxRate: 0.05,
@@ -208,6 +233,7 @@ describe('QuoteView', () => {
   function seedSyncedDraft(draftId: string, serverId: string) {
     return localDb.drafts.put({
       draftId,
+      ownerUserId: OWNER,
       serverId,
       clientName: 'Booking View Client',
       clientEmail: 'bv@example.com',

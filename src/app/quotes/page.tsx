@@ -11,11 +11,36 @@ import { deleteDraft } from '@/lib/deleteQuote';
 import { cancelPendingDelete } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 import { NewQuoteLink } from '@/components/NewQuoteLink';
+import { getViewContext } from '@/lib/clientUserContext';
 import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
-  const allDrafts = useLiveQuery(() => localDb.drafts.orderBy('updatedAt').reverse().toArray(), []) ?? [];
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const allDrafts =
+    useLiveQuery(
+      () =>
+        ownerUserId
+          ? localDb.drafts
+              .orderBy('updatedAt')
+              .reverse()
+              .filter((d) => d.ownerUserId === ownerUserId)
+              .toArray()
+          : [],
+      [ownerUserId],
+    ) ?? [];
   const [search, setSearch] = useState('');
+
+  // Bootstrap the effective owner so the list is namespaced to the current
+  // user (or viewed user while an admin is in view-as mode).
+  useEffect(() => {
+    let cancelled = false;
+    getViewContext().then((ctx) => {
+      if (!cancelled) setOwnerUserId(ctx?.ownerUserId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const drafts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -33,15 +58,17 @@ export default function QuotesListPage() {
   // device never appears here on its own. Pull the server's list on mount and
   // whenever connectivity returns, so quotes made elsewhere show up here too.
   useEffect(() => {
-    pullServerQuotes();
-    window.addEventListener('online', pullServerQuotes);
-    return () => window.removeEventListener('online', pullServerQuotes);
-  }, []);
+    if (!ownerUserId) return;
+    pullServerQuotes(ownerUserId);
+    const onOnline = () => pullServerQuotes(ownerUserId);
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [ownerUserId]);
 
   async function handleDelete(draft: (typeof drafts)[number]) {
     const label = draft.clientName || 'this quote';
     if (!window.confirm(`Delete ${label}? This can't be undone.`)) return;
-    await deleteDraft(draft);
+    await deleteDraft(draft, ownerUserId!);
   }
 
   async function handleCancelDelete(draft: (typeof drafts)[number]) {

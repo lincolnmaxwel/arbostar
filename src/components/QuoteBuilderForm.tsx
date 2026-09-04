@@ -13,6 +13,7 @@ import { SyncStatusBadge } from '@/components/SyncStatusBadge';
 import { compressImage } from '@/lib/compressImage';
 import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
 import { formatPhoneInput } from '@/lib/formatPhone';
+import { getViewContext } from '@/lib/clientUserContext';
 import styles from './QuoteBuilderForm.module.css';
 
 interface ExistingClient {
@@ -23,9 +24,10 @@ interface ExistingClient {
   address: string | null;
 }
 
-function emptyDraft(draftId: string): DraftQuote {
+function emptyDraft(draftId: string, ownerUserId: string): DraftQuote {
   return {
     draftId,
+    ownerUserId,
     clientName: '',
     clientEmail: '',
     items: [],
@@ -36,8 +38,21 @@ function emptyDraft(draftId: string): DraftQuote {
 }
 
 export function QuoteBuilderForm({ draftId }: { draftId: string }) {
-  const draft = useLiveQuery(() => localDb.drafts.get(draftId), [draftId]);
-  const outboxEntry = useLiveQuery(() => getEntryForDraft(draftId), [draftId]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [foreignDraft, setForeignDraft] = useState(false);
+  const draft = useLiveQuery(
+    () => {
+      if (!ownerUserId) return undefined;
+      return localDb.drafts
+        .filter((d) => d.draftId === draftId && d.ownerUserId === ownerUserId)
+        .first();
+    },
+    [draftId, ownerUserId],
+  );
+  const outboxEntry = useLiveQuery(
+    () => (ownerUserId ? getEntryForDraft(draftId, ownerUserId) : undefined),
+    [draftId, ownerUserId],
+  );
   const [formState, setFormState] = useState<DraftQuote | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [syncingNow, setSyncingNow] = useState(false);
@@ -53,6 +68,28 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   // fresh page load always starts unlocked.
   const [lockedClientId, setLockedClientId] = useState<string | null>(null);
   const router = useRouter();
+
+  // Bootstrap the effective owner before any local query runs, so drafts are
+  // never read/written outside the current user's namespace.
+  useEffect(() => {
+    let cancelled = false;
+    getViewContext().then((ctx) => {
+      if (!cancelled) setOwnerUserId(ctx?.ownerUserId ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // A draft URL whose row belongs to another user renders "Draft not found"
+  // and never exposes its contents.
+  useEffect(() => {
+    if (!ownerUserId) return;
+    localDb.drafts.get(draftId).then((existing) => {
+      if (existing && existing.ownerUserId !== ownerUserId) setForeignDraft(true);
+      else setForeignDraft(false);
+    });
+  }, [draftId, ownerUserId]);
 
   // Confirmed clients (at least one scheduled job — see /api/clients) a repeat
   // customer's info can be reused from, instead of retyping it every time.
@@ -75,13 +112,17 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     let cancelled = false;
     setFormState(null);
     setLockedClientId(null);
-    localDb.drafts.get(draftId).then((existing) => {
-      if (!cancelled) setFormState(existing ?? emptyDraft(draftId));
-    });
+    if (!ownerUserId) return;
+    localDb.drafts
+      .filter((d) => d.draftId === draftId && d.ownerUserId === ownerUserId)
+      .first()
+      .then((existing) => {
+        if (!cancelled) setFormState(existing ?? emptyDraft(draftId, ownerUserId));
+      });
     return () => {
       cancelled = true;
     };
-  }, [draftId]);
+  }, [draftId, ownerUserId]);
 
   // formState is the authoritative snapshot for user-editable fields (so typing
   // in one field can't be dropped by a stale read of another field's edit), but
@@ -146,10 +187,13 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   );
 
   useEffect(() => {
-    if (draft?.status === 'synced') {
-      uploadPendingPhotos(draftId);
+    if (draft?.status === 'synced' && ownerUserId) {
+      uploadPendingPhotos(draftId, ownerUserId);
     }
-  }, [draft?.status, draftId]);
+  }, [draft?.status, draftId, ownerUserId]);
+
+  if (!ownerUserId) return <p className={styles.loading}>Loading draft...</p>;
+  if (foreignDraft) return <p className={styles.loading}>Draft not found</p>;
 
   if (!formState) return <p className={styles.loading}>Loading draft...</p>;
 
@@ -270,7 +314,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     persist.cancel();
     const online = await isReallyOnline();
     await localDb.drafts.put({ ...formState!, status: online ? 'syncing' : 'local', pendingSend, updatedAt: Date.now() });
-    await enqueueSync(draftId);
+    await enqueueSync(draftId, formState!.ownerUserId);
     // /quotes/[draftId] is a dynamic route the service worker has no generic
     // cache entry for — if this draftId's view page was never visited online
     // before, navigating there while offline fails as a hard navigation (no

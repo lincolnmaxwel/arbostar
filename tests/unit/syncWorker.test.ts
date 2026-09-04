@@ -4,6 +4,9 @@ import { localDb } from '@/lib/localDb';
 import { enqueueSync, getEntryForDraft } from '@/lib/outbox';
 import { runSyncCycle } from '@/lib/syncWorker';
 
+const OWNER_A = 'user-a';
+const OWNER_B = 'user-b';
+
 // runSyncCycle also health-checks and pulls the server's quote list every
 // cycle (for cross-device sync), in addition to POSTing due outbox entries —
 // so tests route by URL/method instead of a fixed positional call sequence.
@@ -31,6 +34,20 @@ function mockFetch({
   });
 }
 
+function putDraft(overrides: Record<string, unknown>) {
+  return localDb.drafts.put({
+    draftId: 'd1',
+    ownerUserId: OWNER_A,
+    clientName: 'A',
+    clientEmail: 'a@x.com',
+    items: [],
+    taxRate: 0.05,
+    status: 'syncing',
+    updatedAt: Date.now(),
+    ...overrides,
+  });
+}
+
 describe('runSyncCycle', () => {
   beforeEach(async () => {
     await localDb.drafts.clear();
@@ -40,16 +57,14 @@ describe('runSyncCycle', () => {
   });
 
   it('syncs a due draft successfully and clears the outbox entry', async () => {
-    await localDb.drafts.put({
-      draftId: 'd1', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
-    });
-    await enqueueSync('d1');
+    await putDraft({ draftId: 'd1' });
+    await enqueueSync('d1', OWNER_A);
 
     global.fetch = mockFetch({
       post: () => ({ ok: true, status: 201, json: async () => ({ quote: { id: 'server-1', items: [] } }) }),
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     const draft = await localDb.drafts.get('d1');
     expect(draft?.status).toBe('synced');
@@ -58,14 +73,12 @@ describe('runSyncCycle', () => {
   });
 
   it('marks the draft as error and stops retrying on a 409 conflict', async () => {
-    await localDb.drafts.put({
-      draftId: 'd2', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
-    });
-    await enqueueSync('d2');
+    await putDraft({ draftId: 'd2' });
+    await enqueueSync('d2', OWNER_A);
 
     global.fetch = mockFetch({ post: () => ({ ok: false, status: 409 }) }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     const draft = await localDb.drafts.get('d2');
     expect(draft?.status).toBe('error');
@@ -74,10 +87,8 @@ describe('runSyncCycle', () => {
   });
 
   it('reschedules with backoff on a network error, without marking the draft as error', async () => {
-    await localDb.drafts.put({
-      draftId: 'd3', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
-    });
-    await enqueueSync('d3');
+    await putDraft({ draftId: 'd3' });
+    await enqueueSync('d3', OWNER_A);
 
     global.fetch = vi.fn(async (url: string, opts?: RequestInit) => {
       if (url === '/api/health') return { ok: true, status: 200 };
@@ -86,7 +97,7 @@ describe('runSyncCycle', () => {
       throw new Error(`unexpected fetch: ${url}`);
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     const draft = await localDb.drafts.get('d3');
     expect(draft?.status).toBe('syncing');
@@ -97,10 +108,8 @@ describe('runSyncCycle', () => {
   });
 
   it('sends pendingSend:true as send:true in the POST body, then clears it on success', async () => {
-    await localDb.drafts.put({
-      draftId: 'd5', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(), pendingSend: true,
-    });
-    await enqueueSync('d5');
+    await putDraft({ draftId: 'd5', pendingSend: true });
+    await enqueueSync('d5', OWNER_A);
 
     let capturedBody: any;
     global.fetch = mockFetch({
@@ -110,7 +119,7 @@ describe('runSyncCycle', () => {
       },
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     expect(capturedBody.send).toBe(true);
 
@@ -119,10 +128,8 @@ describe('runSyncCycle', () => {
   });
 
   it('sends send:false when pendingSend was never set', async () => {
-    await localDb.drafts.put({
-      draftId: 'd6', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
-    });
-    await enqueueSync('d6');
+    await putDraft({ draftId: 'd6' });
+    await enqueueSync('d6', OWNER_A);
 
     let capturedBody: any;
     global.fetch = mockFetch({
@@ -132,24 +139,54 @@ describe('runSyncCycle', () => {
       },
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     expect(capturedBody.send).toBe(false);
   });
 
   it('does nothing when the health check fails (offline)', async () => {
-    await localDb.drafts.put({
-      draftId: 'd4', clientName: 'A', clientEmail: 'a@x.com', items: [], taxRate: 0.05, status: 'syncing', updatedAt: Date.now(),
-    });
-    await enqueueSync('d4');
+    await putDraft({ draftId: 'd4' });
+    await enqueueSync('d4', OWNER_A);
 
     global.fetch = vi.fn().mockRejectedValueOnce(new Error('offline'));
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     const draft = await localDb.drafts.get('d4');
     expect(draft?.status).toBe('syncing');
     expect(await getEntryForDraft('d4')).toBeDefined();
+  });
+
+  it('syncs only the given owner\'s drafts and never another owner\'s outbox', async () => {
+    await putDraft({ draftId: 'a-draft' });
+    await enqueueSync('a-draft', OWNER_A);
+    await localDb.drafts.put({
+      draftId: 'b-draft',
+      ownerUserId: OWNER_B,
+      clientName: 'B',
+      clientEmail: 'b@x.com',
+      items: [],
+      taxRate: 0.05,
+      status: 'syncing',
+      updatedAt: Date.now(),
+    });
+    await enqueueSync('b-draft', OWNER_B);
+
+    const postedDraftIds: string[] = [];
+    global.fetch = mockFetch({
+      post: (body) => {
+        postedDraftIds.push(body.draftId);
+        return { ok: true, status: 200, json: async () => ({ quote: { id: `server-${body.draftId}`, items: [] } }) };
+      },
+    }) as any;
+
+    await runSyncCycle(OWNER_A);
+
+    expect(postedDraftIds).toEqual(['a-draft']);
+    expect((await localDb.drafts.get('a-draft'))?.status).toBe('synced');
+    // B's entry stays queued and unsynced.
+    expect((await localDb.drafts.get('b-draft'))?.status).toBe('syncing');
+    expect(await getEntryForDraft('b-draft')).toBeDefined();
   });
 
   it('retries a pending photo upload for an already-synced draft every cycle, not just once', async () => {
@@ -159,8 +196,10 @@ describe('runSyncCycle', () => {
     // drop), nothing ever retried it. runSyncCycle now retries on every
     // cycle for every locally-synced draft, independent of whether the
     // builder form is even open.
-    await localDb.drafts.put({
-      draftId: 'd8', serverId: 'server-8', clientName: 'A', clientEmail: 'a@x.com', taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
+    await putDraft({
+      draftId: 'd8',
+      serverId: 'server-8',
+      status: 'synced',
       items: [{ id: 'item-8', serverItemId: 'server-item-8', title: 'Hedges', price: 100, photoIds: ['photo-8'] }],
     });
     await localDb.photos.add({ id: 'photo-8', draftId: 'd8', blob: new Blob(['x']), fileName: 'p.jpg', status: 'pending' });
@@ -192,16 +231,19 @@ describe('runSyncCycle', () => {
       throw new Error(`unexpected fetch: ${url} ${opts?.method ?? 'GET'}`);
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     expect(photoUploadCalled).toBe(true);
     expect((await localDb.photos.get('photo-8'))?.status).toBe('uploaded');
   });
 
   it('pulls and applies another device\'s edit within the same cycle', async () => {
-    await localDb.drafts.put({
-      draftId: 'd7', serverId: 'server-7', clientName: 'Old Name', clientEmail: 'a@x.com',
-      taxRate: 0.05, status: 'synced', updatedAt: Date.now() - 60_000, items: [],
+    await putDraft({
+      draftId: 'd7',
+      serverId: 'server-7',
+      clientName: 'Old Name',
+      status: 'synced',
+      updatedAt: Date.now() - 60_000,
     });
 
     global.fetch = mockFetch({
@@ -213,7 +255,7 @@ describe('runSyncCycle', () => {
       },
     }) as any;
 
-    await runSyncCycle();
+    await runSyncCycle(OWNER_A);
 
     const draft = await localDb.drafts.get('d7');
     expect(draft?.clientName).toBe('New Name');

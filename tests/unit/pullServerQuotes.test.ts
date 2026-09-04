@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { localDb } from '@/lib/localDb';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 
+const OWNER_A = 'user-a';
+const OWNER_B = 'user-b';
+
 function serverQuote(overrides: Partial<{
   id: string;
   draftId: string;
@@ -37,15 +40,16 @@ describe('pullServerQuotes', () => {
     await localDb.pendingDeletes.clear();
   });
 
-  it('inserts a quote this device has never seen', async () => {
+  it('inserts a quote this device has never seen, tagged with the owner', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [serverQuote()] }) });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     const draft = await localDb.drafts.get('d1');
     expect(draft?.clientName).toBe('A');
     expect(draft?.serverId).toBe('server-1');
     expect(draft?.status).toBe('synced');
+    expect(draft?.ownerUserId).toBe(OWNER_A);
   });
 
   it('inserts serviceAddress along with the rest of the quote', async () => {
@@ -54,7 +58,7 @@ describe('pullServerQuotes', () => {
       json: async () => ({ quotes: [serverQuote({ serviceAddress: '123 Oak St, Springfield' })] }),
     });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     const draft = await localDb.drafts.get('d1');
     expect(draft?.serviceAddress).toBe('123 Oak St, Springfield');
@@ -62,7 +66,7 @@ describe('pullServerQuotes', () => {
 
   it('does not clobber a local draft that has unsynced changes', async () => {
     await localDb.drafts.put({
-      draftId: 'd1', serverId: 'server-1', clientName: 'Local Edit In Progress', clientEmail: 'a@x.com',
+      draftId: 'd1', ownerUserId: OWNER_A, serverId: 'server-1', clientName: 'Local Edit In Progress', clientEmail: 'a@x.com',
       taxRate: 0.05, status: 'local', updatedAt: Date.now(), items: [],
     });
     global.fetch = vi.fn().mockResolvedValue({
@@ -70,7 +74,7 @@ describe('pullServerQuotes', () => {
       json: async () => ({ quotes: [serverQuote({ clientName: 'Stale Server Copy' })] }),
     });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     const draft = await localDb.drafts.get('d1');
     expect(draft?.clientName).toBe('Local Edit In Progress');
@@ -78,7 +82,7 @@ describe('pullServerQuotes', () => {
 
   it('refreshes a fully-synced local draft when the server copy is newer', async () => {
     await localDb.drafts.put({
-      draftId: 'd1', serverId: 'server-1', clientName: 'Old Name', clientEmail: 'a@x.com',
+      draftId: 'd1', ownerUserId: OWNER_A, serverId: 'server-1', clientName: 'Old Name', clientEmail: 'a@x.com',
       taxRate: 0.05, status: 'synced', updatedAt: Date.now() - 60_000,
       items: [{ id: 'item-1', serverItemId: 'server-item-1', title: 'Hedges', price: 100, photoIds: ['photo-1'] }],
     });
@@ -87,7 +91,7 @@ describe('pullServerQuotes', () => {
       json: async () => ({ quotes: [serverQuote({ clientName: 'Edited On Other Device' })] }),
     });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     const draft = await localDb.drafts.get('d1');
     expect(draft?.clientName).toBe('Edited On Other Device');
@@ -97,10 +101,10 @@ describe('pullServerQuotes', () => {
   });
 
   it('skips a quote queued for local deletion instead of resurrecting it', async () => {
-    await localDb.pendingDeletes.put({ serverId: 'server-1', draftId: 'd1', createdAt: Date.now() });
+    await localDb.pendingDeletes.put({ serverId: 'server-1', draftId: 'd1', ownerUserId: OWNER_A, createdAt: Date.now() });
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [serverQuote()] }) });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     expect(await localDb.drafts.get('d1')).toBeUndefined();
   });
@@ -108,14 +112,14 @@ describe('pullServerQuotes', () => {
   it('removes a fully-synced draft that was deleted on another device', async () => {
     await localDb.photos.add({ id: 'photo-1', draftId: 'd1', blob: new Blob(['x']), fileName: 'p.jpg', status: 'uploaded' });
     await localDb.drafts.put({
-      draftId: 'd1', serverId: 'server-1', clientName: 'Gone', clientEmail: 'a@x.com',
+      draftId: 'd1', ownerUserId: OWNER_A, serverId: 'server-1', clientName: 'Gone', clientEmail: 'a@x.com',
       taxRate: 0.05, status: 'synced', updatedAt: Date.now(),
       items: [{ id: 'item-1', serverItemId: 'server-item-1', title: 'Hedges', price: 100, photoIds: ['photo-1'] }],
     });
     // Server list no longer contains server-1 -> it was deleted elsewhere.
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [] }) });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     expect(await localDb.drafts.get('d1')).toBeUndefined();
     expect(await localDb.photos.get('photo-1')).toBeUndefined();
@@ -123,13 +127,35 @@ describe('pullServerQuotes', () => {
 
   it('does not remove a local draft with unsynced changes even if absent from the server list', async () => {
     await localDb.drafts.put({
-      draftId: 'd1', serverId: 'server-1', clientName: 'Still Editing', clientEmail: 'a@x.com',
+      draftId: 'd1', ownerUserId: OWNER_A, serverId: 'server-1', clientName: 'Still Editing', clientEmail: 'a@x.com',
       taxRate: 0.05, status: 'local', updatedAt: Date.now(), items: [],
     });
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ quotes: [] }) });
 
-    await pullServerQuotes();
+    await pullServerQuotes(OWNER_A);
 
     expect(await localDb.drafts.get('d1')).toBeDefined();
+  });
+
+  it('never touches drafts owned by another user', async () => {
+    await localDb.drafts.put({
+      draftId: 'd1', ownerUserId: OWNER_B, serverId: 'server-1', clientName: 'B\'s Draft', clientEmail: 'b@x.com',
+      taxRate: 0.05, status: 'synced', updatedAt: Date.now() - 60_000,
+      items: [{ id: 'item-1', serverItemId: 'server-item-1', title: 'Hedges', price: 100, photoIds: ['photo-1'] }],
+    });
+    await localDb.photos.add({ id: 'photo-1', draftId: 'd1', blob: new Blob(['x']), fileName: 'p.jpg', status: 'pending' });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ quotes: [serverQuote({ clientName: 'Server Edit' })] }),
+    });
+
+    await pullServerQuotes(OWNER_A);
+
+    const draft = await localDb.drafts.get('d1');
+    expect(draft?.clientName).toBe('B\'s Draft');
+    expect(draft?.ownerUserId).toBe(OWNER_B);
+    // Photo rows stay attached — the foreign draft was neither refreshed
+    // nor removed by A's pull.
+    expect(await localDb.photos.get('photo-1')).toBeDefined();
   });
 });

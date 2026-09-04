@@ -2,8 +2,8 @@ import { localDb, DraftQuote } from '@/lib/localDb';
 import { getEntryForDraft, clearEntry } from '@/lib/outbox';
 import { queuePendingDelete, flushPendingDeletes } from '@/lib/pendingDeletes';
 
-export async function deleteDraft(draft: DraftQuote): Promise<void> {
-  const entry = await getEntryForDraft(draft.draftId);
+export async function deleteDraft(draft: DraftQuote, ownerUserId: string): Promise<void> {
+  const entry = await getEntryForDraft(draft.draftId, ownerUserId);
   if (entry) {
     await clearEntry(entry.id!);
   }
@@ -25,6 +25,6 @@ export async function deleteDraft(draft: DraftQuote): Promise<void> {
   // offline. flushPendingDeletes() actually removes the row once the
   // server confirms the delete — immediately, in the common online case.
   await localDb.drafts.update(draft.draftId, { pendingDelete: true });
-  await queuePendingDelete(draft.serverId, draft.draftId);
-  await flushPendingDeletes();
+  await queuePendingDelete(draft.serverId, draft.draftId, ownerUserId);
+  await flushPendingDeletes(ownerUserId);
 }

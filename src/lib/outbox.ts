@@ -4,18 +4,19 @@ const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 60000;
 const STUCK_DELAY_MS = Number.MAX_SAFE_INTEGER;
 
-export async function enqueueSync(draftId: string): Promise<void> {
+export async function enqueueSync(draftId: string, ownerUserId: string): Promise<void> {
   // Transaction keeps the read+write atomic: without it, two concurrent
   // calls for the same draftId could both see "no existing entry" and
   // create duplicate outbox rows.
   await localDb.transaction('rw', localDb.outbox, async () => {
-    const existing = await getEntryForDraft(draftId);
+    const existing = await getEntryForDraft(draftId, ownerUserId);
     if (existing) {
       await localDb.outbox.update(existing.id!, { nextAttemptAt: Date.now() });
       return;
     }
     await localDb.outbox.add({
       draftId,
+      ownerUserId,
       attempts: 0,
       nextAttemptAt: Date.now(),
       createdAt: Date.now(),
@@ -50,11 +51,20 @@ export async function clearEntry(entryId: number): Promise<void> {
   await localDb.outbox.delete(entryId);
 }
 
-export async function dueEntries(): Promise<OutboxEntry[]> {
+/** Due entries for the given owner only — never drains another owner's outbox. */
+export async function dueEntries(ownerUserId: string): Promise<OutboxEntry[]> {
   const now = Date.now();
-  return localDb.outbox.filter((e) => e.nextAttemptAt <= now).toArray();
+  return localDb.outbox
+    .filter((e) => e.ownerUserId === ownerUserId && e.nextAttemptAt <= now)
+    .toArray();
 }
 
-export async function getEntryForDraft(draftId: string): Promise<OutboxEntry | undefined> {
-  return localDb.outbox.where('draftId').equals(draftId).first();
+export async function getEntryForDraft(
+  draftId: string,
+  ownerUserId?: string,
+): Promise<OutboxEntry | undefined> {
+  const entry = await localDb.outbox.where('draftId').equals(draftId).first();
+  if (!entry) return undefined;
+  if (ownerUserId !== undefined && entry.ownerUserId !== ownerUserId) return undefined;
+  return entry;
 }

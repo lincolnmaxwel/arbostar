@@ -3,6 +3,7 @@ import { dueEntries, recordFailure, markStuck, clearEntry } from '@/lib/outbox';
 import { flushPendingDeletes } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 import { uploadPendingPhotos } from '@/lib/photoSync';
+import { getViewContext } from '@/lib/clientUserContext';
 
 export async function isReallyOnline(): Promise<boolean> {
   try {
@@ -13,17 +14,19 @@ export async function isReallyOnline(): Promise<boolean> {
   }
 }
 
-export async function runSyncCycle(): Promise<void> {
+export async function runSyncCycle(ownerUserId: string): Promise<void> {
   if (!(await isReallyOnline())) return;
 
-  await flushPendingDeletes();
+  await flushPendingDeletes(ownerUserId);
   // Runs every cycle (every 5s, plus on the 'online' event) app-wide via
   // startSyncLoop — not just when the Quotes list happens to be open — so an
   // edit or delete made on another device shows up here within a few seconds
   // instead of only the next time this page is manually reloaded.
-  await pullServerQuotes();
+  await pullServerQuotes(ownerUserId);
 
-  const entries = await dueEntries();
+  // Only this owner's entries: an admin viewing user B syncs B's local
+  // drafts and never drains another owner's outbox.
+  const entries = await dueEntries(ownerUserId);
   for (const entry of entries) {
     const draft = await localDb.drafts.get(entry.draftId);
     if (!draft) {
@@ -86,17 +89,24 @@ export async function runSyncCycle(): Promise<void> {
   // nothing ever retried it, so the photo stayed on this device forever and
   // never reached the server (invisible to every other device and the
   // public portal, even though the quote's text/pricing synced fine). Retry
-  // every cycle instead, for every locally-synced draft, so it recovers on
-  // its own the next time this device is online with the app open.
-  const syncedDrafts = await localDb.drafts.where('status').equals('synced').toArray();
+  // every cycle instead, for every locally-synced draft of this owner, so it
+  // recovers on its own the next time this device is online with the app
+  // open.
+  const syncedDrafts = await localDb.drafts
+    .filter((d) => d.ownerUserId === ownerUserId && d.status === 'synced')
+    .toArray();
   for (const draft of syncedDrafts) {
-    await uploadPendingPhotos(draft.draftId);
+    await uploadPendingPhotos(draft.draftId, ownerUserId);
   }
 }
 
 export function startSyncLoop(intervalMs = 5000): () => void {
-  const timer = setInterval(runSyncCycle, intervalMs);
-  const onOnline = () => runSyncCycle();
+  const tick = async () => {
+    const ctx = await getViewContext();
+    if (ctx) await runSyncCycle(ctx.ownerUserId);
+  };
+  const timer = setInterval(tick, intervalMs);
+  const onOnline = () => tick();
   window.addEventListener('online', onOnline);
   return () => {
     clearInterval(timer);

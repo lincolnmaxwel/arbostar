@@ -27,9 +27,12 @@ export async function addPhotoToItem(draftId: string, blob: Blob, fileName: stri
 // attempt died.
 const inFlight = new Set<string>();
 
-export async function uploadPendingPhotos(draftId: string): Promise<void> {
+export async function uploadPendingPhotos(draftId: string, ownerUserId?: string): Promise<void> {
   const draft = await localDb.drafts.get(draftId);
   if (!draft) return;
+  // Owner guard: only the effective owner's drafts are uploaded (defense in
+  // depth — callers already filter by owner before invoking this).
+  if (ownerUserId !== undefined && draft.ownerUserId !== ownerUserId) return;
 
   for (const item of draft.items) {
     if (!item.serverItemId) continue;

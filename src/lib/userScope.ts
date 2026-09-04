@@ -20,6 +20,40 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  constructor() {
+    super('forbidden');
+  }
+}
+
+/**
+ * Require a real admin session (the actual logged-in actor, never the
+ * effective view-as owner). Returns the actor's id. Throws UnauthorizedError
+ * when not authenticated and ForbiddenError for staff sessions.
+ */
+export async function requireAdminSession(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new UnauthorizedError();
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!actor || actor.status !== 'active' || actor.role !== 'admin') throw new ForbiddenError();
+  return actor.id;
+}
+
+/**
+ * Audit an administrative action (create/update user, feature toggle, view-as
+ * entry/exit, etc.). Admin actions are logged with the real admin as actor,
+ * independent of any view-as scope.
+ */
+export async function auditAdminAction(
+  actorId: string,
+  entityType: string,
+  entityId: string,
+  action: string,
+) {
+  await prisma.auditLog.create({ data: { entityType, entityId, action, actorId } });
+}
+
 /**
  * Resolve the effective data scope for an authenticated request: the real
  * session, the actor's current role/status, and the validated view-as cookie.

@@ -2,17 +2,45 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { NewQuoteLink } from './NewQuoteLink';
+import { getViewContext, resetViewContext } from '@/lib/clientUserContext';
 import styles from './Header.module.css';
+
+interface HeaderUser {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const userEmail = session?.user?.email ?? null;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [actorRole, setActorRole] = useState<string | null>(null);
+  const [isViewAs, setIsViewAs] = useState(false);
+  const [targetName, setTargetName] = useState<string | null>(null);
+  const [users, setUsers] = useState<HeaderUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [viewAsOpen, setViewAsOpen] = useState(false);
+  const viewAsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getViewContext().then((ctx) => {
+      if (cancelled || !ctx) return;
+      setActorRole(ctx.actorRole);
+      setIsViewAs(ctx.isViewAs);
+      setTargetName(ctx.targetName);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -25,7 +53,59 @@ export function Header() {
     return () => document.removeEventListener('click', onClickOutside);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!viewAsOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setViewAsOpen(false);
+    }
+    function onClickOutside(e: MouseEvent) {
+      if (viewAsRef.current && !viewAsRef.current.contains(e.target as Node)) {
+        setViewAsOpen(false);
+      }
+    }
+    document.addEventListener('click', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('click', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [viewAsOpen]);
+
+  useEffect(() => {
+    if (!viewAsOpen || actorRole !== 'admin') return;
+    setUsersLoading(true);
+    fetch('/api/admin/users')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (body?.users) setUsers(body.users);
+      })
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
+  }, [viewAsOpen, actorRole]);
+
   if (pathname === '/login' || pathname.startsWith('/portal/')) return null;
+
+  async function handleViewAs(userId: string) {
+    const res = await fetch('/api/admin/view-as', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) return;
+    setViewAsOpen(false);
+    resetViewContext();
+    router.refresh();
+    window.location.href = '/quotes';
+  }
+
+  async function handleStopViewAs() {
+    await fetch('/api/admin/view-as', { method: 'DELETE' });
+    resetViewContext();
+    setIsViewAs(false);
+    setTargetName(null);
+    router.refresh();
+    window.location.href = '/quotes';
+  }
 
   return (
     <header className={styles.header}>
@@ -44,8 +124,52 @@ export function Header() {
           <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
           <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
           <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
+          {actorRole === 'admin' && (
+            <Link href="/admin/users" className={pathname.startsWith('/admin') ? styles.active : ''}>Users</Link>
+          )}
         </nav>
         <div className={styles.actions}>
+          {isViewAs && (
+            <div className={styles.viewAsBanner}>
+              <span className={styles.viewAsLabel} data-testid="viewing-as-indicator">
+                Viewing as {targetName ?? 'another user'}
+              </span>
+              <button type="button" className={styles.stopViewAsButton} onClick={handleStopViewAs}>
+                Stop viewing
+              </button>
+            </div>
+          )}
+          {actorRole === 'admin' && !isViewAs && (
+            <div className={styles.viewAsWrap} ref={viewAsRef}>
+              <button
+                type="button"
+                className={styles.viewAsButton}
+                onClick={() => setViewAsOpen((v) => !v)}
+                aria-expanded={viewAsOpen}
+                aria-haspopup="menu"
+              >
+                View as
+              </button>
+              {viewAsOpen && (
+                <div className={styles.viewAsDropdown} role="menu">
+                  {usersLoading && <div className={styles.viewAsEmpty}>Loading users...</div>}
+                  {!usersLoading && users.length === 0 && <div className={styles.viewAsEmpty}>No users</div>}
+                  {!usersLoading &&
+                    users.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        role="menuitem"
+                        className={styles.viewAsOption}
+                        onClick={() => handleViewAs(u.id)}
+                      >
+                        {u.name} <span className={styles.viewAsOptionEmail}>{u.email}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
           {userEmail ? (
             <div className={styles.userMenu} ref={menuRef}>
               <button

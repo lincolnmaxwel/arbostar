@@ -47,7 +47,11 @@ export default function LoginPage() {
     const result = await signIn('credentials', { email, password, redirect: false });
     setSubmitting(false);
     if (result?.error) {
-      setError('Invalid email or password');
+      if (result.error === 'Account is inactive.' || result.error === 'Account is blocked.') {
+        setError(result.error);
+      } else {
+        setError('Invalid email or password');
+      }
       return;
     }
     // A client-side router.push() here raced Safari (and some Edge

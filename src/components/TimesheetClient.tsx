@@ -235,6 +235,7 @@ export function TimesheetClient() {
       setNewClientForm(EMPTY_NEW_CLIENT);
       setNewClientOpen(false);
       setNotice(`Client ${created.name} added.`);
+      router.refresh();
     } catch {
       setNewClientError('Could not create client. Check your connection and try again.');
     } finally {

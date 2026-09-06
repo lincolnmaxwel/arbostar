@@ -36,6 +36,25 @@ export function productLineAmount(quantity: number, unitPrice: number): Prisma.D
     .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
 
+const shortDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+/**
+ * Human-readable invoice period for the timesheet entries selected: a single
+ * day ('Aug 5, 2026'), one year ('Aug 1 - Aug 28, 2026'), or across years
+ * ('Dec 30, 2025 - Jan 3, 2026').
+ */
+export function formatDateRange(start: Date, end: Date): string {
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  if (sameDay) return `${shortDay(start)}, ${start.getFullYear()}`;
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${shortDay(start)} - ${shortDay(end)}, ${start.getFullYear()}`;
+  }
+  return `${shortDay(start)}, ${start.getFullYear()} - ${shortDay(end)}, ${end.getFullYear()}`;
+}
+
 export interface TimesheetTotalsInput {
   hourlyRate: Prisma.Decimal;
   startedAt: Date;

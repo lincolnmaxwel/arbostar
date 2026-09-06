@@ -4,6 +4,7 @@ import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile } from '@/lib/companyProfile';
 import { buildInvoicePdf } from '@/lib/invoicePdf';
+import { formatDateRange } from '@/lib/timesheetMath';
 
 // Regenerates the exact PDF sendInvoiceEmail attached when the invoice was
 // created — same buildInvoicePdf, same frozen quote/invoice totals — so a
@@ -31,11 +32,22 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       client: true,
       quote: { include: { client: true, items: { orderBy: { sortOrder: 'asc' } } } },
       lineItems: { orderBy: { sortOrder: 'asc' } },
+      timesheetEntries: { select: { workDate: true }, orderBy: { workDate: 'asc' } },
     },
   });
   if (!invoice) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   const company = await getCompanyProfile(invoice.userId);
+
+  // The period is derived from the linked entries on every download — never
+  // persisted on the invoice itself.
+  const period =
+    invoice.source === 'timesheet' && invoice.timesheetEntries.length > 0
+      ? formatDateRange(
+          invoice.timesheetEntries[0].workDate,
+          invoice.timesheetEntries[invoice.timesheetEntries.length - 1].workDate,
+        )
+      : undefined;
 
   const items =
     invoice.source === 'timesheet'
@@ -55,6 +67,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     invoiceNumber: invoice.number,
     quoteNumber: invoice.quote?.number,
     date: invoice.createdAt,
+    period,
     client: {
       name: invoice.client.name,
       email: invoice.client.email,

@@ -17,9 +17,10 @@ test('navigation hides disabled features and shows enabled ones per user', async
   await expect(page.getByRole('link', { name: 'Invoices', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Quotes', exact: true })).toBeVisible();
 
-  // User B has every optional feature disabled: only Quotes (and New quote).
+  // User B has every optional feature disabled, including quotes: only the
+  // hard surfaces (login-required pages) remain, and nav hides the Quotes link.
   await signIn(page, E2E_STAFF_B);
-  await expect(page.getByRole('link', { name: 'Quotes', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Quotes', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Clients', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Timesheet', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Invoices', exact: true })).toHaveCount(0);

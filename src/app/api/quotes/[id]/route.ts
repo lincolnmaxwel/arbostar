@@ -4,6 +4,7 @@ import path from 'path';
 import { Prisma } from '@prisma/client';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { prisma } from '@/lib/db';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   let scope;
@@ -14,6 +15,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   // Items (keyed by localItemId, matching DraftQuoteItem.id) and their photos
@@ -41,6 +46,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   const quote = await prisma.quote.findUnique({

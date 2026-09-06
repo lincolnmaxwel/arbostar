@@ -7,7 +7,7 @@ import styles from '../app/admin/users/admin-users.module.css';
 
 type Role = 'admin' | 'staff';
 type UserStatus = 'active' | 'inactive' | 'blocked';
-type FeatureKey = 'invoices' | 'timesheet' | 'clients_crm';
+type FeatureKey = 'quotes' | 'invoices' | 'timesheet' | 'clients_crm';
 
 interface AdminUser {
   id: string;
@@ -21,6 +21,7 @@ interface AdminUser {
 }
 
 const FEATURES: { key: FeatureKey; label: string }[] = [
+  { key: 'quotes', label: 'Quotes' },
   { key: 'invoices', label: 'Invoices' },
   { key: 'timesheet', label: 'Timesheet' },
   { key: 'clients_crm', label: 'Clients CRM' },
@@ -52,7 +53,7 @@ export function AdminUsersClient() {
     role: 'staff' as Role,
     status: 'active' as UserStatus,
     hourlyRate: '0',
-    features: { invoices: false, timesheet: false, clients_crm: false },
+    features: { quotes: true, invoices: false, timesheet: false, clients_crm: false },
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -109,7 +110,7 @@ export function AdminUsersClient() {
         role: 'staff',
         status: 'active',
         hourlyRate: '0',
-        features: { invoices: false, timesheet: false, clients_crm: false },
+        features: { quotes: true, invoices: false, timesheet: false, clients_crm: false },
       });
       setShowCreate(false);
       setNotice(`User ${body.user.email} created.`);
@@ -204,6 +205,38 @@ export function AdminUsersClient() {
       }
       setNotice(`${feature} ${enabled ? 'enabled' : 'disabled'} for ${user.email}.`);
       await load();
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function handleDeleteUser(user: AdminUser) {
+    if (!window.confirm(`Permanently delete ${user.name} (${user.email})? This will permanently delete all of this user's clients, quotes, invoices, and timesheet entries. This cannot be undone.`)) {
+      return;
+    }
+    setSavingUserId(user.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(body?.message ?? body?.error ?? 'Could not delete user.');
+        return;
+      }
+      setUsers((current) => current.filter((currentUser) => currentUser.id !== user.id));
+      setRateValues((current) => {
+        const next = { ...current };
+        delete next[user.id];
+        return next;
+      });
+      if (passwordResetFor === user.id) {
+        setPasswordResetFor(null);
+        setPasswordValue('');
+      }
+      setNotice(`User ${user.email} and all associated data were deleted.`);
+    } catch {
+      setError('Could not delete user. Check your connection and try again.');
     } finally {
       setSavingUserId(null);
     }
@@ -479,6 +512,14 @@ export function AdminUsersClient() {
                         </button>
                         <button type="button" className={styles.viewAsActionButton} onClick={() => handleViewAs(u)}>
                           View as
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.deleteButton}
+                          disabled={savingUserId === u.id}
+                          onClick={() => handleDeleteUser(u)}
+                        >
+                          Delete
                         </button>
                       </div>
                     )}

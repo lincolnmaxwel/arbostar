@@ -27,6 +27,7 @@ enum FeatureKey {
   invoices
   timesheet
   clients_crm
+  quotes
 }
 
 enum QuoteStatus {
@@ -68,6 +69,11 @@ enum TimesheetEntryStatus {
   invoiced
 }
 
+enum ServiceBillingType {
+  quantity
+  hourly
+}
+
 model User {
   id                String   @id @default(uuid())
   name              String
@@ -76,6 +82,9 @@ model User {
   role              Role     @default(staff)
   status            UserStatus @default(active)
   hourlyRate        Decimal  @db.Decimal(10, 2) @default(0)
+  // Default service name for timesheet labor lines on invoices; snapshotted
+  // into TimesheetEntry.serviceName at entry creation.
+  defaultServiceName String   @default("Labor")
   // Where client-response notifications (quote approved/declined, booking
   // date confirmed/rejected) get sent. Null means "use `email`" — kept
   // separate from the login email so a user can route notifications
@@ -89,6 +98,7 @@ model User {
   featureFlags      UserFeatureFlag[]
   companyProfile    CompanyProfile?
   auditLogTargets   AuditLog[]
+  serviceCatalogItems ServiceCatalogItem[]
 }
 
 model Client {
@@ -108,10 +118,24 @@ model Client {
   @@index([userId])
 }
 
+// Per-user products/services a user offers, priced for quick reuse on
+// timesheet entries. Adding one here does not touch existing timesheet
+// products — TimesheetProduct rows are immutable snapshots, never a live
+// relation to this catalog.
 model ServiceCatalogItem {
-  id           String  @id @default(uuid())
+  id           String              @id @default(uuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
-  defaultPrice Decimal @db.Decimal(10, 2)
+  defaultPrice Decimal             @db.Decimal(10, 2)
+  // quantity = per unit/package; hourly = per hour (unit is always null then,
+  // the unit is implicitly "hour"). A fraction of quantity is just a fraction
+  // of the package (e.g. 0.5 of a 1kg item = half its price).
+  billingType  ServiceBillingType  @default(quantity)
+  unit         String?
+  createdAt    DateTime            @default(now())
+
+  @@index([userId])
 }
 
 model Quote {
@@ -233,6 +257,7 @@ model InvoiceLineItem {
   invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   sourceEntryId String?
   description   String
+  notes         String?
   quantity      Decimal  @db.Decimal(10, 3)
   unitPrice     Decimal  @db.Decimal(10, 2)
   amount        Decimal  @db.Decimal(10, 2)
@@ -250,6 +275,10 @@ model TimesheetEntry {
   endedAt         DateTime
   durationMinutes Int
   hourlyRate      Decimal              @db.Decimal(10, 2)
+  // Snapshot of User.defaultServiceName at creation — never rewritten, same
+  // rule as hourlyRate.
+  serviceName     String               @default("Labor")
+  description     String
   status          TimesheetEntryStatus @default(open)
   invoiceId       String?
   invoice         Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: Restrict)

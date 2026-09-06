@@ -70,6 +70,7 @@ describe('timesheet API', () => {
       workDate: '2026-09-01',
       startedAt: '2026-09-01T13:00:00.000Z',
       endedAt: '2026-09-01T16:30:00.000Z',
+      description: 'Test work description',
       ...overrides,
     };
   }
@@ -84,7 +85,7 @@ describe('timesheet API', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     entryIds.push(body.entry.id);
-    return body.entry as { id: string; durationMinutes: number; hourlyRate: string; products: unknown[] };
+    return body.entry as { id: string; durationMinutes: number; hourlyRate: string; description: string; products: unknown[] };
   }
 
   it('rejects unauthenticated access and the disabled feature', async () => {
@@ -112,6 +113,77 @@ describe('timesheet API', () => {
     expect(entry.products).toHaveLength(1);
     const created = await prisma.timesheetProduct.findFirst({ where: { timesheetEntryId: entry.id } });
     expect(Number(created?.lineTotal)).toBe(30.85);
+  });
+
+  it('creates an entry with a trimmed description and returns it in the response', async () => {
+    const entry = await createOpenEntry({ description: '  Pruned oaks and cleared the drive  ' });
+    expect(entry.description).toBe('Pruned oaks and cleared the drive');
+    const stored = await prisma.timesheetEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(stored.description).toBe('Pruned oaks and cleared the drive');
+  });
+
+  it('rejects a create without a description (400, Description is required.)', async () => {
+    const missing = await createEntry(
+      new Request('http://localhost/api/timesheet', {
+        method: 'POST',
+        body: JSON.stringify(entryPayload({ description: undefined })),
+      }) as any,
+    );
+    expect(missing.status).toBe(400);
+
+    const blank = await createEntry(
+      new Request('http://localhost/api/timesheet', {
+        method: 'POST',
+        body: JSON.stringify(entryPayload({ description: '   ' })),
+      }) as any,
+    );
+    expect(blank.status).toBe(400);
+    const body = await blank.json();
+    expect(JSON.stringify(body.error)).toContain('Description is required.');
+  });
+
+  it('lists entries including the description', async () => {
+    await createOpenEntry({ workDate: '2026-09-07', description: 'Hedge trimming' });
+    const res = await listEntries(new NextRequest('http://localhost/api/timesheet'));
+    const body = await res.json();
+    const found = body.entries.find((e: { description: string }) => e.description === 'Hedge trimming');
+    expect(found).toBeDefined();
+  });
+
+  it('PATCH updates and preserves the description on open entries (blank is rejected)', async () => {
+    const entry = await createOpenEntry({ description: 'First note' });
+
+    const res = await patchEntry(
+      new Request(`http://localhost/api/timesheet/${entry.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ description: 'Second note' }),
+      }) as any,
+      { params: { id: entry.id } },
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).entry.description).toBe('Second note');
+
+    // Blank description is rejected — description is required, never nulled.
+    const blank = await patchEntry(
+      new Request(`http://localhost/api/timesheet/${entry.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ description: '   ' }),
+      }) as any,
+      { params: { id: entry.id } },
+    );
+    expect(blank.status).toBe(400);
+
+    // Omitting description leaves the stored value untouched.
+    const untouched = await patchEntry(
+      new Request(`http://localhost/api/timesheet/${entry.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ endedAt: '2026-09-01T18:30:00.000Z' }),
+      }) as any,
+      { params: { id: entry.id } },
+    );
+    const untouchedBody = await untouched.json();
+    expect(untouchedBody.entry.description).toBe('Second note');
+    expect(untouchedBody.entry.durationMinutes).toBe(330);
   });
 
   it('rejects an entry for another owner\'s client', async () => {
@@ -221,11 +293,17 @@ describe('timesheet API', () => {
     expect(body.entryIds.sort()).toEqual([e1.id, e2.id].sort());
 
     const lines = await prisma.invoiceLineItem.findMany({ where: { invoiceId: body.invoice.id }, orderBy: { sortOrder: 'asc' } });
-    // e1: labor + chips; e2: labor only.
-    expect(lines).toHaveLength(3);
+    // Aggregated: one labor line for both entries (same service + rate), one chips line.
+    expect(lines).toHaveLength(2);
     expect(lines[0].description).toContain('Labor');
+    // 7h total at 50: e1 (3.5h) + e2 (3.5h).
+    expect(Number(lines[0].quantity)).toBe(7);
+    expect(Number(lines[0].unitPrice)).toBe(50);
+    expect(Number(lines[0].amount)).toBe(350);
+    expect(lines[0].notes).toBe('2026-09-01: Test work description\n2026-09-02: Test work description');
+    expect(lines[1].description).toBe('Chips');
     expect(Number(lines[1].amount)).toBe(50);
-    // e1 labor (3.5h × 50) + chips (50) + e2 labor (3.5h × 50) = 400.
+    // Aggregated labor (350) + chips (50) = 400.
     expect(Number(body.invoice.subtotal)).toBe(400);
     expect(Number(body.invoice.taxAmount)).toBe(20);
     expect(Number(body.invoice.total)).toBe(420);
@@ -236,7 +314,7 @@ describe('timesheet API', () => {
     expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
     const call = vi.mocked(sendInvoiceEmail).mock.calls[0][0];
     expect(call.invoiceNumber).toBe(body.invoice.number);
-    expect(call.items).toHaveLength(3);
+    expect(call.items).toHaveLength(2);
 
     // Reuse is rejected — all selected entries are already invoiced.
     const res2 = await generateInvoice(
@@ -246,6 +324,48 @@ describe('timesheet API', () => {
       }) as any,
     );
     expect(res2.status).toBe(409);
+  });
+
+  it('freezes entry descriptions into invoice line notes (products stay null)', async () => {
+    const withDesc = await createOpenEntry({ workDate: '2026-09-03', description: 'Stump grinding and cleanup' });
+    const defaultDesc = await createOpenEntry({ workDate: '2026-09-04' });
+    const withDescAndProduct = await createOpenEntry({
+      workDate: '2026-09-05',
+      description: 'Crown reduction',
+      products: [{ name: 'Chips', quantity: 1, unitPrice: 40 }],
+    });
+
+    const res = await generateInvoice(
+      new Request('http://localhost/api/timesheet/invoice', {
+        method: 'POST',
+        body: JSON.stringify({ clientId, entryIds: [withDesc.id, defaultDesc.id, withDescAndProduct.id] }),
+      }) as any,
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+
+    // All three entries share one service + rate, so a single aggregated labor
+    // line carries every frozen entry description; the product line stays null.
+    const lines = await prisma.invoiceLineItem.findMany({
+      where: { invoiceId: body.invoice.id },
+      orderBy: { sortOrder: 'asc' },
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0].description).toContain('Labor');
+    expect(lines[0].notes).toBe(
+      '2026-09-03: Stump grinding and cleanup\n2026-09-04: Test work description\n2026-09-05: Crown reduction',
+    );
+    expect(lines[1].description).toBe('Chips');
+    expect(lines[1].notes).toBeNull();
+    expect(Number(lines[1].amount)).toBe(40);
+
+    // The emailed items carry only the aggregated line title — the per-entry
+    // notes stay in the DB (InvoiceLineItem.notes) but are never shown to
+    // the client.
+    const call = vi.mocked(sendInvoiceEmail).mock.calls.at(-1)![0];
+    const laborItems = call.items.filter((i: { title: string }) => i.title.startsWith('Labor'));
+    expect(laborItems).toHaveLength(1);
+    expect(laborItems[0].description).toBeUndefined();
   });
 
   it('rejects mixed-client selection', async () => {
@@ -270,6 +390,7 @@ describe('timesheet API', () => {
           workDate: '2026-09-01',
           startedAt: '2026-09-01T13:00:00.000Z',
           endedAt: '2026-09-01T14:00:00.000Z',
+          description: 'Test work description',
         }),
       }) as any,
     );

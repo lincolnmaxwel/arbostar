@@ -13,13 +13,20 @@ describe('GET /api/quotes/[id]', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Get Test', email: `get-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: {
+        name: 'Get Test',
+        email: `get-${randomUUID()}@example.com`,
+        passwordHash: 'x',
+        role: 'staff',
+        featureFlags: { create: { feature: 'quotes', enabled: true } },
+      },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
   });
 
   afterAll(async () => {
+    await prisma.userFeatureFlag.deleteMany({ where: { userId } });
     await prisma.quote.deleteMany({ where: { createdById: userId } });
     await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });

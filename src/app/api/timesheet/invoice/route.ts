@@ -8,6 +8,7 @@ import {
   computeTimesheetTotals,
   DEFAULT_TIMESHEET_TAX_RATE,
   validateTaxRate,
+  formatDateRange,
   TimesheetProductInput,
 } from '@/lib/timesheetMath';
 import { getCompanyProfile } from '@/lib/companyProfile';
@@ -100,11 +101,24 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Line snapshot helpers: one immutable InvoiceLineItem per hour/product.
-  // sortOrder runs globally across all selected entries so the invoice lines
-  // are deterministic.
+  // Aggregated line snapshot: one immutable InvoiceLineItem per labor group
+  // (serviceName + hourlyRate, which is usually a single group for the whole
+  // period) and one per distinct product (name + unitPrice). Per-entry totals
+  // still feed the subtotal so the sum is identical to before — just in fewer
+  // lines. Labor notes concatenate every entry's date + description.
   let lineOrder = 0;
-  const lineItems = selected.flatMap((entry) => {
+  const entriesByWork = [...selected].sort((a, b) => a.workDate.getTime() - b.workDate.getTime());
+  const laborGroups = new Map<
+    string,
+    { serviceName: string; hourlyRate: Prisma.Decimal; minutes: number; amount: Prisma.Decimal; notes: string[] }
+  >();
+  const productGroups = new Map<
+    string,
+    { name: string; unitPrice: Prisma.Decimal; quantity: Prisma.Decimal; amount: Prisma.Decimal }
+  >();
+
+  let subtotal = new Prisma.Decimal(0);
+  for (const entry of entriesByWork) {
     const totals = computeTimesheetTotals(
       {
         hourlyRate: entry.hourlyRate,
@@ -116,30 +130,75 @@ export async function POST(req: NextRequest) {
       },
       taxRate,
     );
-    const lines = [
-      {
-        description: `Labor — ${entry.workDate.toISOString().slice(0, 10)}`,
-        quantity: totals.durationMinutes / 60,
-        unitPrice: entry.hourlyRate,
-        amount: totals.laborAmount,
-        sortOrder: lineOrder++,
-      },
-      ...entry.products.map((p) => ({
-        description: p.name,
-        quantity: p.quantity,
-        unitPrice: p.unitPrice,
-        amount: p.lineTotal,
-        sortOrder: lineOrder++,
-      })),
-    ];
-    // Subtotal of this entry = labor + its products (tax computed on the whole
-    // invoice, so only the subtotal is accumulated here).
-    return { lines, entrySubtotal: totals.subtotal };
-  });
+    subtotal = subtotal.plus(totals.subtotal);
 
-  const subtotal = lineItems
-    .reduce((acc, l) => acc.plus(l.entrySubtotal), new Prisma.Decimal(0))
-    .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+    const laborKey = `${entry.serviceName}|${entry.hourlyRate}`;
+    const laborGroup = laborGroups.get(laborKey);
+    if (laborGroup) {
+      // Accumulate whole minutes (integer, float-error-free); hours are
+      // derived once, rounded, when the line is built below.
+      laborGroup.minutes += totals.durationMinutes;
+      laborGroup.amount = laborGroup.amount.plus(totals.laborAmount);
+      laborGroup.notes.push(`${entry.workDate.toISOString().slice(0, 10)}: ${entry.description}`);
+    } else {
+      laborGroups.set(laborKey, {
+        serviceName: entry.serviceName,
+        hourlyRate: entry.hourlyRate,
+        minutes: totals.durationMinutes,
+        amount: totals.laborAmount,
+        notes: [`${entry.workDate.toISOString().slice(0, 10)}: ${entry.description}`],
+      });
+    }
+
+    for (const p of entry.products) {
+      const productKey = `${p.name}|${p.unitPrice}`;
+      const productGroup = productGroups.get(productKey);
+      if (productGroup) {
+        productGroup.quantity = productGroup.quantity.plus(p.quantity);
+        productGroup.amount = productGroup.amount.plus(p.lineTotal);
+      } else {
+        productGroups.set(productKey, {
+          name: p.name,
+          unitPrice: p.unitPrice,
+          quantity: p.quantity,
+          amount: p.lineTotal,
+        });
+      }
+    }
+  }
+
+  const lines: {
+    description: string;
+    notes: string | null;
+    quantity: number | Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+    amount: Prisma.Decimal;
+    sortOrder: number;
+  }[] = [];
+  for (const group of laborGroups.values()) {
+    lines.push({
+      description: group.serviceName,
+      notes: group.notes.join('\n'),
+      // Round once, at line build time — same 2dp precision the entry list
+      // Hours column uses.
+      quantity: new Prisma.Decimal(group.minutes).dividedBy(60).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+      unitPrice: group.hourlyRate,
+      amount: group.amount,
+      sortOrder: lineOrder++,
+    });
+  }
+  for (const group of productGroups.values()) {
+    lines.push({
+      description: group.name,
+      notes: null,
+      quantity: group.quantity,
+      unitPrice: group.unitPrice,
+      amount: group.amount,
+      sortOrder: lineOrder++,
+    });
+  }
+
+  subtotal = subtotal.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
   const rate = new Prisma.Decimal(taxRate);
   const taxAmount = subtotal.mul(rate).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
   const total = subtotal.plus(taxAmount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
@@ -171,7 +230,7 @@ export async function POST(req: NextRequest) {
             total,
             sentAt: new Date(),
             lineItems: {
-              create: lineItems.flatMap((l) => l.lines),
+              create: lines,
             },
           },
         });
@@ -203,20 +262,22 @@ export async function POST(req: NextRequest) {
   // Email/PDF failures must not roll back the committed invoice.
   try {
     const company = await getCompanyProfile(scope.ownerUserId);
-    const items = lineItems.flatMap((l) =>
-      l.lines.map((line) => ({
+    // selected is ordered by workDate asc, so the first/last entries bound the
+    // invoice period. Derived on the fly — never persisted.
+    const period = formatDateRange(selected[0].workDate, selected[selected.length - 1].workDate);
+    const items = lines.map((line) => ({
         title: line.description,
         quantity: Number(line.quantity),
         unitPrice: Number(line.unitPrice),
         price: Number(line.amount),
-      })),
-    );
+      }));
 
     let pdfBuffer: Buffer | undefined;
     try {
       pdfBuffer = await buildInvoicePdf({
         invoiceNumber: invoice.number,
         date: invoice.createdAt,
+        period,
         client: { name: client.name, email: client.email, phone: client.phone, address: client.address },
         serviceAddress: data.serviceAddress ?? null,
         company: { name: company.name, phone: company.phone, email: company.email, address: company.address, logoPath: company.logoPath },
@@ -234,6 +295,7 @@ export async function POST(req: NextRequest) {
       to: client.email,
       clientName: client.name,
       invoiceNumber: invoice.number,
+      period,
       companyName: company.name ?? undefined,
       items,
       subtotal: Number(subtotal),

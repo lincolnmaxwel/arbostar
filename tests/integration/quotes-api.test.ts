@@ -15,16 +15,58 @@ describe('/api/quotes', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Test Staff', email: `staff-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: {
+        name: 'Test Staff',
+        email: `staff-${randomUUID()}@example.com`,
+        passwordHash: 'x',
+        role: 'staff',
+        featureFlags: { create: { feature: 'quotes', enabled: true } },
+      },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
   });
 
   afterAll(async () => {
+    await prisma.userFeatureFlag.deleteMany({ where: { userId } });
     await prisma.quote.deleteMany({ where: { createdById: userId } });
     await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
+  });
+
+  it('blocks POST and GET with 403 when the quotes feature is disabled', async () => {
+    const disabled = await prisma.user.create({
+      data: {
+        name: 'No Quotes',
+        email: `no-quotes-${randomUUID()}@example.com`,
+        passwordHash: 'x',
+        role: 'staff',
+        featureFlags: { create: { feature: 'quotes', enabled: false } },
+      },
+    });
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: disabled.id } });
+
+    const postRes = await POST(
+      new Request('http://localhost/api/quotes', {
+        method: 'POST',
+        body: JSON.stringify({
+          draftId: randomUUID(),
+          clientName: 'Nelson Costa',
+          clientEmail: `client-${randomUUID()}@example.com`,
+          taxRate: 0.05,
+          items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+        }),
+      }) as any,
+    );
+    expect(postRes.status).toBe(403);
+    expect((await postRes.json()).error).toBe('This feature is not enabled for your account.');
+
+    const getRes = await GET();
+    expect(getRes.status).toBe(403);
+
+    await prisma.userFeatureFlag.deleteMany({ where: { userId: disabled.id } });
+    await prisma.user.delete({ where: { id: disabled.id } });
+    (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
   });
 
   it('creates a quote on first POST and updates (not duplicates) on retry with the same draftId', async () => {

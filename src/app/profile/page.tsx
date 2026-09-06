@@ -8,6 +8,7 @@ interface ProfileUser {
   email: string;
   notificationEmail: string | null;
   hourlyRate: number;
+  defaultServiceName: string;
 }
 
 interface CompanyProfile {
@@ -36,6 +37,10 @@ export default function ProfilePage() {
   const [hourlyRateSaving, setHourlyRateSaving] = useState(false);
   const [hourlyRateError, setHourlyRateError] = useState<string | null>(null);
   const [hourlyRateSaved, setHourlyRateSaved] = useState(false);
+  const [defaultServiceName, setDefaultServiceName] = useState('');
+  const [serviceNameSaving, setServiceNameSaving] = useState(false);
+  const [serviceNameError, setServiceNameError] = useState<string | null>(null);
+  const [serviceNameSaved, setServiceNameSaved] = useState(false);
 
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [companyName, setCompanyName] = useState('');
@@ -57,6 +62,7 @@ export default function ProfilePage() {
         setUser(body.user);
         setNotificationEmail(body.user.notificationEmail ?? '');
         setHourlyRate(String(body.user.hourlyRate ?? 0));
+        setDefaultServiceName(body.user.defaultServiceName ?? '');
       });
     fetch('/api/company')
       .then((res) => res.json())
@@ -166,6 +172,30 @@ export default function ProfilePage() {
     setHourlyRateSaved(true);
   }
 
+  async function handleSaveServiceName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!defaultServiceName.trim()) {
+      setServiceNameError('Enter a service name.');
+      return;
+    }
+    setServiceNameSaving(true);
+    setServiceNameError(null);
+    setServiceNameSaved(false);
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ defaultServiceName: defaultServiceName.trim() }),
+    });
+    setServiceNameSaving(false);
+    if (!res.ok) {
+      setServiceNameError('Could not save service name.');
+      return;
+    }
+    const body = await res.json();
+    setDefaultServiceName(body.user.defaultServiceName ?? '');
+    setServiceNameSaved(true);
+  }
+
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError(null);
@@ -269,6 +299,31 @@ export default function ProfilePage() {
         <p className={styles.sectionHint}>
           Used when new timesheet entries are created — each entry snapshots this value, so changing it does not affect existing entries.
         </p>
+        {serviceNameError && <div className={styles.error}>{serviceNameError}</div>}
+        {serviceNameSaved && <div className={styles.success}>Saved.</div>}
+        <form onSubmit={handleSaveServiceName}>
+          <div className={styles.field}>
+            <label htmlFor="defaultServiceName">Service name</label>
+            <input
+              id="defaultServiceName"
+              type="text"
+              className={styles.input}
+              value={defaultServiceName}
+              onChange={(e) => {
+                setDefaultServiceName(e.target.value);
+                setServiceNameSaved(false);
+              }}
+              aria-describedby="defaultServiceNameHint"
+              required
+            />
+            <p id="defaultServiceNameHint" className={styles.sectionHint}>
+              The name of the service you provide, shown on invoices generated from timesheet entries.
+            </p>
+          </div>
+          <button type="submit" className={styles.button} disabled={serviceNameSaving}>
+            {serviceNameSaving ? 'Saving...' : 'Save service name'}
+          </button>
+        </form>
         {hourlyRateError && <div className={styles.error}>{hourlyRateError}</div>}
         {hourlyRateSaved && <div className={styles.success}>Saved.</div>}
         <form onSubmit={handleSaveHourlyRate}>

@@ -8,7 +8,7 @@ export function DeleteClientButton({ clientId, clientName, className }: { client
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete() {
-    if (!window.confirm(`Delete ${clientName} and all their quotes? This can't be undone.`)) return;
+    if (!window.confirm(`Permanently delete ${clientName}? This will permanently delete all of this client's quotes, invoices, and timesheet entries. This cannot be undone.`)) return;
     setDeleting(true);
     const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
     setDeleting(false);

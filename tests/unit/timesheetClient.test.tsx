@@ -34,8 +34,10 @@ describe('TimesheetClient', () => {
 
   beforeEach(() => {
     mockFetchResponse((url: string) => {
-      if (url === '/api/timesheet') return { ok: true, json: async () => ({ entries: [] }) };
-      if (url === '/api/clients') {
+      if (url.startsWith('/api/timesheet') && !url.startsWith('/api/timesheet/')) {
+        return { ok: true, json: async () => ({ entries: [] }) };
+      }
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {
@@ -82,7 +84,7 @@ describe('TimesheetClient', () => {
         return { ok: true, status: 201, json: async () => ({ entry: entryFixture() }) };
       }
       if (url === '/api/timesheet') return { ok: true, json: async () => ({ entries: [entryFixture()] }) };
-      if (url === '/api/clients') {
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {
@@ -128,7 +130,7 @@ describe('TimesheetClient', () => {
           }),
         };
       }
-      if (url === '/api/clients') {
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {
@@ -156,7 +158,7 @@ describe('TimesheetClient', () => {
         return { ok: true, status: 201, json: async () => ({ invoice: { number: 42 }, entryIds: ['entry-1'] }) };
       }
       if (url === '/api/timesheet') return { ok: true, json: async () => ({ entries: [entryFixture()] }) };
-      if (url === '/api/clients') {
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {
@@ -188,7 +190,7 @@ describe('TimesheetClient', () => {
         };
       }
       if (url === '/api/timesheet') return { ok: true, json: async () => ({ entries: [entryFixture()] }) };
-      if (url === '/api/clients') {
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {
@@ -227,7 +229,7 @@ describe('TimesheetClient', () => {
           }),
         };
       }
-      if (url === '/api/clients') {
+      if (url === '/api/timesheet/clients') {
         return {
           ok: true,
           json: async () => ({
@@ -258,8 +260,10 @@ describe('TimesheetClient', () => {
 
   it('rejects a From date after the To date', async () => {
     mockFetchResponse((url: string) => {
-      if (url === '/api/timesheet') return { ok: true, json: async () => ({ entries: [] }) };
-      if (url === '/api/clients') {
+      if (url.startsWith('/api/timesheet') && !url.startsWith('/api/timesheet/')) {
+        return { ok: true, json: async () => ({ entries: [] }) };
+      }
+      if (url === '/api/timesheet/clients') {
         return { ok: true, json: async () => ({ clients: [{ id: 'client-1', name: 'Nelson Costa', email: 'n@x.com' }] }) };
       }
       if (url === '/api/profile') {

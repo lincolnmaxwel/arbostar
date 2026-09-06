@@ -22,6 +22,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   // Completion creates an invoice, which requires the invoices feature.
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
+  }
+
   if (!(await isFeatureEnabled(scope.ownerUserId, 'invoices'))) {
     return featureDisabledResponse();
   }

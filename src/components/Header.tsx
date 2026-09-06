@@ -24,7 +24,7 @@ export function Header() {
   const [actorRole, setActorRole] = useState<string | null>(null);
   const [isViewAs, setIsViewAs] = useState(false);
   const [targetName, setTargetName] = useState<string | null>(null);
-  const [features, setFeatures] = useState<{ invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
+  const [features, setFeatures] = useState<{ quotes: boolean; invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
   const [users, setUsers] = useState<HeaderUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [viewAsOpen, setViewAsOpen] = useState(false);
@@ -38,6 +38,7 @@ export function Header() {
       setIsViewAs(ctx.isViewAs);
       setTargetName(ctx.targetName);
       setFeatures({
+        quotes: ctx.features.quotes,
         invoices: ctx.features.invoices,
         timesheet: ctx.features.timesheet,
         clients_crm: ctx.features.clients_crm,
@@ -125,21 +126,27 @@ export function Header() {
           </svg>
           Arbostar
         </Link>
-        <nav className={styles.nav}>
-          <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
-          <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
-          {features?.clients_crm && (
-            <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
-          )}
-          {features?.timesheet && (
-            <Link href="/timesheet" className={pathname.startsWith('/timesheet') ? styles.active : ''}>Timesheet</Link>
-          )}
-          {features?.invoices && (
-            <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
-          )}
-          {actorRole === 'admin' && (
-            <Link href="/admin/users" className={pathname.startsWith('/admin') ? styles.active : ''}>Users</Link>
-          )}
+        <nav className={styles.nav} aria-label="Primary navigation">
+          <div className={styles.mainNav}>
+            {features?.quotes && (
+              <>
+                <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
+                <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
+              </>
+            )}
+            {(features?.clients_crm || features?.timesheet) && (
+              <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
+            )}
+            {features?.timesheet && (
+              <Link href="/timesheet" className={pathname.startsWith('/timesheet') ? styles.active : ''}>Timesheet</Link>
+            )}
+            {features?.timesheet && (
+              <Link href="/services" className={pathname.startsWith('/services') ? styles.active : ''}>Services</Link>
+            )}
+            {features?.invoices && (
+              <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
+            )}
+          </div>
         </nav>
         <div className={styles.actions}>
           {isViewAs && (
@@ -198,6 +205,11 @@ export function Header() {
               </button>
               {menuOpen && (
                 <div id="user-menu" className={styles.userMenuDropdown} role="menu">
+                  {actorRole === 'admin' && (
+                    <Link href="/admin/users" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                      Manage users
+                    </Link>
+                  )}
                   <Link href="/profile" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     Profile
                   </Link>

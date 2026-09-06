@@ -9,12 +9,16 @@
 
 .inner {
   max-width: var(--max-width);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   margin: 0 auto;
-  padding: 0 16px;
-  height: 64px;
+  padding: 0 24px;
+  min-height: 64px;
+  height: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 24px;
 }
 
 .brand {
@@ -40,7 +44,21 @@
 
 .nav {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 26px;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+}
+
+.mainNav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  gap: 22px;
 }
 
 .nav a {
@@ -48,6 +66,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
   padding: 4px 0;
+  white-space: nowrap;
   border-bottom: 2px solid transparent;
   transition: color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-standard) var(--ease-out-expo);
@@ -67,7 +86,13 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding-left: 8px;
 }
 
 .signOutButton {
@@ -88,6 +113,8 @@
 
 .userMenu {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .userMenuButton {
@@ -160,6 +187,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   background: var(--color-accent);
   color: #111827;
   border-radius: 6px;
@@ -169,6 +198,9 @@
 }
 
 .viewAsLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -265,24 +297,70 @@
   .viewAsBanner {
     order: 2;
   }
+
+  .viewAsDropdown {
+    left: 0;
+    right: auto;
+    transform-origin: top left;
+  }
+}
+
+@media (max-width: 1300px) {
+  .inner {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .nav {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    padding-bottom: 4px;
+  }
 }
 
 @media (max-width: 640px) {
   .inner {
-    height: auto;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: 10px 16px;
   }
 
+  .brand {
+    align-self: flex-start;
+  }
+
   .nav {
-    gap: 16px;
-    order: 3;
+    gap: 20px;
+    flex: 0 0 auto;
+  }
+
+  .mainNav {
+    gap: 20px;
+  }
+
+  .actions {
+    order: 2;
     width: 100%;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    white-space: nowrap;
-    padding-bottom: 4px;
+    margin-left: 0;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  .viewAsBanner {
+    order: 0;
+  }
+
+  .userMenu {
+    order: 1;
+  }
+
+  .userMenuButton {
+    max-width: min(200px, 42vw);
   }
 
   .signOutButton {

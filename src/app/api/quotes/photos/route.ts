@@ -4,6 +4,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { prisma } from '@/lib/db';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 
 export async function POST(req: NextRequest) {
   let scope;
@@ -14,6 +15,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   const formData = await req.formData();

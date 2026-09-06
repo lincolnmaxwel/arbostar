@@ -18,6 +18,8 @@ export interface InvoicePdfOptions {
   /** Present only for quote-sourced invoices. */
   quoteNumber?: number;
   date: Date;
+  /** Timesheet invoices only: first-last workDate of the invoiced entries. */
+  period?: string;
   client: { name: string; email?: string | null; phone?: string | null; address?: string | null };
   serviceAddress?: string | null;
   company: { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; logoPath?: string | null };
@@ -55,6 +57,9 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   const metaParts = [`${opts.date.toLocaleDateString()}`];
   if (opts.quoteNumber !== undefined) metaParts.unshift(`Quote #${opts.quoteNumber}`);
   doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(metaParts.join(' · '), marginX, 78);
+  if (opts.period) {
+    doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(`Period: ${opts.period}`, marginX, 92);
+  }
 
   if (opts.company.logoPath) {
     try {
@@ -104,13 +109,31 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
 
   y = Math.max(toY, fromY) + 20;
 
+  // Timesheet lines carry quantity × unit price; quote lines are plain
+  // amounts. When any item has quantity/unitPrice, render four real columns
+  // (Description | Quantity | Unit price | Total) instead of squeezing the
+  // breakdown into the Total column.
+  const hasQtyColumns = opts.items.some((i) => i.quantity !== undefined && i.unitPrice !== undefined);
   const totalColWidth = 90;
-  const descColWidth = contentWidth - totalColWidth - 8;
+  const qtyColWidth = 60;
+  const priceColWidth = 80;
+  const descColWidth = hasQtyColumns
+    ? contentWidth - totalColWidth - qtyColWidth - priceColWidth - 8
+    : contentWidth - totalColWidth - 8;
+  const qtyX = marginX + 8 + descColWidth;
+  const priceX = qtyX + qtyColWidth;
+  const totalX = priceX + priceColWidth;
 
   doc.rect(marginX, y, contentWidth, 22).fill(PRIMARY);
   doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9);
   doc.text('DESCRIPTION', marginX + 8, y + 7);
-  doc.text('TOTAL', marginX + 8 + descColWidth, y + 7, { width: totalColWidth, align: 'right' });
+  if (hasQtyColumns) {
+    doc.text('QUANTITY', qtyX, y + 7, { width: qtyColWidth, align: 'right' });
+    doc.text('UNIT PRICE', priceX, y + 7, { width: priceColWidth, align: 'right' });
+    doc.text('TOTAL', totalX, y + 7, { width: totalColWidth, align: 'right' });
+  } else {
+    doc.text('TOTAL', qtyX, y + 7, { width: totalColWidth, align: 'right' });
+  }
   y += 22;
 
   for (const item of opts.items) {
@@ -122,14 +145,14 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
       doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(item.description, marginX + 8, descY, { width: descColWidth });
       textBottom = descY + doc.heightOfString(item.description, { width: descColWidth });
     }
-    const amount =
-      item.quantity !== undefined && item.unitPrice !== undefined
-        ? `${item.quantity} × ${formatMoney(item.unitPrice)} = ${formatMoney(item.price)}`
-        : formatMoney(item.price);
-    doc.font('Helvetica').fontSize(10).fillColor(DARK).text(amount, marginX + 8 + descColWidth, rowTop, {
-      width: totalColWidth,
-      align: 'right',
-    });
+    doc.font('Helvetica').fontSize(10).fillColor(DARK);
+    if (hasQtyColumns) {
+      doc.text(String(item.quantity ?? ''), qtyX, rowTop, { width: qtyColWidth, align: 'right' });
+      doc.text(item.unitPrice !== undefined ? formatMoney(item.unitPrice) : '', priceX, rowTop, { width: priceColWidth, align: 'right' });
+      doc.text(formatMoney(item.price), totalX, rowTop, { width: totalColWidth, align: 'right' });
+    } else {
+      doc.text(formatMoney(item.price), qtyX, rowTop, { width: totalColWidth, align: 'right' });
+    }
     y = textBottom + 12;
     doc.moveTo(marginX, y).lineTo(pageWidth - marginX, y).strokeColor(BORDER).stroke();
     y += 6;

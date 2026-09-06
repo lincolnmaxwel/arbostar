@@ -21,7 +21,7 @@ async function main() {
   });
 
   // All optional features enabled for the seeded admin (idempotent).
-  for (const feature of ['invoices', 'timesheet', 'clients_crm'] as const) {
+  for (const feature of ['invoices', 'timesheet', 'clients_crm', 'quotes'] as const) {
     await prisma.userFeatureFlag.upsert({
       where: { userId_feature: { userId: admin.id, feature } },
       update: { enabled: true },

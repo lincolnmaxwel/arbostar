@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
 import { prisma } from '@/lib/db';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   let scope;
@@ -11,6 +12,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   const quote = await prisma.quote.findUnique({

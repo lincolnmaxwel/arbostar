@@ -15,7 +15,7 @@ describe('POST /api/quotes/[id]/complete', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Complete Test', email: `complete-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: { feature: 'invoices', enabled: true } } },
+      data: { name: 'Complete Test', email: `complete-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff', featureFlags: { create: [{ feature: 'invoices', enabled: true }, { feature: 'quotes', enabled: true }] } },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
@@ -26,6 +26,7 @@ describe('POST /api/quotes/[id]/complete', () => {
     await prisma.quote.deleteMany({ where: { createdById: userId } });
     await prisma.client.deleteMany({ where: { userId } });
     await prisma.companyProfile.deleteMany({ where: { userId } });
+    await prisma.userFeatureFlag.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
   });
 

@@ -20,7 +20,13 @@ describe('Staff booking API', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Booking Staff', email: `booking-staff-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: {
+        name: 'Booking Staff',
+        email: `booking-staff-${randomUUID()}@example.com`,
+        passwordHash: 'x',
+        role: 'staff',
+        featureFlags: { create: { feature: 'quotes', enabled: true } },
+      },
     });
     userId = user.id;
     (getServerSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { id: userId } });
@@ -32,6 +38,7 @@ describe('Staff booking API', () => {
   });
 
   afterAll(async () => {
+    await prisma.userFeatureFlag.deleteMany({ where: { userId } });
     await prisma.quote.deleteMany({ where: { createdById: userId } });
     await prisma.client.deleteMany({ where: { id: clientId } });
     await prisma.user.delete({ where: { id: userId } });

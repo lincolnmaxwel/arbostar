@@ -111,6 +111,35 @@
   color: var(--color-text-secondary);
 }
 
+.clientPicker {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.clientPicker .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.addClientButton {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 11px;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addClientButton:hover {
+  background: var(--color-primary-light);
+}
+
 .input {
   padding: 8px 10px;
   border: 1px solid var(--color-border);
@@ -130,9 +159,49 @@
 
 .entryForm {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Client also contains the "+ New client" action, so give it a wider
+     track than the three single-control date/time fields. */
+  grid-template-columns: minmax(280px, 2fr) repeat(3, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.descriptionField {
+  grid-column: 1 / -1;
+}
+
+.input:is(textarea) {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.4;
+  font-family: inherit;
+}
+
+.inlineClientForm {
+  margin: -4px 0 16px;
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.inlineClientTitle {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.newClientFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.inlineClientActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .rateNotice {
@@ -163,7 +232,64 @@
   align-items: center;
 }
 
+.productActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.catalogSelect {
+  min-height: 38px;
+  min-width: 210px;
+  padding: 7px 10px;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.catalogSelect:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+@media (max-width: 960px) {
+  .entryForm {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
+  .clientPicker {
+    flex-direction: column;
+  }
+
+  .addClientButton,
+  .catalogSelect {
+    width: 100%;
+  }
+
+  .newClientFields {
+    grid-template-columns: 1fr;
+  }
+
+  .inlineClientActions {
+    flex-direction: column;
+  }
+
+  .inlineClientActions button {
+    width: 100%;
+  }
+
+  .productActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .productRow {
     grid-template-columns: 1fr;
     padding: 8px;
@@ -174,6 +300,19 @@
 
   .productRow .removeProductButton {
     justify-self: end;
+  }
+
+  .filterRow .field,
+  .filterActions {
+    width: 100%;
+  }
+
+  .filterActions {
+    flex-direction: column;
+  }
+
+  .filterActions .actionButton {
+    width: 100%;
   }
 }
 
@@ -195,7 +334,7 @@
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .addProductButton:hover {
@@ -291,6 +430,187 @@
   color: var(--color-text-secondary);
 }
 
+.entryDescription {
+  max-width: 240px;
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detailsButton {
+  color: var(--color-primary);
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 0.5);
+}
+
+.modal {
+  width: min(100%, 620px);
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.modalClose {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.modalClose:hover {
+  color: var(--color-text);
+  background: var(--color-primary-light);
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+}
+
+.detailItem {
+  min-width: 0;
+}
+
+.detailLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detailValue {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.detailSection {
+  margin-top: 22px;
+}
+
+.detailSectionTitle {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.detailDescription {
+  margin: 0;
+  padding: 12px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detailProducts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.detailProducts th,
+.detailProducts td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detailProducts th {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.detailProducts tr:last-child td {
+  border-bottom: none;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.editEntryForm {
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.editEntryHeader {
+  margin-bottom: 14px;
+}
+
+.editEntryTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.editEntryHint {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.editEntryFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.editEntryFields .descriptionField {
+  grid-column: 1 / -1;
+}
+
+.editEntryActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .generateBar {
   display: flex;
   align-items: center;
@@ -366,4 +686,36 @@
   text-align: center;
   padding: 40px 16px;
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .modalBackdrop {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .modal {
+    max-height: 90vh;
+    padding: 20px;
+  }
+
+  .detailsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editEntryFields {
+    grid-template-columns: 1fr;
+  }
+
+  .editEntryFields .descriptionField {
+    grid-column: auto;
+  }
+
+  .editEntryActions {
+    flex-direction: column;
+  }
+
+  .editEntryActions button {
+    width: 100%;
+  }
 }

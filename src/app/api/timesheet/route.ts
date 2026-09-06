@@ -22,6 +22,7 @@ const entrySchema = z.object({
   workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startedAt: z.string(),
   endedAt: z.string(),
+  description: z.string().trim().min(1, 'Description is required.'),
   products: z.array(productSchema).optional().default([]),
 });
 
@@ -53,7 +54,11 @@ export async function GET(req: NextRequest) {
       // cutoff would drop same-day entries.
       ...(dateTo ? { workDate: { lte: new Date(dateTo + 'T23:59:59.999Z') } } : {}),
     },
-    include: { client: { select: { id: true, name: true } }, products: { orderBy: { id: 'asc' } } },
+    include: {
+      client: { select: { id: true, name: true } },
+      products: { orderBy: { id: 'asc' } },
+      invoice: { select: { number: true } },
+    },
     orderBy: { workDate: 'desc' },
   });
 
@@ -97,8 +102,8 @@ export async function POST(req: NextRequest) {
   const productError = validateProducts(data.products as TimesheetProductInput[]);
   if (productError) return NextResponse.json({ error: productError }, { status: 400 });
 
-  // Snapshot the user's current hourly rate — later changes to the default
-  // never rewrite existing entries.
+  // Snapshot the user's current hourly rate and default service name — later
+  // changes to the defaults never rewrite existing entries.
   const user = await prisma.user.findUniqueOrThrow({ where: { id: scope.ownerUserId } });
 
   const totals = computeTimesheetTotals(
@@ -115,6 +120,8 @@ export async function POST(req: NextRequest) {
       endedAt,
       durationMinutes: totals.durationMinutes,
       hourlyRate: user.hourlyRate,
+      serviceName: user.defaultServiceName,
+      description: data.description,
       products: {
         create: (data.products as TimesheetProductInput[]).map((p) => ({
           name: p.name,

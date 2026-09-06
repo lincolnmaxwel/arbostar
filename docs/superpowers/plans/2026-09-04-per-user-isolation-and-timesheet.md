@@ -964,3 +964,31 @@ git commit -m "test: verify per-user isolation across staff and admin view-as"
 - [ ] Confirm no code or migration introduced `Tenant`/`tenantId`; record the
   future integration point in `src/lib/userScope.ts` for the approved SaaS
   foundation plan.
+
+---
+
+## Post-rollout addendum (2026-09-04)
+
+The following two follow-up features were requested after the user-isolation
+rollout and are already being implemented in parallel by Claude Code (API) and
+Lumen (UI). They are recorded here for plan continuity; no additional task
+checklist is introduced.
+
+### 1. Manual client creation from Timesheet
+
+Timesheet users can create a client directly from the Timesheet workflow via
+`POST /api/clients`. `GET /api/timesheet/clients` returns every client owned by
+the effective user, without the existing “confirmed quote” filter, and is
+gated by the `timesheet` feature flag. The existing owner/view-as and audit
+rules continue to apply.
+
+### 2. Per-user service catalog
+
+`ServiceCatalogItem` now has a required `userId` owner; migration
+`20260904150000_add_service_catalog_owner` has already been applied. The new
+`/services` page and `GET/POST /api/services` plus
+`GET/PATCH/DELETE /api/services/[id]` provide per-user CRUD. The Timesheet
+product form uses the catalog as a fill-in shortcut, while retaining the
+captured product name, quantity, and unit price as immutable invoice snapshots.
+The catalog is user-owned now and can later receive `tenantId` when the SaaS
+Tenant model is introduced.

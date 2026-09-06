@@ -24,7 +24,9 @@ export default async function ClientsPage() {
     throw err;
   }
 
-  if (!(await isFeatureEnabled(scope.ownerUserId, 'clients_crm'))) {
+  if (
+    !((await isFeatureEnabled(scope.ownerUserId, 'clients_crm')) || (await isFeatureEnabled(scope.ownerUserId, 'timesheet')))
+  ) {
     return (
       <div className={styles.page}>
         <p className={styles.featureDisabled}>

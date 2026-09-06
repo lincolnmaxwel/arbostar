@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
-const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm'];
+const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm', 'quotes'];
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   let actorId: string;
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const feature = body.feature as FeatureKey;
   if (!FEATURES.includes(feature)) {
     return NextResponse.json(
-      { error: 'Unknown feature. Valid features: invoices, timesheet, clients_crm.' },
+      { error: 'Unknown feature. Valid features: invoices, timesheet, clients_crm, quotes.' },
       { status: 400 },
     );
   }

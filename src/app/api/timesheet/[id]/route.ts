@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
+import { deleteInvoiceCascade } from '@/lib/cascadeDelete';
 import {
   computeTimesheetTotals,
   productLineAmount,
@@ -22,6 +23,7 @@ const patchSchema = z.object({
   workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   startedAt: z.string().optional(),
   endedAt: z.string().optional(),
+  description: z.string().trim().min(1, 'Description is required.').optional(),
   products: z.array(productSchema).optional(),
 });
 
@@ -79,6 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         startedAt,
         endedAt,
         durationMinutes: totals.durationMinutes,
+        ...(data.description !== undefined ? { description: data.description } : {}),
       },
     });
 
@@ -139,15 +142,41 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const entry = await prisma.timesheetEntry.findUnique({
     where: { id: params.id, userId: scope.ownerUserId },
+    include: { invoice: { select: { id: true, number: true } } },
   });
   if (!entry) return NextResponse.json({ error: 'Entry not found.' }, { status: 404 });
-  if (entry.status !== 'open') {
+
+  // Open entry (no invoice): plain delete, products cascade.
+  if (entry.status === 'open' && !entry.invoiceId) {
+    await prisma.timesheetEntry.delete({ where: { id: entry.id } });
+    await auditScopedMutation(scope, 'TimesheetEntry', entry.id, 'delete');
+    return NextResponse.json({ ok: true });
+  }
+
+  // Invoiced entry: deleting it would leave its invoice orphaned and the
+  // Restrict on TimesheetEntry.invoice blocks the entry delete — so delete
+  // the whole invoice (and every sibling entry on it) instead, inside one
+  // transaction. An invoiced entry without an invoice (inconsistent legacy
+  // state) stays protected behind a 409.
+  if (!entry.invoiceId) {
     return NextResponse.json({ error: 'Invoiced entries cannot be deleted.' }, { status: 409 });
   }
 
-  await prisma.timesheetEntry.delete({ where: { id: entry.id } });
+  const invoiceNumber = entry.invoice?.number;
+  let entriesDeleted = 0;
+  await prisma.$transaction(async (tx) => {
+    entriesDeleted = await deleteInvoiceCascade(tx, entry.invoiceId!);
+  });
 
   await auditScopedMutation(scope, 'TimesheetEntry', entry.id, 'delete');
+  if (entry.invoiceId) {
+    await auditScopedMutation(scope, 'Invoice', entry.invoiceId, 'delete');
+  }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    invoiceDeleted: true,
+    invoiceNumber: invoiceNumber ?? null,
+    entriesDeleted,
+  });
 }

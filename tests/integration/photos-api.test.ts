@@ -17,7 +17,13 @@ describe('/api/quotes/photos', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.create({
-      data: { name: 'Photo Test', email: `photo-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+      data: {
+        name: 'Photo Test',
+        email: `photo-${randomUUID()}@example.com`,
+        passwordHash: 'x',
+        role: 'staff',
+        featureFlags: { create: { feature: 'quotes', enabled: true } },
+      },
     });
     userId = user.id;
     const client = await prisma.client.create({ data: { userId, name: 'Client', email: `client-${randomUUID()}@example.com` } });
@@ -36,6 +42,7 @@ describe('/api/quotes/photos', () => {
   });
 
   afterAll(async () => {
+    await prisma.userFeatureFlag.deleteMany({ where: { userId } });
     await prisma.quote.delete({ where: { id: quoteId } });
     await prisma.client.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });

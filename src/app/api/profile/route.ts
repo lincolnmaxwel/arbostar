@@ -10,7 +10,7 @@ export async function GET() {
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { name: true, email: true, notificationEmail: true, hourlyRate: true },
+    select: { name: true, email: true, notificationEmail: true, hourlyRate: true, defaultServiceName: true },
   });
 
   return NextResponse.json({ user: { ...user, hourlyRate: Number(user.hourlyRate) } });
@@ -20,6 +20,7 @@ const patchSchema = z.object({
   // Empty string means "clear it, fall back to login email".
   notificationEmail: z.union([z.literal(''), z.string().email()]).optional(),
   hourlyRate: z.number().nonnegative().optional(),
+  defaultServiceName: z.string().trim().min(1, 'Service name is required.').optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -37,8 +38,11 @@ export async function PATCH(req: NextRequest) {
     data: {
       notificationEmail: parsed.data.notificationEmail || null,
       ...(parsed.data.hourlyRate !== undefined ? { hourlyRate: parsed.data.hourlyRate } : {}),
+      ...(parsed.data.defaultServiceName !== undefined
+        ? { defaultServiceName: parsed.data.defaultServiceName }
+        : {}),
     },
-    select: { name: true, email: true, notificationEmail: true, hourlyRate: true },
+    select: { name: true, email: true, notificationEmail: true, hourlyRate: true, defaultServiceName: true },
   });
 
   return NextResponse.json({ user: { ...user, hourlyRate: Number(user.hourlyRate) } });

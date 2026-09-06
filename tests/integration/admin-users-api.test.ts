@@ -39,7 +39,6 @@ describe('/api/admin/users (admin management)', () => {
 
   beforeEach(() => {
     sessionMock.mockReset();
-    createdUserIds = [];
   });
 
   function asAdmin() {
@@ -85,6 +84,7 @@ describe('/api/admin/users (admin management)', () => {
     expect(body.user.features.invoices).toBe(true);
     expect(body.user.features.timesheet).toBe(true);
     expect(body.user.features.clients_crm).toBe(false);
+    expect(body.user.features.quotes).toBe(false);
     createdUserIds.push(body.user.id);
 
     const stored = await prisma.user.findUniqueOrThrow({ where: { id: body.user.id } });

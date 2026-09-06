@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { verifyCredentials, AccountInactiveError, AccountBlockedError } from '@/lib/auth';
 
 describe('verifyCredentials', () => {
-  const email = 'auth-test@example.com';
-  const inactiveEmail = 'auth-inactive@example.com';
-  const blockedEmail = 'auth-blocked@example.com';
+  const email = `auth-test-${randomUUID()}@example.com`;
+  const inactiveEmail = `auth-inactive-${randomUUID()}@example.com`;
+  const blockedEmail = `auth-blocked-${randomUUID()}@example.com`;
 
   beforeAll(async () => {
     const passwordHash = await bcrypt.hash('correct-horse', 10);

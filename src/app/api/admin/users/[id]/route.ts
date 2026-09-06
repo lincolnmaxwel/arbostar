@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { rm } from 'fs/promises';
+import path from 'path';
 import { Role, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
+import { deleteUserCascade } from '@/lib/cascadeDelete';
 
 interface PatchUserBody {
   name?: unknown;
@@ -169,4 +172,54 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     },
     actorId,
   });
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  let actorId: string;
+  try {
+    actorId = await requireAdminSession();
+  } catch (err) {
+    return adminAuthErrorResponse(err);
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: params.id },
+    include: { companyProfile: { select: { logoPath: true } } },
+  });
+  if (!target) {
+    return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+  }
+
+  // Self-delete guard: an admin can never remove their own account here.
+  if (target.id === actorId) {
+    return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 409 });
+  }
+
+  // Last-active-admin guard (same rule as the PATCH status/role demotion):
+  // never leave the deployment without an active admin.
+  if (target.role === 'admin' && target.status === 'active') {
+    const otherActiveAdmins = await prisma.user.count({
+      where: { role: 'admin', status: 'active', id: { not: target.id } },
+    });
+    if (otherActiveAdmins === 0) {
+      return NextResponse.json({ error: 'Cannot delete the last active admin.' }, { status: 409 });
+    }
+  }
+
+  const { quoteIds } = await deleteUserCascade(target.id);
+
+  await auditAdminAction(actorId, 'User', target.id, 'delete');
+
+  // Clean up files the database doesn't track: quote photo directories and
+  // the user's company logo.
+  for (const quoteId of quoteIds) {
+    const dir = path.join(process.cwd(), 'uploads', 'quotes', quoteId);
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+  if (target.companyProfile?.logoPath) {
+    const logoDir = path.join(process.cwd(), 'uploads', 'company');
+    await rm(path.join(logoDir, target.companyProfile.logoPath), { force: true }).catch(() => {});
+  }
+
+  return NextResponse.json({ ok: true });
 }

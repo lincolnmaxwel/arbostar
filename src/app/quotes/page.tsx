@@ -16,6 +16,7 @@ import styles from './quotes.module.css';
 
 export default function QuotesListPage() {
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [quotesEnabled, setQuotesEnabled] = useState<boolean | null>(null);
   const liveDrafts = useLiveQuery(
     () =>
       ownerUserId
@@ -35,7 +36,10 @@ export default function QuotesListPage() {
   useEffect(() => {
     let cancelled = false;
     getViewContext().then((ctx) => {
-      if (!cancelled) setOwnerUserId(ctx?.ownerUserId ?? null);
+      if (!cancelled) {
+        setOwnerUserId(ctx?.ownerUserId ?? null);
+        setQuotesEnabled(ctx?.features.quotes ?? false);
+      }
     });
     return () => {
       cancelled = true;
@@ -58,12 +62,12 @@ export default function QuotesListPage() {
   // device never appears here on its own. Pull the server's list on mount and
   // whenever connectivity returns, so quotes made elsewhere show up here too.
   useEffect(() => {
-    if (!ownerUserId) return;
+    if (!ownerUserId || quotesEnabled !== true) return;
     pullServerQuotes(ownerUserId);
     const onOnline = () => pullServerQuotes(ownerUserId);
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
-  }, [ownerUserId]);
+  }, [ownerUserId, quotesEnabled]);
 
   async function handleDelete(draft: (typeof drafts)[number]) {
     const label = draft.clientName || 'this quote';
@@ -75,6 +79,21 @@ export default function QuotesListPage() {
     if (!draft.serverId) return;
     await cancelPendingDelete(draft.serverId, draft.draftId);
   }
+
+  if (quotesEnabled === false) {
+    return (
+      <div>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Quotes</h1>
+        </div>
+        <p className={styles.featureDisabled}>
+          Quotes is not enabled for your account. Ask an administrator to enable it.
+        </p>
+      </div>
+    );
+  }
+
+  if (quotesEnabled === null) return <p className={styles.loading}>Loading...</p>;
 
   return (
     <div>

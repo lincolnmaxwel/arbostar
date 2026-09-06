@@ -52,6 +52,7 @@ describe('cross-surface per-user isolation (staff sessions + admin view-as)', ()
             { feature: 'invoices', enabled: true },
             { feature: 'timesheet', enabled: true },
             { feature: 'clients_crm', enabled: true },
+            { feature: 'quotes', enabled: true },
           ],
         },
       },
@@ -68,6 +69,7 @@ describe('cross-surface per-user isolation (staff sessions + admin view-as)', ()
             { feature: 'invoices', enabled: false },
             { feature: 'timesheet', enabled: false },
             { feature: 'clients_crm', enabled: false },
+            { feature: 'quotes', enabled: false },
           ],
         },
       },
@@ -134,6 +136,7 @@ describe('cross-surface per-user isolation (staff sessions + admin view-as)', ()
         endedAt: new Date('2026-09-01T17:00:00.000Z'),
         durationMinutes: 240,
         hourlyRate: 60,
+        description: 'Seeded work description',
       },
     });
     entryAId = entryA.id;
@@ -178,9 +181,8 @@ describe('cross-surface per-user isolation (staff sessions + admin view-as)', ()
 
   it('staff session B sees none of A\'s data', async () => {
     asUser(userBId);
-    // B has its own quote, but never A's.
-    const bQuotes = (await (await listQuotes()).json()).quotes;
-    expect(bQuotes).toHaveLength(1);
+    // B has quotes disabled -> 403 on the quotes list.
+    expect((await listQuotes()).status).toBe(403);
     // B has clients_crm disabled -> 403 on the clients list.
     expect((await listClients()).status).toBe(403);
     expect((await listInvoices()).status).toBe(403);
@@ -247,13 +249,10 @@ describe('cross-surface per-user isolation (staff sessions + admin view-as)', ()
     sessionMock.mockResolvedValue({ user: { id: adminId } });
     cookieGetMock.mockReturnValue({ value: userBId }); // B has all features disabled
 
+    expect((await listQuotes()).status).toBe(403);
     expect((await listClients()).status).toBe(403);
     expect((await listInvoices()).status).toBe(403);
     expect((await listTimesheet(new NextRequest('http://localhost/api/timesheet'))).status).toBe(403);
-
-    // Quotes always work even with flags off.
-    const quotes = await (await listQuotes()).json();
-    expect(Array.isArray(quotes.quotes)).toBe(true);
   });
 
   it('the admin can also see A\'s timesheet surface and mutate it with audit', async () => {

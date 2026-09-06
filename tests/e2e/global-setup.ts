@@ -44,7 +44,7 @@ export default async function globalSetup() {
       },
     });
 
-    for (const feature of ['invoices', 'timesheet', 'clients_crm'] as const) {
+    for (const feature of ['invoices', 'timesheet', 'clients_crm', 'quotes'] as const) {
       await prisma.userFeatureFlag.upsert({
         where: { userId_feature: { userId: staffA.id, feature } },
         update: { enabled: true },
@@ -106,6 +106,7 @@ export default async function globalSetup() {
         endedAt: new Date('2026-09-01T17:00:00.000Z'),
         durationMinutes: 240,
         hourlyRate: 75,
+        description: 'E2E seeded work description',
       },
     });
   } finally {

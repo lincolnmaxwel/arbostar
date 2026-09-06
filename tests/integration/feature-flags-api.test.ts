@@ -51,6 +51,7 @@ describe('/api/admin/users/[id]/features', () => {
     expect(body.features.timesheet).toBe(true);
     expect(body.features.invoices).toBe(false);
     expect(body.features.clients_crm).toBe(false);
+    expect(body.features.quotes).toBe(false);
 
     const res2 = await PATCH(
       new Request('http://localhost/api/admin/users/x/features', {
@@ -67,15 +68,62 @@ describe('/api/admin/users/[id]/features', () => {
     expect(rows[0].enabled).toBe(false);
   });
 
-  it('rejects quotes as a flag', async () => {
-    const res = await PATCH(
+  it('toggles quotes on and off like any other feature', async () => {
+    const on = await PATCH(
       new Request('http://localhost/api/admin/users/x/features', {
         method: 'PATCH',
         body: JSON.stringify({ feature: 'quotes', enabled: true }),
       }) as Request,
       { params: { id: targetId } },
     );
-    expect(res.status).toBe(400);
+    expect(on.status).toBe(200);
+    expect((await on.json()).features.quotes).toBe(true);
+
+    const off = await PATCH(
+      new Request('http://localhost/api/admin/users/x/features', {
+        method: 'PATCH',
+        body: JSON.stringify({ feature: 'quotes', enabled: false }),
+      }) as Request,
+      { params: { id: targetId } },
+    );
+    expect(off.status).toBe(200);
+    expect((await off.json()).features.quotes).toBe(false);
+
+    const row = await prisma.userFeatureFlag.findUnique({
+      where: { userId_feature: { userId: targetId, feature: 'quotes' } },
+    });
+    expect(row?.enabled).toBe(false);
+  });
+
+  it('backfills an enabled quotes flag for a user that predates the quotes feature', async () => {
+    const legacy = await prisma.user.create({
+      data: { name: 'Legacy User', email: `legacy-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+    });
+
+    // Same INSERT the 20260905000002_backfill_quotes_feature_flag migration
+    // runs, scoped to this test's user so parallel test files' user cleanup
+    // can't race the FK check: an existing user with no quotes row must end
+    // up with quotes enabled.
+    const backfill = `
+      INSERT INTO "UserFeatureFlag" ("id", "userId", "feature", "enabled")
+      SELECT gen_random_uuid()::text, u."id", 'quotes', true
+      FROM "User" u
+      WHERE u."id" = '${legacy.id}'
+      ON CONFLICT ("userId", "feature") DO NOTHING;
+    `;
+    await prisma.$executeRawUnsafe(backfill);
+
+    const row = await prisma.userFeatureFlag.findUnique({
+      where: { userId_feature: { userId: legacy.id, feature: 'quotes' } },
+    });
+    expect(row?.enabled).toBe(true);
+
+    // Idempotent: re-running must not duplicate the row.
+    await prisma.$executeRawUnsafe(backfill);
+    expect(await prisma.userFeatureFlag.count({ where: { userId: legacy.id, feature: 'quotes' } })).toBe(1);
+
+    await prisma.userFeatureFlag.deleteMany({ where: { userId: legacy.id } });
+    await prisma.user.delete({ where: { id: legacy.id } });
   });
 
   it('rejects unknown features and non-boolean enabled', async () => {

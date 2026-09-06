@@ -36,7 +36,7 @@ describe('per-user isolation on clients and quotes', () => {
         email: `iso-a-${randomUUID()}@example.com`,
         passwordHash: 'x',
         role: 'staff',
-        featureFlags: { create: { feature: 'clients_crm', enabled: true } },
+        featureFlags: { create: [{ feature: 'clients_crm', enabled: true }, { feature: 'quotes', enabled: true }] },
       },
     });
     userAId = ua.id;
@@ -46,7 +46,7 @@ describe('per-user isolation on clients and quotes', () => {
         email: `iso-b-${randomUUID()}@example.com`,
         passwordHash: 'x',
         role: 'staff',
-        featureFlags: { create: { feature: 'clients_crm', enabled: true } },
+        featureFlags: { create: [{ feature: 'clients_crm', enabled: true }, { feature: 'quotes', enabled: true }] },
       },
     });
     userBId = ub.id;

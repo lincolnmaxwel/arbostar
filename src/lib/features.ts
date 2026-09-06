@@ -2,16 +2,12 @@ import { NextResponse } from 'next/server';
 import { FeatureKey } from '@prisma/client';
 import { prisma } from '@/lib/db';
 
-export type FeatureName = 'quotes' | FeatureKey;
-
-const OPTIONAL_FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm'];
+export type FeatureName = FeatureKey;
 
 /**
- * Quotes are always available; optional features read the user's flag row.
- * Missing rows are disabled for newly created users.
+ * Feature flags read the user's flag row; missing rows are disabled.
  */
 export async function isFeatureEnabled(userId: string, feature: FeatureName): Promise<boolean> {
-  if (feature === 'quotes') return true;
   const row = await prisma.userFeatureFlag.findUnique({
     where: { userId_feature: { userId, feature } },
   });
@@ -21,10 +17,10 @@ export async function isFeatureEnabled(userId: string, feature: FeatureName): Pr
 export async function getFeatureFlags(userId: string): Promise<Record<FeatureName, boolean>> {
   const rows = await prisma.userFeatureFlag.findMany({ where: { userId } });
   const flags: Record<FeatureName, boolean> = {
-    quotes: true,
     invoices: false,
     timesheet: false,
     clients_crm: false,
+    quotes: false,
   };
   for (const row of rows) flags[row.feature] = row.enabled;
   return flags;

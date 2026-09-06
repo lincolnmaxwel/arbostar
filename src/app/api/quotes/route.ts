@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { calculateTotals } from '@/lib/quoteMath';
 import { sendQuoteApprovalEmail } from '@/lib/email';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 
 class ItemOwnershipConflictError extends Error {
   constructor(localItemId: string) {
@@ -43,6 +44,10 @@ export async function POST(req: NextRequest) {
     throw err;
   }
   const ownerUserId = scope.ownerUserId;
+
+  if (!(await isFeatureEnabled(ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
+  }
 
   const body = await req.json();
   const parsed = upsertQuoteSchema.safeParse(body);
@@ -196,6 +201,10 @@ export async function GET() {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   const quotes = await prisma.quote.findMany({

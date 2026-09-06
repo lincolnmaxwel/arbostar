@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
+import { deleteClientCascade } from '@/lib/cascadeDelete';
 
 const patchSchema = z.object({
   name: z.string().min(1),
@@ -29,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     throw err;
   }
 
-  if (!(await isFeatureEnabled(scope.ownerUserId, 'clients_crm'))) {
+  if (!((await isFeatureEnabled(scope.ownerUserId, 'clients_crm')) || (await isFeatureEnabled(scope.ownerUserId, 'timesheet')))) {
     return featureDisabledResponse();
   }
 
@@ -75,39 +76,25 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     throw err;
   }
 
-  if (!(await isFeatureEnabled(scope.ownerUserId, 'clients_crm'))) {
+  if (!((await isFeatureEnabled(scope.ownerUserId, 'clients_crm')) || (await isFeatureEnabled(scope.ownerUserId, 'timesheet')))) {
     return featureDisabledResponse();
   }
 
   const client = await prisma.client.findUnique({
     where: { id: params.id, userId: scope.ownerUserId },
-    include: { quotes: { select: { id: true } } },
   });
   if (!client) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const timesheetCount = await prisma.timesheetEntry.count({
-    where: { clientId: client.id },
-  });
-  if (timesheetCount > 0) {
-    return NextResponse.json(
-      { error: 'has-timesheet', message: 'Delete this client\'s timesheet entries first.' },
-      { status: 409 },
-    );
-  }
-
-  try {
-    await prisma.client.delete({ where: { id: params.id } });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
-      return NextResponse.json({ error: 'has-invoice', message: 'Delete this client\'s invoice(s) first.' }, { status: 409 });
-    }
-    throw err;
-  }
+  // Cascade everything attached to the client (timesheet entries, invoices
+  // with their line items, quotes with items/photos/rounds) in one
+  // transaction, then clean up the quote upload directories the database
+  // doesn't know about.
+  const { quoteIds } = await deleteClientCascade(client.id);
 
   await auditScopedMutation(scope, 'Client', client.id, 'delete');
 
-  for (const quote of client.quotes) {
-    const dir = path.join(process.cwd(), 'uploads', 'quotes', quote.id);
+  for (const quoteId of quoteIds) {
+    const dir = path.join(process.cwd(), 'uploads', 'quotes', quoteId);
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 

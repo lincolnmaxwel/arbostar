@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction, UnauthorizedError, ForbiddenError } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
 
-const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm'];
+const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm', 'quotes'];
 const ROLES: Role[] = ['admin', 'staff'];
 const STATUSES: UserStatus[] = ['active', 'inactive', 'blocked'];
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { prisma } from '@/lib/db';
+import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { sendBookingProposalEmail } from '@/lib/email';
 
 const roundSchema = z.object({
@@ -25,6 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
     throw err;
+  }
+
+  if (!(await isFeatureEnabled(scope.ownerUserId, 'quotes'))) {
+    return featureDisabledResponse();
   }
 
   const body = await req.json();

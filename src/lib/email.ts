@@ -14,6 +14,9 @@ export interface SendQuoteApprovalEmailItem {
   title: string;
   description?: string | null;
   price: number;
+  // Timesheet invoice lines only: quantity × unit price breakdown.
+  quantity?: number;
+  unitPrice?: number;
 }
 
 export interface SendQuoteApprovalEmailOptions {
@@ -30,16 +33,26 @@ export interface SendQuoteApprovalEmailOptions {
 
 function buildItemsHtml(items: SendQuoteApprovalEmailItem[]): string {
   return items
-    .map(
-      (item) => `
-        <tr>
+    .map((item) => {
+      const hasQtyColumns = item.quantity !== undefined && item.unitPrice !== undefined;
+      const descriptionTd = `
           <td style="padding:12px;border-bottom:1px solid #d1d5db;">
             <div style="font-weight:600;">${escapeHtml(item.title)}</div>
             ${item.description ? `<div style="color:#6b7280;font-size:13px;margin-top:4px;">${escapeHtml(item.description)}</div>` : ''}
-          </td>
-            <td style="padding:12px;border-bottom:1px solid #d1d5db;text-align:right;white-space:nowrap;">${formatMoney(item.price)}</td>
-        </tr>`,
-    )
+          </td>`;
+      if (hasQtyColumns) {
+        return `
+        <tr>${descriptionTd}
+          <td style="padding:12px;border-bottom:1px solid #d1d5db;text-align:right;white-space:nowrap;">${item.quantity}</td>
+          <td style="padding:12px;border-bottom:1px solid #d1d5db;text-align:right;white-space:nowrap;">${formatMoney(item.unitPrice!)}</td>
+          <td style="padding:12px;border-bottom:1px solid #d1d5db;text-align:right;white-space:nowrap;">${formatMoney(item.price)}</td>
+        </tr>`;
+      }
+      return `
+        <tr>${descriptionTd}
+          <td style="padding:12px;border-bottom:1px solid #d1d5db;text-align:right;white-space:nowrap;">${formatMoney(item.price)}</td>
+        </tr>`;
+    })
     .join('');
 }
 
@@ -282,6 +295,8 @@ export interface SendInvoiceEmailOptions {
   invoiceNumber: number;
   /** Present only for quote-sourced invoices. */
   quoteNumber?: number;
+  /** Timesheet invoices only: first-last workDate of the invoiced entries. */
+  period?: string;
   companyName?: string;
   items: SendQuoteApprovalEmailItem[];
   subtotal: number;
@@ -298,16 +313,20 @@ export interface SendInvoiceEmailOptions {
 export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<void> {
   const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
   const reference = opts.quoteNumber !== undefined ? ` from quote #${opts.quoteNumber}` : '';
+  const hasQtyColumns = opts.items.some((i) => i.quantity !== undefined && i.unitPrice !== undefined);
+  const headerCell = 'text-align:left;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;';
+  const headerCellRight = 'text-align:right;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;';
+  const header = hasQtyColumns
+    ? `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Quantity</th><th style="${headerCellRight}">Unit price</th><th style="${headerCellRight}">Total</th>`
+    : `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Total</th>`;
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>The work is complete! Here is your invoice <strong>#${opts.invoiceNumber}</strong>${reference}.</p>
+      ${opts.period ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Period: ${escapeHtml(opts.period)}</p>` : ''}
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <thead>
-          <tr>
-            <th style="text-align:left;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Description</th>
-            <th style="text-align:right;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Total</th>
-          </tr>
+          <tr>${header}</tr>
         </thead>
         <tbody>${buildItemsHtml(opts.items)}</tbody>
       </table>

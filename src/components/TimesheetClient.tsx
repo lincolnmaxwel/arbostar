@@ -52,11 +52,16 @@ interface NewProductRow {
   unit?: string | null;
 }
 
+interface EditProductRow extends NewProductRow {
+  originalId?: string;
+}
+
 interface EditEntryForm {
   workDate: string;
   startTime: string;
   endTime: string;
   description: string;
+  products: EditProductRow[];
 }
 
 function todayLocal(): string {
@@ -124,6 +129,7 @@ export function TimesheetClient() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditEntryForm | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [editCatalogSelection, setEditCatalogSelection] = useState('');
   const [detailsEntry, setDetailsEntry] = useState<TimesheetEntry | null>(null);
 
   const loadEntries = useCallback(
@@ -283,6 +289,52 @@ export function TimesheetClient() {
     setForm((f) => ({ ...f, products: f.products.filter((p) => p.id !== id) }));
   }
 
+  function handleEditCatalogSelection(itemId: string) {
+    setEditCatalogSelection(itemId);
+    if (!itemId) return;
+    const item = catalog.find((candidate) => candidate.id === itemId);
+    if (!item) return;
+    setEditForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        products: [
+          ...current.products,
+          {
+            id: crypto.randomUUID(),
+            name: item.name,
+            quantity: item.billingType === 'hourly' ? durationHoursOrOne(current.startTime, current.endTime) : '1',
+            unitPrice: String(item.defaultPrice),
+            billingType: item.billingType,
+            unit: item.unit ?? null,
+          },
+        ],
+      };
+    });
+    setEditCatalogSelection('');
+  }
+
+  function addEditProductRow() {
+    setEditForm((current) => current ? {
+      ...current,
+      products: [...current.products, { id: crypto.randomUUID(), name: '', quantity: '1', unitPrice: '' }],
+    } : current);
+  }
+
+  function updateEditProductRow(id: string, patch: Partial<EditProductRow>) {
+    setEditForm((current) => current ? {
+      ...current,
+      products: current.products.map((product) => (product.id === id ? { ...product, ...patch } : product)),
+    } : current);
+  }
+
+  function removeEditProductRow(id: string) {
+    setEditForm((current) => current ? {
+      ...current,
+      products: current.products.filter((product) => product.id !== id),
+    } : current);
+  }
+
   function timeInputValue(isoDate: string): string {
     const date = new Date(isoDate);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -294,17 +346,26 @@ export function TimesheetClient() {
     setError(null);
     setNotice(null);
     setEditingEntryId(entry.id);
+    setEditCatalogSelection('');
     setEditForm({
       workDate: entry.workDate.slice(0, 10),
       startTime: timeInputValue(entry.startedAt),
       endTime: timeInputValue(entry.endedAt),
       description: entry.description ?? '',
+      products: entry.products.map((product) => ({
+        id: product.id,
+        originalId: product.id,
+        name: product.name,
+        quantity: product.quantity,
+        unitPrice: product.unitPrice,
+      })),
     });
   }
 
   function handleCancelEdit() {
     setEditingEntryId(null);
     setEditForm(null);
+    setEditCatalogSelection('');
   }
 
   async function handleEditEntry(e: React.FormEvent) {
@@ -326,6 +387,20 @@ export function TimesheetClient() {
       setError('End time must be after start time.');
       return;
     }
+    for (const product of editForm.products) {
+      if (!product.name.trim()) {
+        setError('Every product needs a name.');
+        return;
+      }
+      if (!(Number(product.quantity) > 0)) {
+        setError('Product quantity must be positive.');
+        return;
+      }
+      if (product.unitPrice === '' || !(Number(product.unitPrice) >= 0)) {
+        setError('Product unit price cannot be negative.');
+        return;
+      }
+    }
     const entry = entries.find((candidate) => candidate.id === editingEntryId);
     if (!entry || entry.status !== 'open') {
       setError('This entry is no longer editable.');
@@ -343,9 +418,9 @@ export function TimesheetClient() {
           startedAt: startedAt.toISOString(),
           endedAt: endedAt.toISOString(),
           description: editForm.description.trim(),
-          products: entry.products.map((product) => ({
-            id: product.id,
-            name: product.name,
+          products: editForm.products.map((product) => ({
+            ...(product.originalId ? { id: product.originalId } : {}),
+            name: product.name.trim(),
             quantity: Number(product.quantity),
             unitPrice: Number(product.unitPrice),
           })),
@@ -947,7 +1022,7 @@ export function TimesheetClient() {
                           <form id={`edit-entry-${e.id}`} className={styles.editEntryForm} onSubmit={handleEditEntry}>
                             <div className={styles.editEntryHeader}>
                               <h3 className={styles.editEntryTitle}>Edit entry</h3>
-                              <p className={styles.editEntryHint}>Update the date, time, or description for this open entry.</p>
+                              <p className={styles.editEntryHint}>Update the date, time, description, or products for this open entry.</p>
                             </div>
                             <div className={styles.editEntryFields}>
                               <div className={styles.field}>
@@ -995,6 +1070,70 @@ export function TimesheetClient() {
                                   required
                                 />
                               </div>
+                            </div>
+                            {editForm.products.length > 0 && (
+                              <div>
+                                <p className={styles.productsLabel}>Products</p>
+                                {editForm.products.map((product) => (
+                                  <div key={product.id} className={styles.productRow}>
+                                    <input
+                                      className={styles.input}
+                                      placeholder="Product name"
+                                      value={product.name}
+                                      onChange={(event) => updateEditProductRow(product.id, { name: event.target.value })}
+                                      aria-label="Product name"
+                                    />
+                                    <input
+                                      className={styles.input}
+                                      type="number"
+                                      step="0.001"
+                                      min="0"
+                                      placeholder={productQuantityLabel(product)}
+                                      value={product.quantity}
+                                      onChange={(event) => updateEditProductRow(product.id, { quantity: event.target.value })}
+                                      aria-label={productQuantityLabel(product)}
+                                    />
+                                    <input
+                                      className={styles.input}
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="Unit price ($)"
+                                      value={product.unitPrice}
+                                      onChange={(event) => updateEditProductRow(product.id, { unitPrice: event.target.value })}
+                                      aria-label="Product unit price"
+                                    />
+                                    <button
+                                      type="button"
+                                      className={styles.removeProductButton}
+                                      onClick={() => removeEditProductRow(product.id)}
+                                      aria-label={`Remove product ${product.name || 'row'}`}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className={styles.productActions}>
+                              <button type="button" className={styles.addProductButton} onClick={addEditProductRow}>
+                                + Add product
+                              </button>
+                              {catalog.length > 0 && (
+                                <select
+                                  className={styles.catalogSelect}
+                                  aria-label="Add from catalog"
+                                  value={editCatalogSelection}
+                                  onChange={(event) => handleEditCatalogSelection(event.target.value)}
+                                >
+                                  <option value="">Add from catalog</option>
+                                  {catalog.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.name} ({formatMoney(Number(item.defaultPrice))})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                             <div className={styles.editEntryActions}>
                               <button type="submit" className={styles.submitButton} disabled={editSaving}>

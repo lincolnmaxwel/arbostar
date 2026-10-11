@@ -94,6 +94,55 @@ function productQuantityLabel(product: NewProductRow): string {
   return unit ? `Qty (${unit})` : 'Qty';
 }
 
+// Small inline SVG icons for the entry row actions — text buttons made the
+// Actions column wide enough to force horizontal scrolling.
+function RowIcon({ name }: { name: 'edit' | 'invoice' | 'details' | 'delete' }) {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+  switch (name) {
+    case 'edit':
+      return (
+        <svg {...common}>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+      );
+    case 'invoice':
+      return (
+        <svg {...common}>
+          <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+          <path d="M14 3v6h6" />
+          <path d="M9 13h6M9 17h6" />
+        </svg>
+      );
+    case 'details':
+      return (
+        <svg {...common}>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'delete':
+      return (
+        <svg {...common}>
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
+      );
+  }
+}
+
 const EMPTY_NEW_CLIENT = { name: '', email: '', phone: '', address: '' };
 
 export function TimesheetClient() {
@@ -1022,35 +1071,45 @@ export function TimesheetClient() {
                           {isOpen && (
                             <button
                               type="button"
-                              className={styles.actionButton}
+                              className={styles.iconButton}
                               onClick={() => handleStartEdit(e)}
                               aria-expanded={editingEntryId === e.id}
                               aria-controls={`edit-entry-${e.id}`}
+                              aria-label={`Edit entry for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
+                              title="Edit"
                             >
-                              Edit
+                              <RowIcon name="edit" />
                             </button>
                           )}
                           {isOpen && (
                             <button
                               type="button"
-                              className={styles.actionButton}
+                              className={styles.iconButton}
                               onClick={() => void generateInvoicesFor([e])}
                               disabled={generating}
                               aria-label={`Generate invoice for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
+                              title="Generate invoice"
                             >
-                              Generate invoice
+                              <RowIcon name="invoice" />
                             </button>
                           )}
                           <button
                             type="button"
-                            className={`${styles.actionButton} ${styles.detailsButton}`}
+                            className={styles.iconButton}
                             onClick={() => setDetailsEntry(e)}
                             aria-label={`View details for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
+                            title="View details"
                           >
-                            View details
+                            <RowIcon name="details" />
                           </button>
-                          <button type="button" className={styles.actionButton} onClick={() => handleDeleteEntry(e)}>
-                            Delete
+                          <button
+                            type="button"
+                            className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+                            onClick={() => handleDeleteEntry(e)}
+                            aria-label={`Delete entry for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
+                            title="Delete"
+                          >
+                            <RowIcon name="delete" />
                           </button>
                         </div>
                       </td>

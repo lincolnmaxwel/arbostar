@@ -750,9 +750,39 @@
   cursor: default;
 }
 
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iconButtonDanger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .rowActions {
   display: flex;
   gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .empty {

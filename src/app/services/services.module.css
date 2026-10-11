@@ -206,6 +206,14 @@
   margin: 0;
 }
 
+.inlineField > label {
+  display: block;
+}
+
+.inlineField > label + label {
+  margin-top: 6px;
+}
+
 .actionsCell {
   display: flex;
   justify-content: flex-end;

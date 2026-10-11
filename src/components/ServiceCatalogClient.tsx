@@ -159,7 +159,8 @@ export function ServiceCatalogClient() {
         name,
         defaultPrice,
         billingType: editForm.billingType,
-        unit: editForm.billingType === 'quantity' ? editForm.unit.trim() || undefined : undefined,
+        // '' (not undefined) so a cleared unit is actually cleared server-side.
+        unit: editForm.billingType === 'quantity' ? editForm.unit.trim() : undefined,
       }),
       });
       const body = await res.json().catch(() => null);
@@ -304,7 +305,40 @@ export function ServiceCatalogClient() {
                           <span className={styles.itemName}>{item.name}</span>
                         )}
                       </td>
-                      <td>{billingLabel(item)}</td>
+                      <td>
+                        {isEditing ? (
+                          <div className={styles.inlineField}>
+                            <label>
+                              <span className={styles.srOnly}>Billed by</span>
+                              <select
+                                className={styles.input}
+                                value={editForm.billingType}
+                                onChange={(e) =>
+                                  setEditForm((current) => ({ ...current, billingType: e.target.value as ServiceForm['billingType'] }))
+                                }
+                                disabled={isBusy}
+                              >
+                                <option value="quantity">Quantity</option>
+                                <option value="hourly">Hour</option>
+                              </select>
+                            </label>
+                            {editForm.billingType === 'quantity' && (
+                              <label>
+                                <span className={styles.srOnly}>Unit</span>
+                                <input
+                                  className={styles.input}
+                                  placeholder="Unit: kg, L, each..."
+                                  value={editForm.unit}
+                                  onChange={(e) => setEditForm((current) => ({ ...current, unit: e.target.value }))}
+                                  disabled={isBusy}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        ) : (
+                          billingLabel(item)
+                        )}
+                      </td>
                       <td>
                         {isEditing ? (
                           <label className={styles.inlineField}>

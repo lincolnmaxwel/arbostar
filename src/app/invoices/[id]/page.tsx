@@ -48,12 +48,16 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           id: l.id,
           title: l.description,
           description: l.notes,
+          quantity: Number(l.quantity),
+          unitPrice: Number(l.unitPrice),
           amount: Number(l.amount),
         }))
       : (invoice.quote?.items.map((item) => ({
           id: item.id,
           title: item.title,
           description: item.description,
+          quantity: undefined as number | undefined,
+          unitPrice: undefined as number | undefined,
           amount: Number(item.price),
         })) ?? []);
 
@@ -109,6 +113,8 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           <thead>
             <tr>
               <th>Description</th>
+              {isTimesheet && <th className={styles.priceCol}>Quantity</th>}
+              {isTimesheet && <th className={styles.priceCol}>Unit Price</th>}
               <th className={styles.priceCol}>Total</th>
             </tr>
           </thead>
@@ -119,6 +125,10 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
                   <div className={styles.itemTitle}>{item.title}</div>
                   {item.description && <div className={styles.itemDescription}>{item.description}</div>}
                 </td>
+                {isTimesheet && <td className={styles.priceCol}>{item.quantity}</td>}
+                {isTimesheet && (
+                  <td className={styles.priceCol}>{item.unitPrice !== undefined ? formatMoney(item.unitPrice) : ''}</td>
+                )}
                 <td className={styles.priceCol}>{formatMoney(item.amount)}</td>
               </tr>
             ))}

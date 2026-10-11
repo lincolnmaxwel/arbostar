@@ -1001,7 +1001,6 @@ export function TimesheetClient() {
                   <th scope="col">Date</th>
                   <th scope="col">Client</th>
                   <th scope="col">Hours</th>
-                  <th scope="col">Rate</th>
                   <th scope="col">Labor</th>
                   <th scope="col">Products</th>
                   <th scope="col">Subtotal</th>
@@ -1044,8 +1043,10 @@ export function TimesheetClient() {
                           </button>
                         )}
                       </td>
-                      <td className={styles.nowrap}>{hours}</td>
-                      <td className={styles.nowrap}>{formatMoney(Number(e.hourlyRate))}/hr</td>
+                      <td className={styles.nowrap}>
+                        <div>{hours}</div>
+                        <div className={styles.rateLine}>{formatMoney(Number(e.hourlyRate))}/hr</div>
+                      </td>
                       <td className={styles.nowrap}>{formatMoney(entryLaborTotal(e))}</td>
                       <td>
                         {e.products.length === 0 ? (
@@ -1116,7 +1117,7 @@ export function TimesheetClient() {
                       </tr>
                       {editingEntryId === e.id && editForm && (
                         <tr key={`${e.id}-edit`}>
-                        <td colSpan={10}>
+                        <td colSpan={9}>
                           <form id={`edit-entry-${e.id}`} className={styles.editEntryForm} onSubmit={handleEditEntry}>
                             <div className={styles.editEntryHeader}>
                               <h3 className={styles.editEntryTitle}>Edit entry</h3>

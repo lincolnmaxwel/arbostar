@@ -83,6 +83,7 @@
 }
 
 .tableCaption {
+  display: none;
   caption-side: top;
   text-align: left;
   color: var(--color-text-secondary);
@@ -419,15 +420,26 @@
 
 .table {
   width: 100%;
-  min-width: 820px;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+/* Desktop fits the card without scrolling; only narrow screens (phones,
+   small tablets) fall back to horizontal scroll inside .tableWrap. */
+@media (max-width: 768px) {
+  .table {
+    min-width: 760px;
+  }
+
+  .tableCaption {
+    display: table-caption;
+  }
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 12px 10px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
@@ -474,13 +486,24 @@
 }
 
 .productList {
+  margin: 0;
+  padding-left: 14px;
   font-size: 12px;
   color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+span.productList {
+  padding-left: 0;
 }
 
 .clientCell {
-  min-width: 260px;
-  max-width: 360px;
+  min-width: 150px;
+}
+
+.rateLine {
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 
 .entryDescription {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { formatMoney } from '@/lib/quoteMath';
 import { formatPhoneInput } from '@/lib/formatPhone';
 import styles from '../app/timesheet/timesheet.module.css';
+import CatalogSearch from './CatalogSearch';
 
 interface TimesheetClientOption {
   id: string;
@@ -122,14 +123,12 @@ export function TimesheetClient() {
   const [newClientForm, setNewClientForm] = useState(EMPTY_NEW_CLIENT);
   const [newClientSaving, setNewClientSaving] = useState(false);
   const [newClientError, setNewClientError] = useState<string | null>(null);
-  const [catalogSelection, setCatalogSelection] = useState('');
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditEntryForm | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [editCatalogSelection, setEditCatalogSelection] = useState('');
   const [detailsEntry, setDetailsEntry] = useState<TimesheetEntry | null>(null);
 
   const loadEntries = useCallback(
@@ -250,7 +249,6 @@ export function TimesheetClient() {
   }
 
   function handleCatalogSelection(itemId: string) {
-    setCatalogSelection(itemId);
     if (!itemId) return;
     const item = catalog.find((candidate) => candidate.id === itemId);
     if (!item) return;
@@ -268,7 +266,6 @@ export function TimesheetClient() {
         },
       ],
     }));
-    setCatalogSelection('');
   }
 
   function addProductRow() {
@@ -290,7 +287,6 @@ export function TimesheetClient() {
   }
 
   function handleEditCatalogSelection(itemId: string) {
-    setEditCatalogSelection(itemId);
     if (!itemId) return;
     const item = catalog.find((candidate) => candidate.id === itemId);
     if (!item) return;
@@ -311,7 +307,6 @@ export function TimesheetClient() {
         ],
       };
     });
-    setEditCatalogSelection('');
   }
 
   function addEditProductRow() {
@@ -346,7 +341,6 @@ export function TimesheetClient() {
     setError(null);
     setNotice(null);
     setEditingEntryId(entry.id);
-    setEditCatalogSelection('');
     setEditForm({
       workDate: entry.workDate.slice(0, 10),
       startTime: timeInputValue(entry.startedAt),
@@ -365,7 +359,6 @@ export function TimesheetClient() {
   function handleCancelEdit() {
     setEditingEntryId(null);
     setEditForm(null);
-    setEditCatalogSelection('');
   }
 
   async function handleEditEntry(e: React.FormEvent) {
@@ -857,19 +850,7 @@ export function TimesheetClient() {
               + Add product
             </button>
             {catalog.length > 0 && (
-              <select
-                className={styles.catalogSelect}
-                aria-label="Add from catalog"
-                value={catalogSelection}
-                onChange={(e) => handleCatalogSelection(e.target.value)}
-              >
-                <option value="">Add from catalog</option>
-                {catalog.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({formatMoney(Number(item.defaultPrice))})
-                  </option>
-                ))}
-              </select>
+              <CatalogSearch items={catalog} onSelect={handleCatalogSelection} formatPrice={formatMoney} />
             )}
           </div>
 
@@ -1119,19 +1100,7 @@ export function TimesheetClient() {
                                 + Add product
                               </button>
                               {catalog.length > 0 && (
-                                <select
-                                  className={styles.catalogSelect}
-                                  aria-label="Add from catalog"
-                                  value={editCatalogSelection}
-                                  onChange={(event) => handleEditCatalogSelection(event.target.value)}
-                                >
-                                  <option value="">Add from catalog</option>
-                                  {catalog.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                      {item.name} ({formatMoney(Number(item.defaultPrice))})
-                                    </option>
-                                  ))}
-                                </select>
+                                <CatalogSearch items={catalog} onSelect={handleEditCatalogSelection} formatPrice={formatMoney} />
                               )}
                             </div>
                             <div className={styles.editEntryActions}>

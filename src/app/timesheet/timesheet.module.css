@@ -252,6 +252,53 @@
   cursor: pointer;
 }
 
+.catalogSearch {
+  position: relative;
+}
+
+.catalogDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 100%;
+  width: max-content;
+  max-width: 360px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+.catalogOption {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.catalogOption:hover,
+.catalogOptionActive {
+  background: var(--color-bg);
+}
+
+.catalogEmpty {
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
 .catalogSelect:focus {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;
@@ -269,7 +316,8 @@
   }
 
   .addClientButton,
-  .catalogSelect {
+  .catalogSelect,
+  .catalogSearch {
     width: 100%;
   }
 

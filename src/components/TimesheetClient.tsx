@@ -1249,9 +1249,8 @@ export function TimesheetClient() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="timesheet-entry-details-title"
-          onClick={() => setDetailsEntry(null)}
         >
-          <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
+          <div className={styles.modal}>
             <div className={styles.modalHeader}>
               <h2 id="timesheet-entry-details-title" className={styles.modalTitle}>Timesheet entry details</h2>
               <button type="button" className={styles.modalClose} onClick={() => setDetailsEntry(null)} aria-label="Close details">

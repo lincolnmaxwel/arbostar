@@ -93,7 +93,6 @@ export function PortalItemsTable({ items }: { items: PortalItem[] }) {
           role="dialog"
           aria-modal="true"
           aria-label="Photo viewer"
-          onClick={closeGallery}
         >
           <button type="button" className={styles.lightboxClose} onClick={closeGallery} aria-label="Close">
             &times;

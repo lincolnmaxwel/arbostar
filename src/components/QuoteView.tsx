@@ -378,7 +378,6 @@ export function QuoteView({ draftId }: { draftId: string }) {
           role="dialog"
           aria-modal="true"
           aria-label="Photo viewer"
-          onClick={closeGallery}
         >
           <button type="button" className={styles.lightboxClose} onClick={closeGallery} aria-label="Close">
             &times;

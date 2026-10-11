@@ -62,9 +62,8 @@ export function EditClientButton({ client, className }: { client: Client; classN
           role="dialog"
           aria-modal="true"
           aria-label={`Edit ${client.name}`}
-          onClick={() => !saving && setOpen(false)}
         >
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.modal}>
             <h2 className={styles.title}>Edit client</h2>
 
             {error && <div className={styles.error}>{error}</div>}

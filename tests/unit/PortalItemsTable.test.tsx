@@ -52,4 +52,18 @@ describe('PortalItemsTable', () => {
     expect(screen.getByText('Stump grinding')).toBeInTheDocument();
     expect(screen.queryByLabelText(/view photo/i)).not.toBeInTheDocument();
   });
+
+  it('does not close the lightbox when the backdrop is clicked', () => {
+    render(
+      <PortalItemsTable
+        items={[{ id: 'i1', title: 'Hedges', description: '', price: 100, photos: [{ id: 'p1', filePath: '/uploads/quotes/q1/p1.jpg' }] }]}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('View photo for Hedges'));
+    fireEvent.click(screen.getByTestId('photo-lightbox'));
+    expect(screen.getByTestId('photo-lightbox')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(screen.queryByTestId('photo-lightbox')).not.toBeInTheDocument();
+  });
 });

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '@/lib/localDb';
+import { enqueueSync } from '@/lib/outbox';
+import { runSyncCycle, isReallyOnline } from '@/lib/syncWorker';
 import { getViewContext } from '@/lib/clientUserContext';
 import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
@@ -64,6 +66,8 @@ export function QuoteView({ draftId }: { draftId: string }) {
   const [copied, setCopied] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
 
   const serverId = draft?.serverId;
 
@@ -148,6 +152,45 @@ export function QuoteView({ draftId }: { draftId: string }) {
       return;
     }
     setApproval((a) => (a ? { ...a, status: 'completed' } : a));
+  }
+
+  // Same path as "Save and Send" in the builder: flag the draft pendingSend,
+  // queue it, and let the sync worker POST it with send:true (which flips the
+  // status to "sent" and emails the client). updatedAt is bumped so the
+  // server's optimistic-concurrency check doesn't 409 against its own
+  // earlier write.
+  async function handleSend() {
+    if (!draft || !ownerUserId) return;
+    const message = draft.clientEmail
+      ? `Send this estimate to ${draft.clientEmail}?`
+      : 'This client has no email on file. The estimate will be marked as sent but nothing will be emailed — share the client link manually. Continue?';
+    if (!window.confirm(message)) return;
+
+    setSending(true);
+    setSendMessage(null);
+    try {
+      const online = await isReallyOnline();
+      await localDb.drafts.update(draftId, {
+        pendingSend: true,
+        status: online ? 'syncing' : 'local',
+        updatedAt: Date.now(),
+      });
+      await enqueueSync(draftId, ownerUserId);
+      if (!online) {
+        setSendMessage('Queued — the estimate will be sent as soon as you are back online.');
+        return;
+      }
+      await runSyncCycle(ownerUserId);
+      const after = await localDb.drafts.get(draftId);
+      if (after?.status === 'synced' && after.pendingSend !== true) {
+        setApproval((a) => (a ? { ...a, status: 'sent' } : a));
+        setSendMessage('Estimate sent.');
+      } else {
+        setSendMessage('Could not send yet — it will retry automatically.');
+      }
+    } finally {
+      setSending(false);
+    }
   }
 
   function copyClientLink() {
@@ -256,9 +299,15 @@ export function QuoteView({ draftId }: { draftId: string }) {
           <p className={styles.meta}>Last updated {new Date(draft.updatedAt).toLocaleString()}</p>
         </div>
         <div className={styles.topBarActions}>
+          {sendMessage && <span className={styles.sendMessage} role="status">{sendMessage}</span>}
           {approval && (
             <button type="button" className={styles.copyLinkButton} onClick={copyClientLink}>
               {copied ? 'Link copied!' : 'Copy client link'}
+            </button>
+          )}
+          {(!approval || approval.status === 'draft') && (
+            <button type="button" className={styles.sendButton} onClick={handleSend} disabled={sending || draft.status === 'syncing'}>
+              {sending ? 'Sending...' : 'Send'}
             </button>
           )}
           {/* Once a quote is sent, the client may already be looking at (or have

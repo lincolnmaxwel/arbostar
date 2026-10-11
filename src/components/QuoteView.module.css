@@ -57,6 +57,7 @@
 }
 
 .topBarActions {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -72,6 +73,32 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.sendButton {
+  background: var(--color-accent);
+  color: #111827;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.sendButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.sendMessage {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
 }
 
 .copyLinkButton:hover {

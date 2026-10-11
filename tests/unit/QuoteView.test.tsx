@@ -212,6 +212,61 @@ describe('QuoteView', () => {
     expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
   });
 
+  it('Send on a saved draft flags pendingSend, queues it, and says so when offline', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const base = mockFetchRoutes({
+      '/api/quotes/server-quote-6': { ok: true, json: async () => ({ quote: { status: 'draft', publicToken: 'tok-6' } }) },
+    });
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/health') throw new Error('offline');
+      return (base as any)(url, init);
+    }) as unknown as typeof fetch;
+
+    await localDb.outbox.clear();
+    await localDb.drafts.put({
+      draftId: 'view-6',
+      ownerUserId: OWNER,
+      serverId: 'server-quote-6',
+      clientName: 'Send Client',
+      clientEmail: 'send@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [{ id: 'i1', title: 'Hedges', price: 100, photoIds: [] }],
+    });
+
+    render(<QuoteView draftId="view-6" />);
+    await waitFor(() => expect(screen.getByTestId('approval-badge')).toHaveTextContent('Draft'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => expect(screen.getByText(/Queued/)).toBeInTheDocument());
+    const saved = await localDb.drafts.get('view-6');
+    expect(saved?.pendingSend).toBe(true);
+    expect(await localDb.outbox.where('draftId').equals('view-6').count()).toBe(1);
+  });
+
+  it('does not show Send once the quote has been sent', async () => {
+    global.fetch = mockFetchRoutes({
+      '/api/quotes/server-quote-7': { ok: true, json: async () => ({ quote: { status: 'sent', publicToken: 'tok-7' } }) },
+    });
+    await localDb.drafts.put({
+      draftId: 'view-7',
+      ownerUserId: OWNER,
+      serverId: 'server-quote-7',
+      clientName: 'Sent Client',
+      clientEmail: 'sent@example.com',
+      taxRate: 0.05,
+      status: 'synced',
+      updatedAt: Date.now(),
+      items: [],
+    });
+
+    render(<QuoteView draftId="view-7" />);
+    await waitFor(() => expect(screen.getByTestId('approval-badge')).toHaveTextContent('Pending client approval'));
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+  });
+
   it('keeps the Edit link for a quote that has never synced (no serverId yet)', async () => {
     await localDb.drafts.put({
       draftId: 'view-6',

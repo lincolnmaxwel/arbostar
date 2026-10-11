@@ -12,7 +12,7 @@ interface ServerQuoteItem {
 interface ServerQuote {
   id: string;
   draftId: string;
-  client: { name: string; email: string; phone?: string | null; address?: string | null };
+  client: { name: string; email?: string | null; phone?: string | null; address?: string | null };
   serviceAddress?: string | null;
   status: ApprovalStatus;
   bookingStatus: BookingStatus;
@@ -105,7 +105,7 @@ export async function pullServerQuotes(ownerUserId: string): Promise<void> {
       serverId: q.id,
       ownerUserId,
       clientName: q.client.name,
-      clientEmail: q.client.email,
+      clientEmail: q.client.email ?? '',
       clientPhone: q.client.phone ?? undefined,
       clientAddress: q.client.address ?? undefined,
       serviceAddress: q.serviceAddress ?? undefined,

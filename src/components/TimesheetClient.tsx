@@ -9,7 +9,7 @@ import styles from '../app/timesheet/timesheet.module.css';
 interface TimesheetClientOption {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
 }
 
 interface ServiceCatalogItem {
@@ -202,8 +202,8 @@ export function TimesheetClient() {
 
   async function handleCreateClient() {
     setNewClientError(null);
-    if (!newClientForm.name.trim() || !newClientForm.email.trim()) {
-      setNewClientError('Name and email are required.');
+    if (!newClientForm.name.trim()) {
+      setNewClientError('Name is required.');
       return;
     }
 
@@ -759,14 +759,13 @@ export function TimesheetClient() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="new-ts-client-email">Email</label>
+                  <label htmlFor="new-ts-client-email">Email (optional)</label>
                   <input
                     id="new-ts-client-email"
                     type="email"
                     className={styles.input}
                     value={newClientForm.email}
                     onChange={(e) => setNewClientForm((current) => ({ ...current, email: e.target.value }))}
-                    required
                   />
                 </div>
                 <div className={styles.field}>

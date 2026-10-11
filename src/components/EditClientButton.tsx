@@ -8,7 +8,7 @@ import styles from './EditClientButton.module.css';
 interface Client {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
 }
@@ -17,7 +17,7 @@ export function EditClientButton({ client, className }: { client: Client; classN
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(client.name);
-  const [email, setEmail] = useState(client.email);
+  const [email, setEmail] = useState(client.email ?? '');
   const [phone, setPhone] = useState(client.phone ?? '');
   const [address, setAddress] = useState(client.address ?? '');
   const [saving, setSaving] = useState(false);
@@ -25,7 +25,7 @@ export function EditClientButton({ client, className }: { client: Client; classN
 
   function openModal() {
     setName(client.name);
-    setEmail(client.email);
+    setEmail(client.email ?? '');
     setPhone(client.phone ?? '');
     setAddress(client.address ?? '');
     setError(null);
@@ -38,7 +38,7 @@ export function EditClientButton({ client, className }: { client: Client; classN
     const res = await fetch(`/api/clients/${client.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone: phone || undefined, address: address || undefined }),
+      body: JSON.stringify({ name, email: email.trim(), phone: phone.trim(), address: address.trim() }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -75,7 +75,7 @@ export function EditClientButton({ client, className }: { client: Client; classN
             </div>
 
             <div className={styles.field}>
-              <label htmlFor="editClientEmail">Email</label>
+              <label htmlFor="editClientEmail">Email (optional)</label>
               <input id="editClientEmail" className={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
@@ -102,7 +102,7 @@ export function EditClientButton({ client, className }: { client: Client; classN
                 type="button"
                 className={styles.saveButton}
                 onClick={handleSave}
-                disabled={saving || !name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)}
+                disabled={saving || !name.trim() || (email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))}
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>

@@ -34,6 +34,35 @@ describe('/api/quotes', () => {
     await prisma.user.delete({ where: { id: userId } });
   });
 
+  it('accepts a client with no email or phone, reuses the same client on resync, and sends no email', async () => {
+    const draftId = randomUUID();
+    const body = (name: string) =>
+      JSON.stringify({
+        draftId,
+        clientName: name,
+        clientEmail: '',
+        taxRate: 0.05,
+        items: [{ localItemId: randomUUID(), title: 'Hedges', price: 500 }],
+        send: true,
+      });
+    vi.mocked(sendQuoteApprovalEmail).mockClear();
+
+    const first = await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: body('No Email Nelson') }) as any);
+    expect(first.status).toBe(201);
+    const firstQuote = (await first.json()).quote;
+
+    const second = await POST(new Request('http://localhost/api/quotes', { method: 'POST', body: body('No Email Nelson Jr') }) as any);
+    expect(second.status).toBe(200);
+    const secondQuote = (await second.json()).quote;
+
+    expect(secondQuote.clientId).toBe(firstQuote.clientId);
+    const client = await prisma.client.findUniqueOrThrow({ where: { id: firstQuote.clientId } });
+    expect(client.email).toBeNull();
+    expect(client.phone).toBeNull();
+    expect(client.name).toBe('No Email Nelson Jr');
+    expect(sendQuoteApprovalEmail).not.toHaveBeenCalled();
+  });
+
   it('blocks POST and GET with 403 when the quotes feature is disabled', async () => {
     const disabled = await prisma.user.create({
       data: {

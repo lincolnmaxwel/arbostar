@@ -292,7 +292,8 @@ export async function POST(req: NextRequest) {
       console.error('[timesheet/invoice] buildInvoicePdf failed', err);
     }
 
-    await sendInvoiceEmail({
+    // No email on file → skip sending; the invoice is still created.
+    if (client.email) await sendInvoiceEmail({
       to: client.email,
       clientName: client.name,
       invoiceNumber: invoice.number,

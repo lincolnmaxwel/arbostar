@@ -19,7 +19,7 @@ import styles from './QuoteBuilderForm.module.css';
 interface ExistingClient {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
 }
@@ -199,7 +199,8 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
 
   const totals = calculateTotals(formState.items, formState.taxRate);
   const hasClientName = formState.clientName.trim().length > 0;
-  const hasValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.clientEmail);
+  // Email is optional; if one is typed it must still look valid.
+  const hasValidEmail = formState.clientEmail.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.clientEmail.trim());
   const hasItems = formState.items.length > 0;
   const canSend = hasClientName && hasValidEmail && hasItems;
 
@@ -218,7 +219,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
     const next: DraftQuote = {
       ...formState!,
       clientName: client.name,
-      clientEmail: client.email,
+      clientEmail: client.email ?? '',
       clientPhone: client.phone ?? undefined,
       clientAddress: client.address ?? undefined,
       // Service address stays a separate, editable field (the job site can
@@ -237,7 +238,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const clientMatches =
     clientSearch.trim().length === 0
       ? []
-      : clients.filter((c) => `${c.name} ${c.email}`.toLowerCase().includes(clientSearch.trim().toLowerCase())).slice(0, 8);
+      : clients.filter((c) => `${c.name} ${c.email ?? ''}`.toLowerCase().includes(clientSearch.trim().toLowerCase())).slice(0, 8);
 
   function addItem() {
     const item: DraftQuoteItem = { id: crypto.randomUUID(), title: '', price: 0, photoIds: [] };
@@ -359,7 +360,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
                   <li key={c.id}>
                     <button type="button" className={styles.clientOption} onMouseDown={() => selectClient(c)}>
                       <span className={styles.clientOptionName}>{c.name}</span>
-                      <span className={styles.clientOptionEmail}>{c.email}</span>
+                      {c.email && <span className={styles.clientOptionEmail}>{c.email}</span>}
                     </button>
                   </li>
                 ))}
@@ -556,7 +557,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
         {!canSend && (
           <p className={styles.sendHint}>
             {!hasClientName && 'Client name is required. '}
-            {!hasValidEmail && 'A valid client email is required. '}
+            {!hasValidEmail && 'Client email is not a valid address. '}
             {!hasItems && 'Add at least one service.'}
           </p>
         )}

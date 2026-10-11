@@ -23,7 +23,8 @@ const quoteItemSchema = z.object({
 const upsertQuoteSchema = z.object({
   draftId: z.string().uuid(),
   clientName: z.string().min(1),
-  clientEmail: z.string().email(),
+  // Optional: some clients have no email. Blank is treated as "none".
+  clientEmail: z.string().trim().email().optional().or(z.literal('')),
   clientPhone: z.string().optional(),
   clientAddress: z.string().optional(),
   serviceAddress: z.string().optional(),
@@ -71,11 +72,27 @@ export async function POST(req: NextRequest) {
   // Per-user client identity: the same email may exist once per owner. The
   // server derives the owner from the authenticated scope — never trust a
   // client-supplied owner.
-  const client = await prisma.client.upsert({
-    where: { userId_email: { userId: ownerUserId, email: data.clientEmail } },
-    update: { name: data.clientName, phone: data.clientPhone, address: data.clientAddress },
-    create: { name: data.clientName, email: data.clientEmail, phone: data.clientPhone, address: data.clientAddress, userId: ownerUserId },
-  });
+  const clientEmail = data.clientEmail || null;
+  let client;
+  if (clientEmail) {
+    client = await prisma.client.upsert({
+      where: { userId_email: { userId: ownerUserId, email: clientEmail } },
+      update: { name: data.clientName, phone: data.clientPhone, address: data.clientAddress },
+      create: { name: data.clientName, email: clientEmail, phone: data.clientPhone, address: data.clientAddress, userId: ownerUserId },
+    });
+  } else if (existing) {
+    // No email to key on: keep editing the quote's current client in place
+    // (clearing its email if it had one) so every resync of the same draft
+    // doesn't mint a fresh Client row.
+    client = await prisma.client.update({
+      where: { id: existing.clientId },
+      data: { name: data.clientName, email: null, phone: data.clientPhone, address: data.clientAddress },
+    });
+  } else {
+    client = await prisma.client.create({
+      data: { name: data.clientName, email: null, phone: data.clientPhone, address: data.clientAddress, userId: ownerUserId },
+    });
+  }
 
   let quoteId: string;
   try {
@@ -172,7 +189,9 @@ export async function POST(req: NextRequest) {
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   });
 
-  if (data.send) {
+  // No email on file: the quote still moves to "sent" but nothing is mailed;
+  // staff share the portal link manually.
+  if (data.send && client.email) {
     const portalUrl = `${process.env.NEXTAUTH_URL}/portal/${quote.publicToken}`;
     await sendQuoteApprovalEmail({
       to: client.email,

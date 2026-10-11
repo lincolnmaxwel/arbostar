@@ -8,7 +8,7 @@ import { prisma } from '@/lib/db';
 
 const createClientSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
+  email: z.string().trim().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
 });
@@ -61,9 +61,9 @@ export async function POST(req: NextRequest) {
       data: {
         userId: scope.ownerUserId,
         name: parsed.data.name,
-        email: parsed.data.email,
-        phone: parsed.data.phone,
-        address: parsed.data.address,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        address: parsed.data.address || null,
       },
     });
 

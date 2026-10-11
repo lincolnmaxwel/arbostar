@@ -8,7 +8,7 @@ import styles from '@/app/clients/clients.module.css';
 interface ClientRow {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   quoteCount: number;
@@ -63,7 +63,7 @@ export function ClientListClient({ clients }: { clients: ClientRow[] }) {
             {filtered.map((c) => (
               <tr key={c.id}>
                 <td className={styles.clientName}>{c.name}</td>
-                <td>{c.email}</td>
+                <td>{c.email ?? '—'}</td>
                 <td>{c.phone || '—'}</td>
                 <td>{c.address || '—'}</td>
                 <td>{c.quoteCount}</td>

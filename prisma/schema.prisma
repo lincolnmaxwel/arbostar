@@ -104,7 +104,7 @@ model User {
 model Client {
   id               String            @id @default(uuid())
   name             String
-  email            String
+  email            String?
   phone            String?
   address          String?
   // Owner of this client record; the same email may exist per user.

@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       invoice.source === 'timesheet'
         ? invoice.lineItems.map((l) => ({ title: l.description, price: Number(l.amount) }))
         : invoice.quote?.items.map((item) => ({ title: item.title, price: Number(item.price) })) ?? [];
-    await sendPaymentReceivedEmail({
+    if (invoice.client.email) await sendPaymentReceivedEmail({
       to: invoice.client.email,
       clientName: invoice.client.name,
       invoiceNumber: invoice.number,

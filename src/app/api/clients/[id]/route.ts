@@ -10,7 +10,7 @@ import { deleteClientCascade } from '@/lib/cascadeDelete';
 
 const patchSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
+  email: z.string().trim().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
 });
@@ -46,7 +46,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   try {
-    const client = await prisma.client.update({ where: { id: params.id }, data: parsed.data });
+    const client = await prisma.client.update({ where: { id: params.id }, data: {
+        name: parsed.data.name,
+        // Blank clears the field — email, phone and address are all optional.
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        address: parsed.data.address || null,
+      },
+    });
     await auditScopedMutation(scope, 'Client', client.id, 'update');
     return NextResponse.json({ client });
   } catch (err) {

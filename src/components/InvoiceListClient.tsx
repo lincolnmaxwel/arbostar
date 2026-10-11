@@ -15,7 +15,7 @@ interface InvoiceRow {
   source: 'quote' | 'timesheet';
   quoteNumber: number | null;
   clientName: string;
-  clientEmail: string;
+  clientEmail: string | null;
   sentAt: string | null;
   total: number;
   paymentStatus: InvoicePaymentStatus;
@@ -89,7 +89,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceRow[] }) {
                 </td>
                 <td>
                   <div>{inv.clientName}</div>
-                  <div className={styles.clientEmail}>{inv.clientEmail}</div>
+                  {inv.clientEmail && <div className={styles.clientEmail}>{inv.clientEmail}</div>}
                 </td>
                 <td>{inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : '—'}</td>
                 <td>

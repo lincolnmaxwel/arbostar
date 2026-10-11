@@ -359,13 +359,12 @@ describe('timesheet API', () => {
     expect(lines[1].notes).toBeNull();
     expect(Number(lines[1].amount)).toBe(40);
 
-    // The emailed items carry only the aggregated line title — the per-entry
-    // notes stay in the DB (InvoiceLineItem.notes) but are never shown to
-    // the client.
+    // The emailed items carry the aggregated line title plus the per-entry
+    // notes, so the client sees what was done under each service name.
     const call = vi.mocked(sendInvoiceEmail).mock.calls.at(-1)![0];
     const laborItems = call.items.filter((i: { title: string }) => i.title.startsWith('Labor'));
     expect(laborItems).toHaveLength(1);
-    expect(laborItems[0].description).toBeUndefined();
+    expect(laborItems[0].description).toBe(lines[0].notes);
   });
 
   it('rejects mixed-client selection', async () => {

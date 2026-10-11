@@ -92,7 +92,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       console.error('[quotes/complete] buildInvoicePdf failed', err);
     }
 
-    await sendInvoiceEmail({
+    // A client with no email on file just doesn't get the message — the
+    // invoice itself is still created and downloadable.
+    if (quote.client.email) await sendInvoiceEmail({
       to: quote.client.email,
       clientName: quote.client.name,
       invoiceNumber: invoice.number,

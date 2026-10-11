@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const portalUrl = `${process.env.NEXTAUTH_URL}/portal/${quote.publicToken}`;
   try {
-    await sendBookingProposalEmail({
+    if (quote.client.email) await sendBookingProposalEmail({
       to: quote.client.email,
       clientName: quote.client.name,
       portalUrl,

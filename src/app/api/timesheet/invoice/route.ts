@@ -267,6 +267,7 @@ export async function POST(req: NextRequest) {
     const period = formatDateRange(selected[0].workDate, selected[selected.length - 1].workDate);
     const items = lines.map((line) => ({
         title: line.description,
+        description: line.notes,
         quantity: Number(line.quantity),
         unitPrice: Number(line.unitPrice),
         price: Number(line.amount),

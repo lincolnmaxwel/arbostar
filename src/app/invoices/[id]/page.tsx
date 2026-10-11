@@ -47,7 +47,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
       ? invoice.lineItems.map((l) => ({
           id: l.id,
           title: l.description,
-          description: null,
+          description: l.notes,
           amount: Number(l.amount),
         }))
       : (invoice.quote?.items.map((item) => ({

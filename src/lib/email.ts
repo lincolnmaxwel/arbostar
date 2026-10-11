@@ -38,7 +38,7 @@ function buildItemsHtml(items: SendQuoteApprovalEmailItem[]): string {
       const descriptionTd = `
           <td style="padding:12px;border-bottom:1px solid #d1d5db;">
             <div style="font-weight:600;">${escapeHtml(item.title)}</div>
-            ${item.description ? `<div style="color:#6b7280;font-size:13px;margin-top:4px;">${escapeHtml(item.description)}</div>` : ''}
+            ${item.description ? `<div style="color:#6b7280;font-size:13px;margin-top:4px;white-space:pre-line;">${escapeHtml(item.description)}</div>` : ''}
           </td>`;
       if (hasQtyColumns) {
         return `
@@ -123,7 +123,7 @@ function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): 
         <tr>
           <td style="padding:12px;border:1px solid #d1d5db;border-radius:6px;text-align:center;font-weight:600;color:#2c5f2d;">
             ${escapeHtml(formatOptionDate(o.date))}
-            <div style="font-weight:400;color:#6b7280;font-size:13px;margin-top:4px;">${escapeHtml(WINDOW_LABEL[o.window])}</div>
+            <div style="font-weight:400;color:#6b7280;font-size:13px;margin-top:4px;white-space:pre-line;">${escapeHtml(WINDOW_LABEL[o.window])}</div>
           </td>
         </tr>`,
     )

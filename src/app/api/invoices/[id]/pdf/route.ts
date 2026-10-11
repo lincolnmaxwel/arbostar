@@ -53,6 +53,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     invoice.source === 'timesheet'
       ? invoice.lineItems.map((l) => ({
           title: l.description,
+          description: l.notes,
           quantity: Number(l.quantity),
           unitPrice: Number(l.unitPrice),
           price: Number(l.amount),

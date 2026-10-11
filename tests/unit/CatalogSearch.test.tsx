@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import CatalogSearch from '@/components/CatalogSearch';
 
 const items = [
@@ -8,6 +9,9 @@ const items = [
   { id: 'c', name: 'Tree trimming', defaultPrice: 300 },
 ];
 const fmt = (n: number) => `$${n}`;
+
+import { afterEach } from 'vitest';
+afterEach(cleanup);
 
 describe('CatalogSearch', () => {
   it('filters the catalog by name as the user types', () => {

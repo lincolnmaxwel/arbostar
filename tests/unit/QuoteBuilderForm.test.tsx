@@ -67,6 +67,41 @@ describe('QuoteBuilderForm', () => {
     );
   });
 
+  it('adds a line item from the service catalog with its name and default price', async () => {
+    global.fetch = vi.fn(async (url: string) => {
+      if (url === '/api/view-context') return viewContextResponse(OWNER) as Response;
+      if (url === '/api/services') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [
+              { id: 's1', name: 'Stump grinding', defaultPrice: '120.00', billingType: 'quantity', unit: 'each' },
+              { id: 's2', name: 'Tree removal', defaultPrice: '800.00', billingType: 'quantity', unit: null },
+            ],
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({}) } as Response;
+    }) as any;
+
+    const draftId = 'test-draft-catalog';
+    render(<QuoteBuilderForm draftId={draftId} />);
+    const search = await screen.findByLabelText('Add from catalog');
+    fireEvent.change(search, { target: { value: 'stump' } });
+    fireEvent.mouseDown(screen.getByRole('button', { name: /Stump grinding/ }));
+
+    await waitFor(
+      async () => {
+        const saved = await localDb.drafts.get(draftId);
+        expect(saved?.items).toHaveLength(1);
+        expect(saved?.items[0].title).toBe('Stump grinding');
+        expect(saved?.items[0].price).toBe(120);
+      },
+      { timeout: 2000 },
+    );
+  });
+
   it('shows the Local badge for a freshly created draft', async () => {
     render(<QuoteBuilderForm draftId="test-draft-2" />);
     await waitFor(() => expect(screen.getByTestId('sync-badge')).toHaveTextContent('Local'));

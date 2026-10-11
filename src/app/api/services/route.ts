@@ -24,7 +24,11 @@ export async function GET() {
     throw err;
   }
 
-  if (!(await isFeatureEnabled(scope.ownerUserId, 'timesheet'))) {
+  // Read access is shared with the quote builder, which fills line items from
+  // the catalog; writes stay timesheet-gated.
+  if (
+    !((await isFeatureEnabled(scope.ownerUserId, 'timesheet')) || (await isFeatureEnabled(scope.ownerUserId, 'quotes')))
+  ) {
     return featureDisabledResponse();
   }
 

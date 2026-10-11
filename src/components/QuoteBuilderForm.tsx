@@ -10,6 +10,7 @@ import { runSyncCycle, isReallyOnline } from '@/lib/syncWorker';
 import { debounce } from '@/lib/debounce';
 import { calculateTotals, formatMoney } from '@/lib/quoteMath';
 import { SyncStatusBadge } from '@/components/SyncStatusBadge';
+import CatalogSearch, { CatalogSearchItem } from '@/components/CatalogSearch';
 import { compressImage } from '@/lib/compressImage';
 import { addPhotoToItem, uploadPendingPhotos } from '@/lib/photoSync';
 import { formatPhoneInput } from '@/lib/formatPhone';
@@ -58,6 +59,9 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
   const [syncingNow, setSyncingNow] = useState(false);
   const [focusedPriceId, setFocusedPriceId] = useState<string | null>(null);
   const [clients, setClients] = useState<ExistingClient[]>([]);
+  // Service catalog (Services page) — lets a line item be filled from a saved
+  // service instead of retyped. Cached locally so it still works offline.
+  const [catalog, setCatalog] = useState<(CatalogSearchItem & { unit?: string | null })[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   // Set once an existing client is picked from the autocomplete below — locks
@@ -98,6 +102,28 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => {
         if (body?.clients) setClients(body.clients);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const CACHE_KEY = 'arbostar-service-catalog';
+    try {
+      const cached = window.localStorage.getItem(CACHE_KEY);
+      if (cached) setCatalog(JSON.parse(cached));
+    } catch {
+      // ignore: cache is a convenience only
+    }
+    fetch('/api/services')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!body?.items) return;
+        setCatalog(body.items);
+        try {
+          window.localStorage.setItem(CACHE_KEY, JSON.stringify(body.items));
+        } catch {
+          // ignore
+        }
       })
       .catch(() => {});
   }, []);
@@ -242,6 +268,18 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
 
   function addItem() {
     const item: DraftQuoteItem = { id: crypto.randomUUID(), title: '', price: 0, photoIds: [] };
+    updateField('items', [...formState!.items, item]);
+  }
+
+  function addItemFromCatalog(serviceId: string) {
+    const service = catalog.find((s) => s.id === serviceId);
+    if (!service) return;
+    const item: DraftQuoteItem = {
+      id: crypto.randomUUID(),
+      title: service.name,
+      price: Number(service.defaultPrice),
+      photoIds: [],
+    };
     updateField('items', [...formState!.items, item]);
   }
 
@@ -529,7 +567,12 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
           </div>
         ))}
 
-        <button type="button" className={styles.addItemButton} onClick={addItem}>+ Add service</button>
+        <div className={styles.addItemRow}>
+          <button type="button" className={styles.addItemButton} onClick={addItem}>+ Add service</button>
+          {catalog.length > 0 && (
+            <CatalogSearch items={catalog} onSelect={addItemFromCatalog} formatPrice={formatMoney} />
+          )}
+        </div>
       </div>
 
       <div className={styles.totals}>

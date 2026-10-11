@@ -22,7 +22,7 @@ type ServiceForm = {
 const EMPTY_FORM: ServiceForm = { name: '', defaultPrice: '', billingType: 'quantity', unit: '' };
 
 function billingLabel(item: Pick<ServiceCatalogItem, 'billingType' | 'unit'>): string {
-  return item.billingType === 'hourly' ? 'Per hour' : `Per ${item.unit?.trim() || 'unit'}`;
+  return item.billingType === 'hourly' ? 'Hour' : item.unit?.trim() || 'Unit';
 }
 
 function priceLabel(billingType: ServiceCatalogItem['billingType'], unit: string): string {

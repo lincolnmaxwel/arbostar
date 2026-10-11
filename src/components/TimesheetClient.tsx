@@ -130,6 +130,7 @@ export function TimesheetClient() {
   const [editForm, setEditForm] = useState<EditEntryForm | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [detailsEntry, setDetailsEntry] = useState<TimesheetEntry | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
 
   const loadEntries = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -518,14 +519,29 @@ export function TimesheetClient() {
     });
   }
 
-  async function handleGenerateInvoice() {
-    if (selectedEntries.length === 0) return;
+  function toggleDescription(id: string) {
+    setExpandedDescriptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleGenerateInvoice() {
+    return generateInvoicesFor(selectedEntries);
+  }
+
+  // Shared by the bulk "Generate invoice" button (selected entries) and the
+  // per-row button (just that one entry).
+  async function generateInvoicesFor(entriesToInvoice: TimesheetEntry[]) {
+    if (entriesToInvoice.length === 0 || generating) return;
     setError(null);
     setNotice(null);
     setGenerating(true);
     try {
       const groups = new Map<string, { clientName: string; entryIds: string[] }>();
-      for (const entry of selectedEntries) {
+      for (const entry of entriesToInvoice) {
         const group = groups.get(entry.client.id);
         if (group) {
           group.entryIds.push(entry.id);
@@ -890,6 +906,26 @@ export function TimesheetClient() {
           </div>
         </div>
 
+        {openEntries.length > 0 && (
+          <div className={styles.generateBar}>
+            <button
+              type="button"
+              className={styles.generateButton}
+              disabled={selectedEntryIds.length === 0 || generating}
+              onClick={handleGenerateInvoice}
+            >
+              {generating
+                ? 'Generating...'
+                : selectedClientCount > 1
+                  ? `Generate ${selectedClientCount} invoices (${selectedClientCount} clients)`
+                  : `Generate invoice (${selectedEntryIds.length} selected)`}
+            </button>
+            <span className={styles.generateHint}>
+              Select open entries across clients, then generate one invoice per client. Invoiced entries can no longer be edited.
+            </span>
+          </div>
+        )}
+
         {loading ? (
           <div className={styles.empty}>
             <p>Loading entries...</p>
@@ -943,9 +979,21 @@ export function TimesheetClient() {
                         />
                       </td>
                       <td className={styles.nowrap}>{e.workDate.slice(0, 10)}</td>
-                      <td>
+                      <td className={styles.clientCell}>
                         <div>{e.client.name}</div>
-                        {e.description && <div className={styles.entryDescription}>{e.description}</div>}
+                        {e.description && (
+                          <button
+                            type="button"
+                            className={`${styles.entryDescription} ${
+                              expandedDescriptions.has(e.id) ? styles.entryDescriptionExpanded : styles.entryDescriptionClamped
+                            }`}
+                            onClick={() => toggleDescription(e.id)}
+                            aria-expanded={expandedDescriptions.has(e.id)}
+                            title={expandedDescriptions.has(e.id) ? 'Click to collapse' : 'Click to show the full description'}
+                          >
+                            {e.description}
+                          </button>
+                        )}
                       </td>
                       <td className={styles.nowrap}>{hours}</td>
                       <td className={styles.nowrap}>{formatMoney(Number(e.hourlyRate))}/hr</td>
@@ -980,6 +1028,17 @@ export function TimesheetClient() {
                               aria-controls={`edit-entry-${e.id}`}
                             >
                               Edit
+                            </button>
+                          )}
+                          {isOpen && (
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => void generateInvoicesFor([e])}
+                              disabled={generating}
+                              aria-label={`Generate invoice for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
+                            >
+                              Generate invoice
                             </button>
                           )}
                           <button
@@ -1120,26 +1179,6 @@ export function TimesheetClient() {
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {openEntries.length > 0 && (
-          <div className={styles.generateBar}>
-            <button
-              type="button"
-              className={styles.generateButton}
-              disabled={selectedEntryIds.length === 0 || generating}
-              onClick={handleGenerateInvoice}
-            >
-              {generating
-                ? 'Generating...'
-                : selectedClientCount > 1
-                  ? `Generate ${selectedClientCount} invoices (${selectedClientCount} clients)`
-                  : `Generate invoice (${selectedEntryIds.length} selected)`}
-            </button>
-            <span className={styles.generateHint}>
-              Select open entries across clients, then generate one invoice per client. Invoiced entries can no longer be edited.
-            </span>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { formatMoney } from '@/lib/quoteMath';
 import { sendGraphMail } from '@/lib/graphMail';
 import type { MailSender } from '@/lib/mailSender';
+import { emailLayout } from '@/lib/emailLayout';
 
 function escapeHtml(value: string): string {
   return value
@@ -60,8 +61,8 @@ function buildItemsHtml(items: SendQuoteApprovalEmailItem[]): string {
 }
 
 export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions): Promise<void> {
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>Your estimate is ready for review:</p>
       ${opts.serviceAddress ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Service address: ${escapeHtml(opts.serviceAddress)}</p>` : ''}
@@ -88,7 +89,7 @@ export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions
         </a>
       </p>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -138,8 +139,8 @@ function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): 
 }
 
 export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOptions): Promise<void> {
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>Your approved estimate is ready to schedule. Here are ${opts.options.length === 1 ? 'the date option we have' : 'the date options we have'} for you (round ${opts.roundNumber}):</p>
       ${opts.serviceAddress ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Service address: ${escapeHtml(opts.serviceAddress)}</p>` : ''}
@@ -152,7 +153,7 @@ export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOpt
         </a>
       </p>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -189,8 +190,8 @@ function buildContactLinesHtml(clientPhone?: string, serviceAddress?: string): s
 
 export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecisionNotificationEmailOptions): Promise<void> {
   const verb = opts.decision === 'approved' ? 'approved' : 'declined';
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> just ${verb} quote #${opts.quoteNumber}.</p>
       ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
@@ -199,7 +200,7 @@ export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecision
         </a>
       </p>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -227,8 +228,8 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
       ? `chose ${opts.scheduledDate ? formatOptionDate(opts.scheduledDate) : 'a date'}${opts.scheduledWindow ? ` (${WINDOW_LABEL[opts.scheduledWindow]})` : ''}`
       : `rejected the proposed dates${opts.rejectionReason ? `: "${opts.rejectionReason}"` : ''}`;
 
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p><strong>${escapeHtml(opts.clientName)}</strong> ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${escapeHtml(detail)}.</p>
       ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
@@ -237,7 +238,7 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
         </a>
       </p>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -267,8 +268,8 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
     .map((item) => `<li style="padding:4px 0;">${escapeHtml(item.title)}</li>`)
     .join('');
 
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px 24px;border-radius:12px;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <div style="text-align:center;margin-bottom:24px;">
         ${opts.logoUrl ? `<img src="${opts.logoUrl}" alt="${opts.companyName ? escapeHtml(opts.companyName) : 'Company logo'}" style="display:block;margin:0 auto 16px;max-height:64px;max-width:220px;object-fit:contain;" />` : ''}
         <div style="display:inline-block;background:#075bff;color:#fff;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:8px 20px;border-radius:999px;">
@@ -276,7 +277,7 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
         </div>
       </div>
 
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;">
+      <div>
         <p style="margin-top:0;">Hi ${escapeHtml(opts.clientName)},</p>
         <p>Thank you! We've received your payment for invoice <strong>#${opts.invoiceNumber}</strong>, covering the following services:</p>
         <ul style="margin:16px 0;padding-left:20px;color:#374151;">
@@ -291,7 +292,7 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
         <p style="margin-top:24px;margin-bottom:0;">Thank you for your business with ${from}!</p>
       </div>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -336,8 +337,8 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
   const header = hasQtyColumns
     ? `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Quantity</th><th style="${headerCellRight}">Unit price</th><th style="${headerCellRight}">Total</th>`
     : `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Total</th>`;
-  const html = `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;">
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p>Hi ${escapeHtml(opts.clientName)},</p>
       <p>The work is complete! Here is your invoice <strong>#${opts.invoiceNumber}</strong>${reference}.</p>
       ${opts.period ? `<p style="color:#6b7280;font-size:14px;margin:-8px 0 16px;">Period: ${escapeHtml(opts.period)}</p>` : ''}
@@ -358,7 +359,7 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
       ${opts.gstNumber ? `<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">GST #: ${escapeHtml(opts.gstNumber)}</p>` : ''}
       <p style="margin-top:24px;">Thank you for your business with ${from}!</p>
     </div>
-  `;
+  `);
 
   await sendGraphMail({
     to: opts.to,
@@ -369,5 +370,41 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
     attachments: opts.pdfBuffer
       ? [{ filename: `invoice-${opts.invoiceNumber}.pdf`, content: opts.pdfBuffer, contentType: 'application/pdf' }]
       : undefined,
+  });
+}
+
+export interface SendInviteEmailOptions {
+  to: string;
+  name: string;
+  /** Name of the admin who created the invitation. */
+  invitedBy: string;
+  acceptUrl: string;
+  /** Whole days until the link expires. */
+  expiresInDays: number;
+}
+
+// Account invitation: the invitee follows the one-time link to choose their
+// own password, which creates the account. Sent from the platform address with
+// no per-company sender (the invitee has no company yet).
+export async function sendInviteEmail(opts: SendInviteEmailOptions): Promise<void> {
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p><strong>${escapeHtml(opts.invitedBy)}</strong> invited you to join <strong>MyJobbs</strong>. Create your password to activate your account:</p>
+      <p style="margin:24px 0;">
+        <a href="${opts.acceptUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Create my account
+        </a>
+      </p>
+      <p style="color:#5a6785;font-size:13px;">This link works once and expires in ${opts.expiresInDays} days. If the button does not work, copy this address into your browser:<br/>
+        <span style="word-break:break-all;">${escapeHtml(opts.acceptUrl)}</span></p>
+      <p style="color:#5a6785;font-size:13px;">If you were not expecting this invitation, you can ignore this email.</p>
+    </div>
+  `);
+
+  await sendGraphMail({
+    to: opts.to,
+    subject: 'You have been invited to MyJobbs',
+    html,
   });
 }

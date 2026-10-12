@@ -20,6 +20,16 @@ interface AdminUser {
   features: Record<FeatureKey, boolean>;
 }
 
+interface PendingInvite {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
 const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: 'quotes', label: 'Quotes' },
   { key: 'invoices', label: 'Invoices' },
@@ -45,6 +55,10 @@ export function AdminUsersClient() {
   const [passwordResetFor, setPasswordResetFor] = useState<string | null>(null);
   const [passwordValue, setPasswordValue] = useState('');
 
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
+  const [invitePending, setInvitePending] = useState<string | null>(null);
+  // Default to inviting by email: the admin never has to pick a password.
+  const [inviteMode, setInviteMode] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -73,6 +87,11 @@ export function AdminUsersClient() {
       for (const u of body.users) next[u.id] = String(u.hourlyRate);
       return { ...prev, ...next };
     });
+    const invitesRes = await fetch('/api/admin/invites');
+    if (invitesRes.ok) {
+      const invitesBody = await invitesRes.json();
+      setInvites(invitesBody.invites);
+    }
     setLoading(false);
   }, []);
 
@@ -91,7 +110,7 @@ export function AdminUsersClient() {
         body: JSON.stringify({
           name: createForm.name,
           email: createForm.email,
-          password: createForm.password,
+          ...(inviteMode ? { sendInvite: true } : { password: createForm.password }),
           role: createForm.role,
           status: createForm.status,
           hourlyRate: Number(createForm.hourlyRate) || 0,
@@ -113,10 +132,57 @@ export function AdminUsersClient() {
         features: { quotes: true, invoices: false, timesheet: false, clients_crm: false },
       });
       setShowCreate(false);
-      setNotice(`User ${body.user.email} created.`);
+      if (body.invite) {
+        setNotice(
+          body.emailSent
+            ? `Invitation sent to ${body.invite.email}.`
+            : `Invitation saved for ${body.invite.email}, but the email could not be sent. Share this link with them: ${body.inviteUrl}`,
+        );
+      } else {
+        setNotice(`User ${body.user.email} created.`);
+      }
       await load();
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleResendInvite(invite: PendingInvite) {
+    setInvitePending(invite.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/invites/${invite.id}/resend`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(
+          body.inviteUrl
+            ? `${body.error} ${body.inviteUrl}`
+            : (body.error ?? 'Could not resend the invitation.'),
+        );
+        return;
+      }
+      setNotice(`Invitation re-sent to ${invite.email}.`);
+      await load();
+    } finally {
+      setInvitePending(null);
+    }
+  }
+
+  async function handleRevokeInvite(invite: PendingInvite) {
+    if (!window.confirm(`Cancel the invitation for ${invite.email}? The link will stop working.`)) return;
+    setInvitePending(invite.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/invites/${invite.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? 'Could not cancel the invitation.');
+        return;
+      }
+      setNotice(`Invitation for ${invite.email} cancelled.`);
+      await load();
+    } finally {
+      setInvitePending(null);
     }
   }
 
@@ -287,6 +353,17 @@ export function AdminUsersClient() {
         <form id="create-user-form" className={styles.createForm} onSubmit={handleCreate}>
           <h2 className={styles.sectionTitle}>Create user</h2>
           {createError && <p className={styles.error} role="alert">{createError}</p>}
+          <fieldset className={styles.featureFieldset}>
+            <legend>How should this person get access?</legend>
+            <label className={styles.checkboxLabel}>
+              <input type="radio" name="create-mode" checked={inviteMode} onChange={() => setInviteMode(true)} />
+              Send an invitation by email (they choose their own password)
+            </label>
+            <label className={styles.checkboxLabel}>
+              <input type="radio" name="create-mode" checked={!inviteMode} onChange={() => setInviteMode(false)} />
+              Set a password now
+            </label>
+          </fieldset>
           <div className={styles.fieldGrid}>
             <div className={styles.field}>
               <label htmlFor="new-name">Name</label>
@@ -311,19 +388,21 @@ export function AdminUsersClient() {
                 required
               />
             </div>
-            <div className={styles.field}>
-              <label htmlFor="new-password">Initial password</label>
-              <input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                className={styles.input}
-                value={createForm.password}
-                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                minLength={6}
-                required
-              />
-            </div>
+            {!inviteMode && (
+              <div className={styles.field}>
+                <label htmlFor="new-password">Initial password</label>
+                <input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  className={styles.input}
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                  minLength={6}
+                  required
+                />
+              </div>
+            )}
             <div className={styles.field}>
               <label htmlFor="new-role">Role</label>
               <select
@@ -336,19 +415,21 @@ export function AdminUsersClient() {
                 <option value="admin">Admin</option>
               </select>
             </div>
-            <div className={styles.field}>
-              <label htmlFor="new-status">Status</label>
-              <select
-                id="new-status"
-                className={styles.input}
-                value={createForm.status}
-                onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value as UserStatus }))}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="blocked">Blocked</option>
-              </select>
-            </div>
+            {!inviteMode && (
+              <div className={styles.field}>
+                <label htmlFor="new-status">Status</label>
+                <select
+                  id="new-status"
+                  className={styles.input}
+                  value={createForm.status}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value as UserStatus }))}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+            )}
             <div className={styles.field}>
               <label htmlFor="new-hourly-rate">Hourly rate ($)</label>
               <input
@@ -381,9 +462,56 @@ export function AdminUsersClient() {
             ))}
           </fieldset>
           <button type="submit" className={styles.submitButton} disabled={creating}>
-            {creating ? 'Creating...' : 'Create user'}
+            {creating ? (inviteMode ? 'Sending...' : 'Creating...') : inviteMode ? 'Send invitation' : 'Create user'}
           </button>
         </form>
+      )}
+
+      {invites.length > 0 && (
+        <div className={styles.tableWrap} style={{ marginBottom: 24 }}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Pending invitations</th>
+                <th>Role</th>
+                <th>Expires</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invites.map((inv) => (
+                <tr key={inv.id}>
+                  <td>
+                    <div className={styles.userName}>{inv.name}</div>
+                    <div className={styles.userEmail}>{inv.email}</div>
+                  </td>
+                  <td>{inv.role === 'admin' ? 'Admin' : 'Staff'}</td>
+                  <td>{inv.expired ? 'Expired' : new Date(inv.expiresAt).toLocaleDateString()}</td>
+                  <td>
+                    <div className={styles.rowActions}>
+                      <button
+                        type="button"
+                        className={styles.actionButton}
+                        disabled={invitePending === inv.id}
+                        onClick={() => handleResendInvite(inv)}
+                      >
+                        Resend
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteButton}
+                        disabled={invitePending === inv.id}
+                        onClick={() => handleRevokeInvite(inv)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {users.length === 0 ? (

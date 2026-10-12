@@ -4,6 +4,8 @@ import { FeatureKey, Role, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction, UnauthorizedError, ForbiddenError } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
+import { generateInviteToken, inviteExpiry, inviteUrl, INVITE_TTL_DAYS } from '@/lib/invites';
+import { sendInviteEmail } from '@/lib/email';
 
 const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm', 'quotes'];
 const ROLES: Role[] = ['admin', 'staff'];
@@ -17,6 +19,8 @@ interface CreateUserBody {
   status?: unknown;
   hourlyRate?: unknown;
   features?: unknown;
+  /** true: email an invitation instead of setting a password now. */
+  sendInvite?: unknown;
 }
 
 export async function POST(req: Request) {
@@ -37,8 +41,14 @@ export async function POST(req: Request) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
+  const sendInvite = body.sendInvite === true;
   const role = ROLES.includes(body.role as Role) ? (body.role as Role) : null;
-  const status = STATUSES.includes(body.status as UserStatus) ? (body.status as UserStatus) : null;
+  // An invited user becomes active the moment they accept.
+  const status = sendInvite
+    ? 'active'
+    : STATUSES.includes(body.status as UserStatus)
+      ? (body.status as UserStatus)
+      : null;
   const hourlyRate = typeof body.hourlyRate === 'number' && Number.isFinite(body.hourlyRate) ? body.hourlyRate : 0;
   const features =
     Array.isArray(body.features) && body.features.every((f) => FEATURES.includes(f as FeatureKey))
@@ -51,7 +61,7 @@ export async function POST(req: Request) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
   }
-  if (password.length < 6) {
+  if (!sendInvite && password.length < 6) {
     return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
   }
   if (!role) {
@@ -67,6 +77,43 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 });
+  }
+
+  if (sendInvite) {
+    const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true } });
+    // One live invitation per email: a new one replaces any pending one.
+    await prisma.userInvite.deleteMany({ where: { email, acceptedAt: null } });
+    const { token, tokenHash } = generateInviteToken();
+    const invite = await prisma.userInvite.create({
+      data: { email, name, role, hourlyRate, features, tokenHash, expiresAt: inviteExpiry(), invitedById: actorId },
+    });
+    await auditAdminAction(actorId, 'UserInvite', invite.id, 'create');
+
+    const acceptUrl = inviteUrl(token);
+    let emailSent = true;
+    try {
+      await sendInviteEmail({
+        to: email,
+        name,
+        invitedBy: actor?.name ?? 'An administrator',
+        acceptUrl,
+        expiresInDays: INVITE_TTL_DAYS,
+      });
+    } catch (err) {
+      emailSent = false;
+      console.error('[admin/users] sendInviteEmail failed', err);
+    }
+
+    // The link goes back to the admin only when the email could not be
+    // delivered, so they can share it by hand.
+    return NextResponse.json(
+      {
+        invite: { id: invite.id, email, name, expiresAt: invite.expiresAt },
+        emailSent,
+        ...(emailSent ? {} : { inviteUrl: acceptUrl }),
+      },
+      { status: 201 },
+    );
   }
 
   const passwordHash = await bcrypt.hash(password, 10);

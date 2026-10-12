@@ -304,6 +304,25 @@ model TimesheetProduct {
   lineTotal        Decimal        @db.Decimal(10, 2)
 }
 
+// Pending account invitation: the admin picks the identity, role and features;
+// the invitee chooses their own password through a one-time link. The user row
+// only exists once the invite is accepted. Only a SHA-256 of the token is stored.
+model UserInvite {
+  id          String       @id @default(uuid())
+  email       String
+  name        String
+  role        Role         @default(staff)
+  hourlyRate  Decimal      @db.Decimal(10, 2) @default(0)
+  features    FeatureKey[]
+  tokenHash   String       @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String
+  createdAt   DateTime     @default(now())
+
+  @@index([email])
+}
+
 model UserFeatureFlag {
   id      String     @id @default(uuid())
   userId  String

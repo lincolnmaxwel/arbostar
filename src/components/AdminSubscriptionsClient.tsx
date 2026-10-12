@@ -462,7 +462,7 @@ export function AdminSubscriptionsClient() {
         </div>
       )}
       <p className={styles.userEmail} style={{ marginTop: 12 }}>
-        To cancel, refund or change a paid subscription, open it in Stripe from Manage > Billing > Open in Stripe; the
+        To cancel, refund or change a paid subscription, open it in Stripe with the Open in Stripe links under Manage; the
         webhook updates this list automatically.
       </p>
     </div>

@@ -334,7 +334,7 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
       </table>
       <table style="width:100%;max-width:280px;margin-left:auto;font-size:14px;color:#6b7280;">
         <tr><td style="padding:4px 0;">Subtotal</td><td style="text-align:right;">${formatMoney(opts.subtotal)}</td></tr>
-        <tr><td style="padding:4px 0;">GST (${(opts.taxRate * 100).toFixed(1)}%)</td><td style="text-align:right;">${formatMoney(opts.taxAmount)}</td></tr>
+        <tr><td style="padding:4px 0;">GST ${(opts.taxRate * 100).toFixed(1)}%</td><td style="text-align:right;">${formatMoney(opts.taxAmount)}</td></tr>
         <tr>
           <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;">Total</td>
           <td style="padding:8px 0;border-top:1px solid #d1d5db;font-weight:700;font-size:16px;color:#111827;text-align:right;">${formatMoney(opts.total)}</td>

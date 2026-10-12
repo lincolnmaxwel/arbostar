@@ -145,7 +145,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             <span>{formatMoney(Number(invoice.subtotal))}</span>
           </div>
           <div className={styles.totalRow}>
-            <span>GST ({(Number(invoice.taxRate) * 100).toFixed(1)}%)</span>
+            <span>GST {(Number(invoice.taxRate) * 100).toFixed(1)}%</span>
             <span>{formatMoney(Number(invoice.taxAmount))}</span>
           </div>
           <div className={`${styles.totalRow} ${styles.grandTotal}`}>

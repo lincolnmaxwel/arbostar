@@ -178,7 +178,7 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   }
 
   totalsRow('Subtotal', formatMoney(opts.subtotal), false);
-  totalsRow(`GST (${(opts.taxRate * 100).toFixed(1)}%)`, formatMoney(opts.taxAmount), false);
+  totalsRow(`GST ${(opts.taxRate * 100).toFixed(1)}%`, formatMoney(opts.taxAmount), false);
   doc.moveTo(totalsX, y).lineTo(totalsX + totalsWidth, y).strokeColor(BORDER).stroke();
   y += 8;
   totalsRow('Total', formatMoney(opts.total), true);

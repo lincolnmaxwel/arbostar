@@ -65,8 +65,8 @@ export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions
       <table style="width:100%;border-collapse:collapse;margin:16px 0;">
         <thead>
           <tr>
-            <th style="text-align:left;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Proposed work</th>
-            <th style="text-align:right;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;">Price</th>
+            <th style="text-align:left;padding:10px 12px;background:#075bff;color:#fff;font-size:12px;text-transform:uppercase;">Proposed work</th>
+            <th style="text-align:right;padding:10px 12px;background:#075bff;color:#fff;font-size:12px;text-transform:uppercase;">Price</th>
           </tr>
         </thead>
         <tbody>${buildItemsHtml(opts.items)}</tbody>
@@ -80,7 +80,7 @@ export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions
         </tr>
       </table>
       <p style="margin-top:24px;">
-        <a href="${opts.portalUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+        <a href="${opts.portalUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           View and respond to your estimate
         </a>
       </p>
@@ -121,7 +121,7 @@ function buildOptionsHtml(options: SendBookingProposalEmailOptions['options']): 
     .map(
       (o) => `
         <tr>
-          <td style="padding:12px;border:1px solid #d1d5db;border-radius:6px;text-align:center;font-weight:600;color:#2c5f2d;">
+          <td style="padding:12px;border:1px solid #d1d5db;border-radius:6px;text-align:center;font-weight:600;color:#075bff;">
             ${escapeHtml(formatOptionDate(o.date))}
             <div style="font-weight:400;color:#6b7280;font-size:13px;margin-top:4px;white-space:pre-line;">${escapeHtml(WINDOW_LABEL[o.window])}</div>
           </td>
@@ -140,7 +140,7 @@ export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOpt
         <tbody>${buildOptionsHtml(opts.options)}</tbody>
       </table>
       <p style="margin-top:24px;">
-        <a href="${opts.portalUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+        <a href="${opts.portalUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           Choose your date
         </a>
       </p>
@@ -185,7 +185,7 @@ export async function sendQuoteDecisionNotificationEmail(opts: SendQuoteDecision
       <p><strong>${escapeHtml(opts.clientName)}</strong> just ${verb} quote #${opts.quoteNumber}.</p>
       ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
-        <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+        <a href="${opts.quoteUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           View quote
         </a>
       </p>
@@ -223,7 +223,7 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
       <p><strong>${escapeHtml(opts.clientName)}</strong> ${opts.decision === 'confirmed' ? 'confirmed scheduling' : 'rejected the proposed scheduling'} for quote #${opts.quoteNumber} — ${escapeHtml(detail)}.</p>
       ${buildContactLinesHtml(opts.clientPhone, opts.serviceAddress)}
       <p style="margin-top:24px;">
-        <a href="${opts.quoteUrl}" style="display:inline-block;background:#2c5f2d;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+        <a href="${opts.quoteUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           View quote
         </a>
       </p>
@@ -260,7 +260,7 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px 24px;border-radius:12px;">
       <div style="text-align:center;margin-bottom:24px;">
         ${opts.logoUrl ? `<img src="${opts.logoUrl}" alt="${opts.companyName ? escapeHtml(opts.companyName) : 'Company logo'}" style="display:block;margin:0 auto 16px;max-height:64px;max-width:220px;object-fit:contain;" />` : ''}
-        <div style="display:inline-block;background:#2c5f2d;color:#fff;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:8px 20px;border-radius:999px;">
+        <div style="display:inline-block;background:#075bff;color:#fff;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:8px 20px;border-radius:999px;">
           ✓ Payment received
         </div>
       </div>
@@ -316,8 +316,8 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
   const from = opts.companyName ? escapeHtml(opts.companyName) : 'us';
   const reference = opts.quoteNumber !== undefined ? ` from quote #${opts.quoteNumber}` : '';
   const hasQtyColumns = opts.items.some((i) => i.quantity !== undefined && i.unitPrice !== undefined);
-  const headerCell = 'text-align:left;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;';
-  const headerCellRight = 'text-align:right;padding:10px 12px;background:#2c5f2d;color:#fff;font-size:12px;text-transform:uppercase;';
+  const headerCell = 'text-align:left;padding:10px 12px;background:#075bff;color:#fff;font-size:12px;text-transform:uppercase;';
+  const headerCellRight = 'text-align:right;padding:10px 12px;background:#075bff;color:#fff;font-size:12px;text-transform:uppercase;';
   const header = hasQtyColumns
     ? `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Quantity</th><th style="${headerCellRight}">Unit price</th><th style="${headerCellRight}">Total</th>`
     : `<th style="${headerCell}">Description</th><th style="${headerCellRight}">Total</th>`;

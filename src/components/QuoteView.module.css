@@ -138,12 +138,12 @@
 }
 
 .scheduled {
-  background: #2c5f2d;
+  background: #075bff;
   color: #fff;
 }
 
 .completed {
-  background: #1e4220;
+  background: #0647cc;
   color: #fff;
 }
 
@@ -402,7 +402,7 @@
 }
 
 .bookingConfirmed {
-  color: #2c5f2d;
+  color: #075bff;
   font-weight: 600;
 }
 

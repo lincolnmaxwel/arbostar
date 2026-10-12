@@ -5,13 +5,13 @@ import { SyncLoopStarter } from '@/components/SyncLoopStarter';
 import { Header } from '@/components/Header';
 
 export const metadata = {
-  title: 'Arbostar Quotes',
+  title: 'MyJobbs',
 };
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#2c5f2d',
+  themeColor: '#075bff',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

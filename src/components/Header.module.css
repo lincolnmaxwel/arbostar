@@ -1,5 +1,5 @@
 .header {
-  background: var(--color-primary);
+  background: linear-gradient(90deg, #075bff 0%, #009fff 100%);
   color: #fff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
   position: sticky;
@@ -32,8 +32,14 @@
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.brandIcon {
+.brandLogo {
+  display: block;
+  height: 36px;
+  width: auto;
   flex-shrink: 0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px 12px;
 }
 
 .brand:hover {

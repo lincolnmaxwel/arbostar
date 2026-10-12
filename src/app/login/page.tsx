@@ -68,7 +68,10 @@ export default function LoginPage() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Arbostar</h1>
+        <h1 className={styles.title}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/myjobbs-logo.png" alt="MyJobbs.com" className={styles.logo} />
+        </h1>
         <p className={styles.subtitle}>Sign in to your account</p>
 
         {error && <p className={styles.error} role="alert">{error}</p>}

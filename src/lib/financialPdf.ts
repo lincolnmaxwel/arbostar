@@ -10,8 +10,8 @@ export interface FinancialPdfOptions {
   generatedAt: Date;
 }
 
-const PRIMARY = '#2c5f2d';
-const PRIMARY_LIGHT = '#eaf3ea';
+const PRIMARY = '#075bff';
+const PRIMARY_LIGHT = '#e8f0ff';
 const GRAY = '#6b7280';
 const DARK = '#111827';
 const BORDER = '#d1d5db';

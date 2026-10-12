@@ -30,7 +30,7 @@ export interface InvoicePdfOptions {
   total: number;
 }
 
-const PRIMARY = '#2c5f2d';
+const PRIMARY = '#075bff';
 const GRAY = '#6b7280';
 const DARK = '#111827';
 const BORDER = '#d1d5db';

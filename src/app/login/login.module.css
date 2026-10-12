@@ -24,6 +24,13 @@
   letter-spacing: -0.02em;
 }
 
+.logo {
+  display: block;
+  height: 48px;
+  width: auto;
+  max-width: 100%;
+}
+
 .subtitle {
   font-size: 0.875rem;
   color: var(--color-text-secondary);

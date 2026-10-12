@@ -7,7 +7,7 @@ const respondSchema = z.object({ decision: z.enum(['approve', 'decline']) });
 
 // No auth check here by design: the long, random publicToken IS the
 // credential. Anyone with the link can respond to that one quote — the same
-// model the reference Arbostar portal link uses.
+// model the reference portal link uses.
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const body = await req.json();
   const parsed = respondSchema.safeParse(body);

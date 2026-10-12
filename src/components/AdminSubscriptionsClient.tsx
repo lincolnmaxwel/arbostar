@@ -111,6 +111,39 @@ export function AdminSubscriptionsClient() {
     }
   }
 
+  async function deleteSubscription(s: SubscriptionRow) {
+    const back =
+      s.trialEndsAt && new Date(s.trialEndsAt).getTime() > Date.now()
+        ? `back to its free trial (ends ${fmt(s.trialEndsAt)})`
+        : 'locked as "trial ended"';
+    if (
+      !window.confirm(
+        `Delete the subscription of ${s.email}? It is canceled in Stripe immediately (no refund) and the account goes ${back}.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(s.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/users/${s.id}/subscription`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? 'Could not delete the subscription.');
+        return;
+      }
+      setNotice(
+        body.access
+          ? `Subscription deleted. ${s.email} is back on the free trial.`
+          : `Subscription deleted. ${s.email} is now locked (trial ended).`,
+      );
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function extendTrial(s: SubscriptionRow) {
     const days = Number(extendDays[s.id] ?? '7');
     if (!Number.isInteger(days) || days < 1 || days > 365) {
@@ -299,6 +332,16 @@ export function AdminSubscriptionsClient() {
                         >
                           {s.billingExempt ? 'Remove exemption' : 'Exempt'}
                         </button>
+                        {(s.stripeSubscriptionId || s.subscriptionStatus) && (
+                          <button
+                            type="button"
+                            className={styles.deleteButton}
+                            disabled={busyId === s.id}
+                            onClick={() => deleteSubscription(s)}
+                          >
+                            Delete subscription
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>

@@ -55,9 +55,16 @@ export async function syncSubscription(sub: Stripe.Subscription): Promise<string
   const customerId = customerIdOf(sub);
   const metaUserId = sub.metadata?.userId;
 
-  let user = metaUserId ? await prisma.user.findUnique({ where: { id: metaUserId }, select: { id: true } }) : null;
-  if (!user) user = await prisma.user.findUnique({ where: { stripeCustomerId: customerId }, select: { id: true } });
+  const select = { id: true, stripeSubscriptionId: true } as const;
+  let user = metaUserId ? await prisma.user.findUnique({ where: { id: metaUserId }, select }) : null;
+  if (!user) user = await prisma.user.findUnique({ where: { stripeCustomerId: customerId }, select });
   if (!user) return null;
+
+  // A subscription that ended and is not the one currently tracked on the user
+  // (an admin deleted it, or it was replaced by a newer one) must not
+  // overwrite the account's state with a stale "canceled".
+  const terminal = sub.status === 'canceled' || sub.status === 'incomplete_expired';
+  if (terminal && user.stripeSubscriptionId !== sub.id) return null;
 
   // A subscription scheduled to end via cancel_at (instead of cancel_at_period_end) counts too.
   const cancelScheduled = sub.cancel_at_period_end || !!sub.cancel_at;

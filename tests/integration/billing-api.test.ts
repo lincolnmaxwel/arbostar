@@ -23,6 +23,7 @@ import { POST as webhook } from '@/app/api/stripe/webhook/route';
 import { GET as getSettings, PATCH as patchSettings } from '@/app/api/admin/billing-settings/route';
 import { PATCH as patchUser } from '@/app/api/admin/users/[id]/route';
 import { GET as listSubscriptions } from '@/app/api/admin/subscriptions/route';
+import { DELETE as deleteSubscription } from '@/app/api/admin/users/[id]/subscription/route';
 
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) delete process.env[key];
@@ -268,5 +269,68 @@ describe('billing: access gate, webhook and admin settings', () => {
     expect((await extend(trialId, 0)).status).toBe(400);
     expect((await extend(trialId, 400)).status).toBe(400);
     expect((await extend(trialId, 'x')).status).toBe(400);
+  });
+
+  it('deleting a subscription returns the account to its trial, or to trial-ended when the trial is over', async () => {
+    const sub = (id: string, status = 'active') => ({
+      stripeCustomerId: `cus_${randomUUID()}`,
+      stripeSubscriptionId: `sub_${randomUUID()}`,
+      subscriptionStatus: status,
+      subscriptionPeriodEnd: new Date(Date.now() + 20 * DAY),
+      ...(id ? {} : {}),
+    });
+    const remove = (id: string) =>
+      deleteSubscription(new Request(`http://localhost/api/admin/users/${id}/subscription`, { method: 'DELETE' }), {
+        params: { id },
+      });
+
+    // Still inside the trial window -> back on trial.
+    const inTrial = await makeUser({ trialEndsAt: new Date(Date.now() + 8 * DAY), ...sub('a') });
+    const res1 = await remove(inTrial.id);
+    expect(res1.status).toBe(200);
+    expect(await res1.json()).toMatchObject({ phase: 'trial', access: true });
+    const row1 = await prisma.user.findUniqueOrThrow({ where: { id: inTrial.id } });
+    expect(row1).toMatchObject({
+      stripeSubscriptionId: null,
+      subscriptionStatus: null,
+      subscriptionPeriodEnd: null,
+      subscriptionCancelAtPeriodEnd: false,
+    });
+    expect(row1.stripeCustomerId).not.toBeNull();
+
+    // Trial already over -> locked.
+    const expired = await makeUser({ trialEndsAt: new Date(Date.now() - 3 * DAY), ...sub('b') });
+    const res2 = await remove(expired.id);
+    expect(await res2.json()).toMatchObject({ phase: 'trial_ended', access: false });
+    expect(await isFeatureEnabled(expired.id, 'quotes')).toBe(false);
+
+    // Nothing to delete, unknown user, and non-admins are refused.
+    expect((await remove(inTrial.id)).status).toBe(409);
+    expect((await remove(randomUUID())).status).toBe(404);
+    sessionMock.mockResolvedValue({ user: { id: trialId } });
+    expect((await remove(expired.id)).status).toBe(403);
+  });
+
+  it('a late "canceled" event for a deleted subscription does not bring the canceled state back', async () => {
+    const user = await makeUser({ trialEndsAt: new Date(Date.now() - DAY), stripeCustomerId: `cus_${randomUUID()}` });
+    const stale = {
+      id: `sub_${randomUUID()}`,
+      customer: user.stripeCustomerId,
+      status: 'canceled',
+      cancel_at_period_end: false,
+      cancel_at: null,
+      metadata: { userId: user.id },
+      items: { data: [{ current_period_end: Math.floor(Date.now() / 1000) }] },
+    } as unknown as Stripe.Subscription;
+
+    expect(await syncSubscription(stale)).toBeNull();
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(row.stripeSubscriptionId).toBeNull();
+    expect(row.subscriptionStatus).toBeNull();
+
+    // A brand-new live subscription still goes through.
+    const fresh = { ...stale, id: `sub_${randomUUID()}`, status: 'active' } as unknown as Stripe.Subscription;
+    expect(await syncSubscription(fresh)).toBe(user.id);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).subscriptionStatus).toBe('active');
   });
 });

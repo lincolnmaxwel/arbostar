@@ -76,11 +76,11 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   y += 22;
 
   const colWidth = contentWidth / 2 - 12;
-  const toX = marginX;
-  const fromX = marginX + contentWidth / 2 + 12;
+  // Provider (no label) on the left, client ("TO") on the right.
+  const fromX = marginX;
+  const toX = marginX + contentWidth / 2 + 12;
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(GRAY).text('TO', toX, y);
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(GRAY).text('FROM', fromX, y);
   const partiesTop = y + 14;
 
   let toY = partiesTop;

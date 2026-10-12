@@ -91,6 +91,18 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
         </div>
 
         <div className={styles.parties}>
+          {(company.name || company.phone || company.email || company.address || company.gstNumber) && (
+            <div className={styles.party}>
+              {/* No "From" label: the provider block leads, and the TO label marks the client. */}
+              <h2 className={styles.partyLabel} aria-hidden="true">&nbsp;</h2>
+              {company.name && <p className={styles.partyName}>{company.name}</p>}
+              {company.phone && <p className={styles.partyLine}>{company.phone}</p>}
+              {company.email && <p className={styles.partyLine}>{company.email}</p>}
+              {company.address && <p className={styles.partyLine}>{company.address}</p>}
+              {company.gstNumber && <p className={styles.partyLine}>GST #: {company.gstNumber}</p>}
+            </div>
+          )}
+
           <div className={styles.party}>
             <h2 className={styles.partyLabel}>To</h2>
             <p className={styles.partyName}>{invoice.client.name}</p>
@@ -99,17 +111,6 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             {invoice.client.address && <p className={styles.partyLine}>{invoice.client.address}</p>}
             {invoice.serviceAddress && <p className={styles.partyLine}>Service address: {invoice.serviceAddress}</p>}
           </div>
-
-          {(company.name || company.phone || company.email || company.address || company.gstNumber) && (
-            <div className={styles.party}>
-              <h2 className={styles.partyLabel}>From</h2>
-              {company.name && <p className={styles.partyName}>{company.name}</p>}
-              {company.phone && <p className={styles.partyLine}>{company.phone}</p>}
-              {company.email && <p className={styles.partyLine}>{company.email}</p>}
-              {company.address && <p className={styles.partyLine}>{company.address}</p>}
-              {company.gstNumber && <p className={styles.partyLine}>GST #: {company.gstNumber}</p>}
-            </div>
-          )}
         </div>
 
         <table className={styles.table}>

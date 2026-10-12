@@ -92,6 +92,10 @@ export interface PlanPrice {
   amount: number;
   currency: string;
   interval: string;
+  intervalCount: number;
+  /** Stripe product id and amount in cents, used to bill one period up front. */
+  productId: string | null;
+  unitAmount: number;
 }
 
 /** Display price of the configured plan (cached for 10 minutes; null when unavailable). */
@@ -102,7 +106,14 @@ export async function getPlanPrice(): Promise<PlanPrice | null> {
     const price = await getStripe().prices.retrieve(process.env.STRIPE_PRICE_ID as string);
     const value =
       price.unit_amount != null
-        ? { amount: price.unit_amount / 100, currency: price.currency.toUpperCase(), interval: price.recurring?.interval ?? 'month' }
+        ? {
+            amount: price.unit_amount / 100,
+            currency: price.currency.toUpperCase(),
+            interval: price.recurring?.interval ?? 'month',
+            intervalCount: price.recurring?.interval_count ?? 1,
+            productId: typeof price.product === 'string' ? price.product : (price.product?.id ?? null),
+            unitAmount: price.unit_amount,
+          }
         : null;
     priceCache = { at: Date.now(), value };
     return value;

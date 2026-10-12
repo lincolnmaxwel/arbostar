@@ -15,6 +15,45 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Stripe statuses that keep the account working. past_due stays open while Stripe retries the card. */
 const LIVE_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
+/** Stripe rejects a Checkout trial_end less than 48h away; keep a margin. */
+export const MIN_TRIAL_END_MS = 50 * 60 * 60 * 1000;
+
+/** Add one billing interval (month, year, week, day) to a date, in UTC. */
+export function addBillingInterval(from: Date, interval: string, count = 1): Date {
+  const d = new Date(from.getTime());
+  const n = Math.max(1, count);
+  switch (interval) {
+    case 'year':
+      d.setUTCFullYear(d.getUTCFullYear() + n);
+      break;
+    case 'week':
+      d.setUTCDate(d.getUTCDate() + 7 * n);
+      break;
+    case 'day':
+      d.setUTCDate(d.getUTCDate() + n);
+      break;
+    default:
+      d.setUTCMonth(d.getUTCMonth() + n);
+  }
+  return d;
+}
+
+/**
+ * Subscribing mid-trial keeps the remaining trial days AND bills a full period
+ * now, so the first renewal lands one period after the trial would have ended.
+ * Returns that renewal date, or null when too little trial is left for Stripe
+ * to defer (the subscription then simply starts today).
+ */
+export function renewalAfterSubscribe(
+  trialEndsAt: Date | null,
+  interval: string,
+  count: number,
+  now: Date = new Date(),
+): Date | null {
+  if (!trialEndsAt || trialEndsAt.getTime() - now.getTime() <= MIN_TRIAL_END_MS) return null;
+  return addBillingInterval(trialEndsAt, interval, count);
+}
+
 export type BillingPhase =
   | 'exempt'
   | 'subscribed'

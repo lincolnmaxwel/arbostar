@@ -11,6 +11,7 @@ interface BillingResponse {
   plan: { amount: number; currency: string; interval: string } | null;
   trialDays: number;
   renewWindowDays: number;
+  subscribePreview: { firstRenewalAt: string } | null;
 }
 
 function formatDate(iso: string | null): string {
@@ -137,7 +138,7 @@ export function BillingClient() {
     );
   }
 
-  const { billing, plan, configured } = data;
+  const { billing, plan, configured, subscribePreview } = data;
   const badge = PHASE_BADGE[billing.phase];
   const price = plan
     ? `${plan.currency} $${plan.amount.toFixed(2)} / ${plan.interval}`
@@ -176,8 +177,10 @@ export function BillingClient() {
 
         {billing.phase === 'trial' && (
           <p className={styles.lead}>
-            You are on a free trial with {plural(billing.daysLeft ?? 0, 'day')} left. Subscribe any time: you will not be
-            charged until the trial ends{billing.trialEndsAt ? ` on ${formatDate(billing.trialEndsAt)}` : ''}.
+            You are on a free trial with {plural(billing.daysLeft ?? 0, 'day')} left (ends {formatDate(billing.trialEndsAt)}).{' '}
+            {subscribePreview
+              ? `Subscribe now and you keep every trial day: the first period is billed today and your first renewal is on ${formatDate(subscribePreview.firstRenewalAt)}.`
+              : 'Subscribe any time to keep using MyJobbs after the trial.'}
           </p>
         )}
 

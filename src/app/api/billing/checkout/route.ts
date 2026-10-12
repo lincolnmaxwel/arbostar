@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { evaluateBilling } from '@/lib/billing';
+import { addBillingInterval, evaluateBilling, MIN_TRIAL_END_MS } from '@/lib/billing';
 import { requireBillingUser, billingAuthErrorResponse, billingNotConfiguredResponse } from '@/lib/billingAuth';
-import { describeStripeError, getStripe, stripeConfigured } from '@/lib/stripe';
+import { describeStripeError, getPlanPrice, getStripe, stripeConfigured } from '@/lib/stripe';
 import { appBaseUrl } from '@/lib/emailLayout';
-
-// Stripe rejects a Checkout trial_end that is less than 48h away; keep a margin.
-const MIN_TRIAL_END_MS = 50 * 60 * 60 * 1000;
 
 export async function POST() {
   let user;
@@ -56,13 +53,20 @@ export async function POST() {
     await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
   }
 
-  // Subscribing during the free trial keeps the remaining trial days: the card
-  // is collected now and the first charge happens when the trial would end.
+  // Subscribing during the free trial keeps the remaining trial days AND bills
+  // a full period now: the first period is charged at checkout as a one-time
+  // line item and Stripe's trial is stretched by one billing interval, so the
+  // first renewal lands at (trial end + 1 period). With too little trial left
+  // for Stripe to defer, the subscription simply starts today.
   const now = Date.now();
-  const trialEnd =
-    user.trialEndsAt && user.trialEndsAt.getTime() - now > MIN_TRIAL_END_MS
-      ? Math.floor(user.trialEndsAt.getTime() / 1000)
-      : null;
+  const hasTrialLeft = !!user.trialEndsAt && user.trialEndsAt.getTime() - now > MIN_TRIAL_END_MS;
+  const plan = hasTrialLeft ? await getPlanPrice() : null;
+  const prepay = hasTrialLeft && !!plan?.productId;
+  let trialEnd: number | null = null;
+  if (hasTrialLeft && user.trialEndsAt) {
+    const end = prepay && plan ? addBillingInterval(user.trialEndsAt, plan.interval, plan.intervalCount) : user.trialEndsAt;
+    trialEnd = Math.floor(end.getTime() / 1000);
+  }
 
   const base = appBaseUrl();
   const useTax = process.env.STRIPE_AUTOMATIC_TAX === 'true';
@@ -72,7 +76,21 @@ export async function POST() {
       mode: 'subscription',
       customer: customerId,
       client_reference_id: user.id,
-      line_items: [{ price: process.env.STRIPE_PRICE_ID as string, quantity: 1 }],
+      line_items: [
+        { price: process.env.STRIPE_PRICE_ID as string, quantity: 1 },
+        ...(prepay && plan?.productId
+          ? [
+              {
+                price_data: {
+                  currency: plan.currency.toLowerCase(),
+                  product: plan.productId,
+                  unit_amount: plan.unitAmount,
+                },
+                quantity: 1,
+              },
+            ]
+          : []),
+      ],
       subscription_data: {
         metadata: { userId: user.id },
         ...(trialEnd ? { trial_end: trialEnd } : {}),

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateBilling, RENEW_WINDOW_DAYS, type BillingUserFields } from '@/lib/billing';
+import {
+  addBillingInterval,
+  evaluateBilling,
+  renewalAfterSubscribe,
+  RENEW_WINDOW_DAYS,
+  type BillingUserFields,
+} from '@/lib/billing';
 
 const NOW = new Date('2026-10-15T12:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -114,5 +120,25 @@ describe('evaluateBilling', () => {
       NOW,
     );
     expect(info).toMatchObject({ access: true, phase: 'trial' });
+  });
+});
+
+describe('subscribing mid-trial keeps the trial days', () => {
+  it('adds one billing interval to the trial end', () => {
+    expect(addBillingInterval(new Date('2026-10-27T00:00:00Z'), 'month', 1).toISOString()).toBe('2026-11-27T00:00:00.000Z');
+    expect(addBillingInterval(new Date('2026-10-27T00:00:00Z'), 'year', 1).toISOString()).toBe('2027-10-27T00:00:00.000Z');
+    expect(addBillingInterval(new Date('2026-10-27T00:00:00Z'), 'week', 2).toISOString()).toBe('2026-11-10T00:00:00.000Z');
+  });
+
+  it('puts the first renewal one period after the trial end', () => {
+    const trialEnd = new Date(NOW.getTime() + 12 * DAY);
+    expect(renewalAfterSubscribe(trialEnd, 'month', 1, NOW)?.toISOString()).toBe(
+      addBillingInterval(trialEnd, 'month', 1).toISOString(),
+    );
+  });
+
+  it('does not defer when the trial is too short for Stripe or missing', () => {
+    expect(renewalAfterSubscribe(new Date(NOW.getTime() + 24 * 60 * 60 * 1000), 'month', 1, NOW)).toBeNull();
+    expect(renewalAfterSubscribe(null, 'month', 1, NOW)).toBeNull();
   });
 });

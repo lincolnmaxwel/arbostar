@@ -228,7 +228,7 @@ export function Header() {
                     Profile
                   </Link>
                   <Link href="/billing" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
-                    Subscription
+                    {actorRole === 'admin' ? 'Subscriptions' : 'Subscription'}
                   </Link>
                   <button
                     type="button"

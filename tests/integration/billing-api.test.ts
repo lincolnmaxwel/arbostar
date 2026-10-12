@@ -22,6 +22,12 @@ import { POST as checkout } from '@/app/api/billing/checkout/route';
 import { POST as webhook } from '@/app/api/stripe/webhook/route';
 import { GET as getSettings, PATCH as patchSettings } from '@/app/api/admin/billing-settings/route';
 import { PATCH as patchUser } from '@/app/api/admin/users/[id]/route';
+import { GET as listSubscriptions } from '@/app/api/admin/subscriptions/route';
+
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}
 
 const sessionMock = getServerSession as unknown as ReturnType<typeof vi.fn>;
 const DAY = 24 * 60 * 60 * 1000;
@@ -107,8 +113,8 @@ describe('billing: access gate, webhook and admin settings', () => {
       sessionMock.mockResolvedValue({ user: { id: paidId } });
       expect((await checkout()).status).toBe(409);
     } finally {
-      process.env.STRIPE_SECRET_KEY = prevKey;
-      process.env.STRIPE_PRICE_ID = prevPrice;
+      restoreEnv('STRIPE_SECRET_KEY', prevKey);
+      restoreEnv('STRIPE_PRICE_ID', prevPrice);
     }
   });
 
@@ -176,8 +182,8 @@ describe('billing: access gate, webhook and admin settings', () => {
       expect(ok.status).toBe(200);
       expect(await ok.json()).toEqual({ received: true });
     } finally {
-      process.env.STRIPE_WEBHOOK_SECRET = prevSecret;
-      process.env.STRIPE_SECRET_KEY = prevKey;
+      restoreEnv('STRIPE_WEBHOOK_SECRET', prevSecret);
+      restoreEnv('STRIPE_SECRET_KEY', prevKey);
     }
   });
 
@@ -219,5 +225,48 @@ describe('billing: access gate, webhook and admin settings', () => {
       { params: { id: lockedId } },
     );
     expect(bad.status).toBe(400);
+  });
+
+  it('admin subscriptions overview lists every account with its billing phase', async () => {
+    const res = await listSubscriptions();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const byId = Object.fromEntries(body.subscriptions.map((r: { id: string }) => [r.id, r]));
+    expect(byId[trialId]).toMatchObject({ phase: 'trial', access: true });
+    expect(byId[paidId]).toMatchObject({ phase: 'subscribed', autoRenews: true });
+    expect(byId[adminId]).toMatchObject({ phase: 'exempt', role: 'admin' });
+    expect(body.summary.total).toBeGreaterThanOrEqual(4);
+    expect(['test', 'live']).toContain(body.stripeMode);
+
+    sessionMock.mockResolvedValue({ user: { id: trialId } });
+    expect((await listSubscriptions()).status).toBe(403);
+  });
+
+  it('admin can extend a trial, counting from today when it already lapsed', async () => {
+    const extend = (id: string, days: unknown) =>
+      patchUser(
+        new Request(`http://localhost/api/admin/users/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ extendTrialDays: days }),
+        }),
+        { params: { id } },
+      );
+
+    const before = (await prisma.user.findUniqueOrThrow({ where: { id: trialId } })).trialEndsAt as Date;
+    expect((await extend(trialId, 10)).status).toBe(200);
+    const after = (await prisma.user.findUniqueOrThrow({ where: { id: trialId } })).trialEndsAt as Date;
+    expect(after.getTime() - before.getTime()).toBe(10 * DAY);
+
+    // A lapsed trial restarts from now, not from the old end date.
+    const lapsed = await makeUser({ trialEndsAt: new Date(Date.now() - 20 * DAY) });
+    expect((await extend(lapsed.id, 7)).status).toBe(200);
+    const restarted = (await prisma.user.findUniqueOrThrow({ where: { id: lapsed.id } })).trialEndsAt as Date;
+    expect(restarted.getTime()).toBeGreaterThan(Date.now() + 6.9 * DAY);
+    expect(restarted.getTime()).toBeLessThan(Date.now() + 7.1 * DAY);
+    expect(await isFeatureEnabled(lapsed.id, 'quotes')).toBe(true);
+
+    expect((await extend(trialId, 0)).status).toBe(400);
+    expect((await extend(trialId, 400)).status).toBe(400);
+    expect((await extend(trialId, 'x')).status).toBe(400);
   });
 });

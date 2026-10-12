@@ -16,6 +16,8 @@ interface PatchUserBody {
   hourlyRate?: unknown;
   password?: unknown;
   billingExempt?: unknown;
+  /** Push the trial end out by this many days (from today if it already lapsed). */
+  extendTrialDays?: unknown;
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -46,6 +48,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     hourlyRate?: number;
     passwordHash?: string;
     billingExempt?: boolean;
+    trialEndsAt?: Date;
   } = {};
 
   if (body.name !== undefined) {
@@ -93,6 +96,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'billingExempt must be true or false.' }, { status: 400 });
     }
     data.billingExempt = body.billingExempt;
+  }
+
+  if (body.extendTrialDays !== undefined) {
+    const days = body.extendTrialDays;
+    if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 365) {
+      return NextResponse.json({ error: 'Trial extension must be a whole number of days between 1 and 365.' }, { status: 400 });
+    }
+    const base = Math.max(Date.now(), target.trialEndsAt?.getTime() ?? 0);
+    data.trialEndsAt = new Date(base + days * 24 * 60 * 60 * 1000);
   }
 
   if (body.password !== undefined) {

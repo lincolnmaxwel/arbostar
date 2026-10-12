@@ -45,7 +45,9 @@ export async function deleteClientCascade(clientId: string): Promise<{ quoteIds:
  * Delete a user and everything they own: timesheet entries, invoices,
  * quotes (by createdById), clients, company profile, then the user row.
  * ServiceCatalogItem and UserFeatureFlag cascade with the User; AuditLog
- * target rows become null. Runs in its own transaction. Returns the deleted
+ * target rows become null. UserInvite has no foreign key, so its rows are
+ * removed explicitly: invitations addressed to this user's email (pending or
+ * accepted) and invitations this user sent as an admin. Runs in its own transaction. Returns the deleted
  * quote ids for uploads/quotes/[quoteId] cleanup.
  */
 export async function deleteUserCascade(userId: string): Promise<{ quoteIds: string[] }> {
@@ -56,6 +58,10 @@ export async function deleteUserCascade(userId: string): Promise<{ quoteIds: str
     await tx.quote.deleteMany({ where: { createdById: userId } });
     await tx.client.deleteMany({ where: { userId } });
     await tx.companyProfile.deleteMany({ where: { userId } });
+    const owner = await tx.user.findUnique({ where: { id: userId }, select: { email: true } });
+    await tx.userInvite.deleteMany({
+      where: { OR: [{ invitedById: userId }, ...(owner ? [{ email: owner.email }] : [])] },
+    });
     await tx.user.delete({ where: { id: userId } });
     return { quoteIds: quotes.map((q) => q.id) };
   });

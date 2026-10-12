@@ -82,7 +82,18 @@ export async function POST(req: Request) {
   if (sendInvite) {
     const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true } });
     // One live invitation per email: a new one replaces any pending one.
-    await prisma.userInvite.deleteMany({ where: { email, acceptedAt: null } });
+    // Housekeeping in the same place: drop invitations that expired or were
+    // accepted more than 30 days ago so the table cannot grow without bound.
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    await prisma.userInvite.deleteMany({
+      where: {
+        OR: [
+          { email, acceptedAt: null },
+          { acceptedAt: { lt: cutoff } },
+          { acceptedAt: null, expiresAt: { lt: cutoff } },
+        ],
+      },
+    });
     const { token, tokenHash } = generateInviteToken();
     const invite = await prisma.userInvite.create({
       data: { email, name, role, hourlyRate, features, tokenHash, expiresAt: inviteExpiry(), invitedById: actorId },

@@ -16,6 +16,7 @@ import { GET as listInvites } from '@/app/api/admin/invites/route';
 import { DELETE as revokeInvite } from '@/app/api/admin/invites/[id]/route';
 import { POST as resendInvite } from '@/app/api/admin/invites/[id]/resend/route';
 import { POST as acceptInvite } from '@/app/api/invite/[token]/accept/route';
+import { DELETE as deleteUser } from '@/app/api/admin/users/[id]/route';
 import { hashInviteToken } from '@/lib/invites';
 
 const sessionMock = getServerSession as unknown as ReturnType<typeof vi.fn>;
@@ -182,6 +183,43 @@ describe('user invitations', () => {
     const revoked = await revokeInvite(new Request('http://localhost'), { params: { id: row.id } });
     expect(revoked.status).toBe(200);
     expect((await accept(newToken, { password: 'long-enough' })).status).toBe(404);
+  });
+
+  it('deleting a user also deletes the invitations addressed to them and those they sent', async () => {
+    // Accepted invite addressed to the user.
+    const email = `gone-${randomUUID()}@example.com`;
+    await invite(email, { role: 'admin' });
+    await accept(tokenFromLastEmail(), { password: 'long-enough' });
+    const gone = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    // Pending invite sent by that user (they are an admin now).
+    sessionMock.mockResolvedValue({ user: { id: gone.id } });
+    const sentEmail = `sent-${randomUUID()}@example.com`;
+    const sentRes = await invite(sentEmail);
+    expect(sentRes.status).toBe(201);
+
+    // Unrelated invite from the main admin must survive.
+    sessionMock.mockResolvedValue({ user: { id: adminId } });
+    const keepEmail = `keep-${randomUUID()}@example.com`;
+    await invite(keepEmail);
+
+    const res = await deleteUser(new Request('http://localhost'), { params: { id: gone.id } });
+    expect(res.status).toBe(200);
+
+    expect(await prisma.userInvite.count({ where: { email } })).toBe(0);
+    expect(await prisma.userInvite.count({ where: { email: sentEmail } })).toBe(0);
+    expect(await prisma.userInvite.count({ where: { email: keepEmail } })).toBe(1);
+  });
+
+  it('purges long-expired and long-accepted invitations when a new one is created', async () => {
+    const old = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const staleEmail = `stale-${randomUUID()}@example.com`;
+    emails.push(staleEmail);
+    await prisma.userInvite.create({
+      data: { email: staleEmail, name: 'Stale', tokenHash: randomUUID(), expiresAt: old, invitedById: adminId },
+    });
+    await invite(`trigger-${randomUUID()}@example.com`);
+    expect(await prisma.userInvite.count({ where: { email: staleEmail } })).toBe(0);
   });
 
   it('returns the link to the admin when the email cannot be delivered', async () => {

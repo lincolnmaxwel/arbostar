@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 import { hashResetToken, lookupReset } from '@/lib/passwordReset';
 
@@ -38,7 +39,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       });
       if (burned.count !== 1) throw new ResetAlreadyUsedError();
 
-      await tx.user.update({ where: { id: lookup.reset.userId }, data: { passwordHash } });
+      await tx.user.update({ where: { id: lookup.reset.userId }, data: { passwordHash, sessionId: randomUUID() } });
       // Any other outstanding link for this account dies with this one.
       await tx.passwordReset.updateMany({
         where: { userId: lookup.reset.userId, usedAt: null },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import styles from './login.module.css';
@@ -35,6 +35,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [otherDevice, setOtherDevice] = useState(false);
+
+  useEffect(() => {
+    setOtherDevice(new URLSearchParams(window.location.search).get('reason') === 'other-device');
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +80,12 @@ export default function LoginPage() {
         </h1>
         <p className={styles.subtitle}>Sign in to your account</p>
 
+        {otherDevice && !error && (
+          <p className={styles.success} role="status">
+            You were signed out because this account was signed in on another device. Only one device can use an
+            account at a time.
+          </p>
+        )}
         {error && <p className={styles.error} role="alert">{error}</p>}
 
         <form onSubmit={handleSubmit}>

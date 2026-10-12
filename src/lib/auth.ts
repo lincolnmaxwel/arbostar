@@ -1,6 +1,7 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
 
 // Stable, user-facing error messages surfaced by the login page when a real
@@ -32,6 +33,19 @@ export async function verifyCredentials(email: string, password: string) {
   return { id: user.id, name: user.name, email: user.email, role: user.role };
 }
 
+/**
+ * Sign-in: verify credentials, then rotate the user's single active session id.
+ * Any JWT issued by an earlier sign-in carries the old id and is rejected by
+ * the jwt callback below, so an account can only be used from one place.
+ */
+export async function authorizeCredentials(email: string, password: string) {
+  const user = await verifyCredentials(email, password);
+  if (!user) return null;
+  const sid = randomUUID();
+  await prisma.user.update({ where: { id: user.id }, data: { sessionId: sid } });
+  return { ...user, sid };
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
@@ -44,19 +58,36 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        return verifyCredentials(credentials.email, credentials.password);
+        return authorizeCredentials(credentials.email, credentials.password);
       },
     }),
   ],
+  // Re-validate against the DB periodically-enough: the jwt callback runs on
+  // every getServerSession()/session fetch.
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.sid = user.sid;
+        token.revoked = false;
+        return token;
+      }
+      if (token.id) {
+        const row = await prisma.user.findUnique({ where: { id: token.id }, select: { sessionId: true } });
+        // Revoked when the account is gone or a newer sign-in replaced this
+        // one. A null sessionId is a legacy account: its old tokens stay valid
+        // until its next sign-in stamps an id.
+        token.revoked = !row || (row.sessionId !== null && row.sessionId !== token.sid);
       }
       return token;
     },
     async session({ session, token }) {
+      if (token.revoked) {
+        // No user => every server check (`session?.user?.id`) treats this as
+        // signed out; `revoked` lets the client explain why and clear the cookie.
+        return { expires: session.expires, revoked: true } as unknown as typeof session;
+      }
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;

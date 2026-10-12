@@ -30,7 +30,7 @@
   --duration-fast: 150ms;
   --duration-standard: 220ms;
 
-  --max-width: 960px;
+  --max-width: 1200px;
 }
 
 *, *::before, *::after {

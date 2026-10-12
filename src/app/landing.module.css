@@ -339,12 +339,14 @@
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
 }
 
 .card {
+  flex: 0 1 calc((100% - 40px) / 3);
   background: #fff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -478,8 +480,8 @@
     gap: 40px;
   }
 
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
+  .card {
+    flex-basis: calc((100% - 20px) / 2);
   }
 
   .steps {
@@ -504,8 +506,8 @@
     padding: 60px 0;
   }
 
-  .grid {
-    grid-template-columns: 1fr;
+  .card {
+    flex-basis: 100%;
   }
 
   .previewCard {

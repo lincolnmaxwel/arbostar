@@ -18,7 +18,6 @@ type IconName =
   | 'clock'
   | 'users'
   | 'chart'
-  | 'team'
   | 'brand'
   | 'phone';
 
@@ -74,13 +73,6 @@ function Icon({ name }: { name: IconName }) {
           <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
         </svg>
       );
-    case 'team':
-      return (
-        <svg {...common}>
-          <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" />
-          <path d="M9 12l2 2 4-4" />
-        </svg>
-      );
     case 'brand':
       return (
         <svg {...common}>
@@ -134,11 +126,6 @@ const FEATURES: { icon: IconName; title: string; text: string }[] = [
     icon: 'chart',
     title: 'Financial reports',
     text: 'See jobs completed, paid and outstanding by day, week, month, year or any custom period, with net, GST and total separated.',
-  },
-  {
-    icon: 'team',
-    title: 'Teams and permissions',
-    text: 'Invite staff by email, choose what each person can use, and keep every user’s clients and documents separate.',
   },
   {
     icon: 'brand',

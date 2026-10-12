@@ -1,8 +1,13 @@
 .page {
-  min-height: calc(100vh - 48px);
+  /* Full-viewport brand background; the card sits centered on top of it. */
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  padding: 24px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #eef4ff url('/brand/background-login.jpg') center / cover no-repeat;
 }
 
 .card {

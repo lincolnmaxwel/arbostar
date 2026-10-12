@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { evaluateBilling } from '@/lib/billing';
 import { requireBillingUser, billingAuthErrorResponse, billingNotConfiguredResponse } from '@/lib/billingAuth';
-import { getStripe, stripeConfigured } from '@/lib/stripe';
+import { describeStripeError, getStripe, stripeConfigured } from '@/lib/stripe';
 import { appBaseUrl } from '@/lib/emailLayout';
 
 // Stripe rejects a Checkout trial_end that is less than 48h away; keep a margin.
@@ -16,6 +16,13 @@ export async function POST() {
     return billingAuthErrorResponse(err);
   }
   if (!stripeConfigured()) return billingNotConfiguredResponse();
+  if (!(process.env.STRIPE_PRICE_ID as string).startsWith('price_')) {
+    console.error('[billing/checkout] STRIPE_PRICE_ID must be a Price id (price_...), not a Product id (prod_...)');
+    return NextResponse.json(
+      { error: 'Billing is misconfigured: the plan id must start with "price_". Please contact support.' },
+      { status: 503 },
+    );
+  }
 
   const info = evaluateBilling(user);
   if (info.phase === 'exempt') {
@@ -32,12 +39,20 @@ export async function POST() {
 
   let customerId = user.stripeCustomerId;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      name: user.name,
-      metadata: { userId: user.id },
-    });
-    customerId = customer.id;
+    try {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.name,
+        metadata: { userId: user.id },
+      });
+      customerId = customer.id;
+    } catch (err) {
+      const { code } = describeStripeError('customer create', err);
+      return NextResponse.json(
+        { error: `Could not reach the payment provider${code ? ` (${code})` : ''}. Please try again.` },
+        { status: 502 },
+      );
+    }
     await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
   }
 
@@ -78,7 +93,10 @@ export async function POST() {
     }
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error('[billing/checkout] failed', err);
-    return NextResponse.json({ error: 'Could not start checkout. Please try again.' }, { status: 502 });
+    const { code } = describeStripeError('checkout session create', err);
+    return NextResponse.json(
+      { error: `Could not start checkout${code ? ` (${code})` : ''}. Please try again.` },
+      { status: 502 },
+    );
   }
 }

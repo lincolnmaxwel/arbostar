@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { evaluateBilling } from '@/lib/billing';
 import { requireBillingUser, billingAuthErrorResponse, billingNotConfiguredResponse } from '@/lib/billingAuth';
-import { getStripe, stripeConfigured, syncSubscription } from '@/lib/stripe';
+import { describeStripeError, getStripe, stripeConfigured, syncSubscription } from '@/lib/stripe';
 
 // "Renew": undo a scheduled cancellation so the subscription keeps going
 // after the current period. A subscription that already ended has to go
@@ -31,7 +31,10 @@ export async function POST() {
     await syncSubscription(updated);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('[billing/renew] failed', err);
-    return NextResponse.json({ error: 'Could not renew the subscription. Please try again.' }, { status: 502 });
+    const { code } = describeStripeError('subscription renew', err);
+    return NextResponse.json(
+      { error: `Could not renew the subscription${code ? ` (${code})` : ''}. Please try again.` },
+      { status: 502 },
+    );
   }
 }

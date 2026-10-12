@@ -9,6 +9,20 @@ import { prisma } from '@/lib/db';
 
 let client: Stripe | null = null;
 
+/**
+ * Log a Stripe SDK failure with everything needed to diagnose it and return
+ * the short, non-sensitive Stripe error code (e.g. "resource_missing") so the
+ * UI can show something actionable instead of a bare 502.
+ */
+export function describeStripeError(context: string, err: unknown): { code: string | null; message: string } {
+  if (err instanceof Stripe.errors.StripeError) {
+    console.error(`[stripe] ${context} failed:`, err.type, err.code ?? '-', err.message);
+    return { code: err.code ?? err.type, message: err.message };
+  }
+  console.error(`[stripe] ${context} failed:`, err);
+  return { code: null, message: err instanceof Error ? err.message : 'unknown error' };
+}
+
 export function stripeConfigured(): boolean {
   return !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRICE_ID;
 }

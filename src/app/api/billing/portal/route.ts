@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireBillingUser, billingAuthErrorResponse, billingNotConfiguredResponse } from '@/lib/billingAuth';
-import { getStripe, stripeConfigured } from '@/lib/stripe';
+import { describeStripeError, getStripe, stripeConfigured } from '@/lib/stripe';
 import { appBaseUrl } from '@/lib/emailLayout';
 
 // Opens the Stripe Customer Portal (update card, invoices history, cancel).
@@ -23,7 +23,10 @@ export async function POST() {
     });
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error('[billing/portal] failed', err);
-    return NextResponse.json({ error: 'Could not open the billing portal. Please try again.' }, { status: 502 });
+    const { code } = describeStripeError('billing portal session create', err);
+    return NextResponse.json(
+      { error: `Could not open the billing portal${code ? ` (${code})` : ''}. Please try again.` },
+      { status: 502 },
+    );
   }
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { useLivePolling } from '@/lib/useLivePolling';
 import styles from '../app/admin/users/admin-users.module.css';
+import sub from '../app/billing/subscriptions.module.css';
 
 type Phase = 'exempt' | 'subscribed' | 'past_due' | 'trial' | 'trial_ended' | 'canceled';
 
@@ -65,6 +66,7 @@ export function AdminSubscriptionsClient() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
   const [trialDates, setTrialDates] = useState<Record<string, string>>({});
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const hasData = useRef(false);
 
@@ -266,140 +268,201 @@ export function AdminSubscriptionsClient() {
                 <th>Status</th>
                 <th>Trial ends</th>
                 <th>Renewal / ends</th>
-                <th>Stripe</th>
-                <th>Actions</th>
+                <th aria-label="Manage"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <div className={styles.userName}>{s.name}</div>
-                    <div className={styles.userEmail}>{s.email}</div>
-                    {s.role === 'admin' && <span className={styles.selfBadge}>Admin</span>}
-                    {s.accountStatus !== 'active' && <div className={styles.userEmail}>Account {s.accountStatus}</div>}
-                  </td>
-                  <td>
-                    <div className={styles.userName}>{s.billingExempt ? 'Exempt' : PHASE_LABEL[s.phase]}</div>
-                    {s.subscriptionStatus && <div className={styles.userEmail}>Stripe: {s.subscriptionStatus}</div>}
-                    {!s.access && <div className={styles.userEmail}>Access locked</div>}
-                  </td>
-                  <td>{s.phase === 'trial' ? `${fmt(s.trialEndsAt)} (${s.daysLeft}d)` : fmt(s.trialEndsAt)}</td>
-                  <td>
-                    {s.phase === 'subscribed' || s.phase === 'past_due' ? (
-                      <>
-                        <div>{fmt(s.periodEnd)}</div>
-                        <div className={styles.userEmail}>
-                          {s.cancelAtPeriodEnd ? 'Cancels at period end' : s.autoRenews ? 'Auto-renews' : ''}
-                          {s.daysLeft !== null ? ` · ${s.daysLeft}d left` : ''}
-                        </div>
-                      </>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td>
-                    <div className={styles.rowActions}>
-                      {s.stripeCustomerId ? (
-                        <a
-                          className={styles.actionButton}
-                          href={`${dash}/customers/${s.stripeCustomerId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Customer
-                        </a>
-                      ) : (
-                        <span className={styles.userEmail}>-</span>
-                      )}
-                      {s.stripeSubscriptionId && (
-                        <a
-                          className={styles.actionButton}
-                          href={`${dash}/subscriptions/${s.stripeSubscriptionId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Subscription
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    {s.role === 'admin' ? (
-                      <span className={styles.userEmail}>-</span>
-                    ) : (
-                      <div className={styles.rowActions}>
-                        <input
-                          type="number"
-                          min="1"
-                          max="365"
-                          className={styles.input}
-                          style={{ width: 70 }}
-                          value={extendDays[s.id] ?? '7'}
-                          onChange={(e) => setExtendDays((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                          aria-label={`Days to extend trial for ${s.email}`}
-                        />
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          disabled={busyId === s.id}
-                          onClick={() => extendTrial(s)}
-                        >
-                          Extend trial
-                        </button>
-                        <input
-                          type="date"
-                          className={styles.input}
-                          style={{ width: 150 }}
-                          value={trialDates[s.id] ?? localDateValue(s.trialEndsAt)}
-                          onChange={(e) => setTrialDates((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                          aria-label={`Trial end date for ${s.email}`}
-                        />
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          disabled={busyId === s.id}
-                          onClick={() => setTrialDate(s)}
-                        >
-                          Set trial end
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          disabled={busyId === s.id}
-                          onClick={() =>
-                            patchUser(
-                              s.id,
-                              { billingExempt: !s.billingExempt },
-                              s.billingExempt
-                                ? `${s.email} now follows the normal trial/subscription rules.`
-                                : `${s.email} is exempt from billing.`,
-                            )
-                          }
-                        >
-                          {s.billingExempt ? 'Remove exemption' : 'Exempt'}
-                        </button>
-                        {(s.stripeSubscriptionId || s.subscriptionStatus) && (
+              {rows.map((s) => {
+                const open = openId === s.id;
+                const hasSub = !!(s.stripeSubscriptionId || s.subscriptionStatus);
+                const canManage = s.role !== 'admin';
+                return (
+                  <Fragment key={s.id}>
+                    <tr>
+                      <td>
+                        <div className={styles.userName}>{s.name}</div>
+                        <div className={styles.userEmail}>{s.email}</div>
+                        {s.role === 'admin' && <span className={styles.selfBadge}>Admin</span>}
+                        {s.accountStatus !== 'active' && <div className={styles.userEmail}>Account {s.accountStatus}</div>}
+                      </td>
+                      <td>
+                        <div className={styles.userName}>{s.billingExempt ? 'Exempt' : PHASE_LABEL[s.phase]}</div>
+                        {s.subscriptionStatus && <div className={styles.userEmail}>Stripe: {s.subscriptionStatus}</div>}
+                        {!s.access && <div className={styles.userEmail}>Access locked</div>}
+                      </td>
+                      <td>{s.phase === 'trial' ? `${fmt(s.trialEndsAt)} (${s.daysLeft}d)` : fmt(s.trialEndsAt)}</td>
+                      <td>
+                        {s.phase === 'subscribed' || s.phase === 'past_due' ? (
+                          <>
+                            <div>{fmt(s.periodEnd)}</div>
+                            <div className={styles.userEmail}>
+                              {s.cancelAtPeriodEnd ? 'Cancels at period end' : s.autoRenews ? 'Auto-renews' : ''}
+                              {s.daysLeft !== null ? ` · ${s.daysLeft}d left` : ''}
+                            </div>
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {canManage ? (
                           <button
                             type="button"
-                            className={styles.deleteButton}
-                            disabled={busyId === s.id}
-                            onClick={() => deleteSubscription(s)}
+                            className={styles.actionButton}
+                            aria-expanded={open}
+                            onClick={() => setOpenId(open ? null : s.id)}
                           >
-                            Delete subscription
+                            {open ? 'Close' : 'Manage'}
                           </button>
+                        ) : (
+                          <span className={styles.userEmail}>-</span>
                         )}
-                      </div>
+                      </td>
+                    </tr>
+                    {open && canManage && (
+                      <tr>
+                        <td colSpan={5} className={sub.panelCell}>
+                          <div className={sub.panel}>
+                            <section className={sub.card}>
+                              <h3 className={sub.cardTitle}>Trial</h3>
+                              <p className={sub.hint}>
+                                {s.trialEndsAt
+                                  ? `Ends ${fmt(s.trialEndsAt)}${s.phase === 'trial' ? ` (${s.daysLeft} days left)` : ''}.`
+                                  : 'No trial date set.'}
+                                {hasSub && ' It only matters again if the subscription is deleted or ends.'}
+                              </p>
+                              <div className={sub.field}>
+                                <label className={sub.fieldLabel} htmlFor={`add-${s.id}`}>
+                                  Add days
+                                </label>
+                                <div className={sub.inline}>
+                                  <input
+                                    id={`add-${s.id}`}
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    className={styles.input}
+                                    value={extendDays[s.id] ?? '7'}
+                                    onChange={(e) => setExtendDays((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                  />
+                                  <button
+                                    type="button"
+                                    className={styles.actionButton}
+                                    disabled={busyId === s.id}
+                                    onClick={() => extendTrial(s)}
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                              </div>
+                              <div className={sub.field}>
+                                <label className={sub.fieldLabel} htmlFor={`date-${s.id}`}>
+                                  Or set an exact end date
+                                </label>
+                                <div className={sub.inline}>
+                                  <input
+                                    id={`date-${s.id}`}
+                                    type="date"
+                                    className={styles.input}
+                                    value={trialDates[s.id] ?? localDateValue(s.trialEndsAt)}
+                                    onChange={(e) => setTrialDates((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                  />
+                                  <button
+                                    type="button"
+                                    className={styles.actionButton}
+                                    disabled={busyId === s.id}
+                                    onClick={() => setTrialDate(s)}
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+                            </section>
+
+                            <section className={sub.card}>
+                              <h3 className={sub.cardTitle}>Billing</h3>
+                              <p className={sub.hint}>
+                                {s.billingExempt
+                                  ? 'This account is exempt: it is never charged and never locked.'
+                                  : 'Exempt accounts are never charged and never locked (partners, internal accounts). An existing Stripe subscription keeps billing.'}
+                              </p>
+                              <div>
+                                <button
+                                  type="button"
+                                  className={styles.actionButton}
+                                  disabled={busyId === s.id}
+                                  onClick={() =>
+                                    patchUser(
+                                      s.id,
+                                      { billingExempt: !s.billingExempt },
+                                      s.billingExempt
+                                        ? `${s.email} now follows the normal trial/subscription rules.`
+                                        : `${s.email} is exempt from billing.`,
+                                    )
+                                  }
+                                >
+                                  {s.billingExempt ? 'Remove exemption' : 'Make exempt'}
+                                </button>
+                              </div>
+                              {s.stripeCustomerId && (
+                                <div className={sub.field}>
+                                  <span className={sub.fieldLabel}>Open in Stripe</span>
+                                  <div className={sub.links}>
+                                    <a
+                                      className={styles.actionButton}
+                                      href={`${dash}/customers/${s.stripeCustomerId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Customer
+                                    </a>
+                                    {s.stripeSubscriptionId && (
+                                      <a
+                                        className={styles.actionButton}
+                                        href={`${dash}/subscriptions/${s.stripeSubscriptionId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        Subscription
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </section>
+
+                            {hasSub && (
+                              <section className={`${sub.card} ${sub.cardDanger}`}>
+                                <h3 className={sub.cardTitle}>Danger zone</h3>
+                                <p className={sub.hint}>
+                                  Cancels the subscription in Stripe right away (no refund). The account goes back to its
+                                  free trial if it is still running, or is locked as &quot;trial ended&quot;.
+                                </p>
+                                <div>
+                                  <button
+                                    type="button"
+                                    className={styles.deleteButton}
+                                    disabled={busyId === s.id}
+                                    onClick={() => deleteSubscription(s)}
+                                  >
+                                    Delete subscription
+                                  </button>
+                                </div>
+                              </section>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
       <p className={styles.userEmail} style={{ marginTop: 12 }}>
-        To cancel, refund or change a paid subscription, open it in Stripe with the Customer / Subscription links; the
+        To cancel, refund or change a paid subscription, open it in Stripe from Manage > Billing > Open in Stripe; the
         webhook updates this list automatically.
       </p>
     </div>

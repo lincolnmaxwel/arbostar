@@ -100,3 +100,6 @@ Deleting: `DELETE /api/invoices/[id]` and `DELETE /api/clients/[id]` (buttons on
 ### Idioma
 
 Qualquer texto que for adicionado ao sistema precisa ser em ingles. Mesmo eu pedindo em portugues, faça a tradução e deixe todo o texto para o usuario em ingle
+### Financial (staff-facing report, server-truth only)
+
+`/financial` (gated by the `invoices` feature flag; no new flag) summarizes invoices issued in a period: jobs completed (quote + timesheet invoices), paid vs awaiting payment, plus money split three ways — net (`subtotal`), GST (`taxAmount`) and gross (`total`) — for Invoiced / Received (paid) / Outstanding (pending). "Scheduled (open)" is a live snapshot of `scheduled` quotes, not period-filtered. Everything is keyed on `Invoice.createdAt` inside the period. Period math lives in `src/lib/financial.ts` (`resolvePeriod`: daily/weekly Mon–Sun/monthly/yearly anchored on a date, or a custom inclusive range; boundaries are shifted by the browser's `getTimezoneOffset()` passed as `tz`, so an evening invoice lands on the viewer's local day). `GET /api/financial` returns the JSON; `GET /api/financial/pdf` builds the report with `buildFinancialReportPdf()` (`src/lib/financialPdf.ts`, pdfkit, paginated invoice list, same company header as invoices).

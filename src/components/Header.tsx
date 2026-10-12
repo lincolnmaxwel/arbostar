@@ -146,6 +146,9 @@ export function Header() {
             {features?.invoices && (
               <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
             )}
+            {features?.invoices && (
+              <Link href="/financial" className={pathname.startsWith('/financial') ? styles.active : ''}>Financial</Link>
+            )}
           </div>
         </nav>
         <div className={styles.actions}>

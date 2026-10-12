@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { resetViewContext } from '@/lib/clientUserContext';
+import { useLivePolling } from '@/lib/useLivePolling';
 import type { BillingInfo } from '@/lib/billing';
 import styles from '../app/billing/billing.module.css';
 
@@ -32,62 +33,83 @@ const PHASE_BADGE: Record<BillingInfo['phase'], { label: string; tone: string }>
   canceled: { label: 'Canceled', tone: styles.badgeBad },
 };
 
+const POLL_MS = 5000;
+// How long the post-checkout "confirming" notice may wait for the webhook.
+const CONFIRM_WINDOW_MS = 45000;
+
 export function BillingClient() {
   const [data, setData] = useState<BillingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingUntil, setConfirmingUntilState] = useState<number | null>(null);
+  // Mirror of confirmingUntil readable inside load() without a stale closure.
+  const confirmingRef = useRef<number | null>(null);
+  const setConfirmingUntil = useCallback((value: number | null) => {
+    confirmingRef.current = value;
+    setConfirmingUntilState(value);
+  }, []);
   const [busy, setBusy] = useState<'checkout' | 'portal' | 'renew' | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPhase = useRef<BillingInfo['phase'] | null>(null);
+  const hasData = useRef(false);
 
   const load = useCallback(async (): Promise<BillingResponse | null> => {
     const res = await fetch('/api/billing', { cache: 'no-store' });
     if (!res.ok) {
-      setError('Could not load your subscription. Please try again.');
+      // A failed refresh must not wipe a screen that already has data.
+      if (!hasData.current) setError('Could not load your subscription. Please try again.');
       setLoading(false);
       return null;
     }
     const body = (await res.json()) as BillingResponse;
+    hasData.current = true;
+    setError(null);
     setData(body);
     setLoading(false);
-    return body;
-  }, []);
 
+    // Any change of state (paid, deleted, canceled, trial over...) makes older
+    // transient messages stale, and the header/gate must re-evaluate access.
+    const phase = body.billing.phase;
+    const wasConfirming = confirmingRef.current !== null;
+    if (lastPhase.current !== null && lastPhase.current !== phase) {
+      setNotice(null);
+      setConfirmingUntil(null);
+      resetViewContext();
+      window.dispatchEvent(new Event('myjobbs:billing-changed'));
+    }
+    lastPhase.current = phase;
+
+    if (wasConfirming && (phase === 'subscribed' || phase === 'past_due')) {
+      setConfirmingUntil(null);
+      setNotice('Your subscription is active. Thank you!');
+    }
+    return body;
+  }, [setConfirmingUntil]);
+
+  // Live refresh: pick up webhook results, admin changes and other tabs.
+  useLivePolling(load, POLL_MS);
+
+  // Read the post-checkout flag once, then drop it from the URL so a reload
+  // does not replay the message.
   useEffect(() => {
-    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get('checkout');
+    if (!checkout) return;
+    if (checkout === 'canceled') setNotice('Checkout was canceled. You have not been charged.');
+    if (checkout === 'success') setConfirmingUntil(Date.now() + CONFIRM_WINDOW_MS);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [setConfirmingUntil]);
 
-    load().then((first) => {
-      if (cancelled || !first) return;
-      if (checkout === 'canceled') {
-        setNotice('Checkout was canceled. You have not been charged.');
-      } else if (checkout === 'success') {
-        // The Stripe webhook may land a moment after the redirect; poll briefly.
-        setNotice('Thanks! Confirming your payment...');
-        let tries = 0;
-        const tick = async () => {
-          const latest = await load();
-          if (cancelled) return;
-          const live = latest && (latest.billing.phase === 'subscribed' || latest.billing.phase === 'past_due');
-          if (live) {
-            setNotice('Your subscription is active. Thank you!');
-            resetViewContext();
-            return;
-          }
-          tries += 1;
-          if (tries < 8) pollRef.current = setTimeout(tick, 2000);
-          else setNotice('Your payment is still being confirmed. This page will update shortly; you can also refresh.');
-        };
-        pollRef.current = setTimeout(tick, 1500);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, [load]);
+  // The confirming notice must not outlive its window if the webhook never lands.
+  useEffect(() => {
+    if (confirmingUntil === null) return;
+    const wait = Math.max(0, confirmingUntil - Date.now());
+    const t = setTimeout(() => {
+      setConfirmingUntil(null);
+      setNotice('Your payment is still being confirmed. This page updates by itself as soon as it is.');
+    }, wait);
+    return () => clearTimeout(t);
+  }, [confirmingUntil, setConfirmingUntil]);
 
   async function go(kind: 'checkout' | 'portal') {
     setBusy(kind);
@@ -154,7 +176,12 @@ export function BillingClient() {
           {error}
         </p>
       )}
-      {notice && (
+      {confirmingUntil !== null && (
+        <p className={`${styles.alert} ${styles.alertOk}`} role="status">
+          Thanks! Confirming your payment...
+        </p>
+      )}
+      {confirmingUntil === null && notice && (
         <p className={`${styles.alert} ${styles.alertOk}`} role="status">
           {notice}
         </p>

@@ -26,6 +26,7 @@ export function Header() {
   const [isViewAs, setIsViewAs] = useState(false);
   const [targetName, setTargetName] = useState<string | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [ctxVersion, setCtxVersion] = useState(0);
   const [features, setFeatures] = useState<{ quotes: boolean; invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
   const [users, setUsers] = useState<HeaderUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -50,7 +51,16 @@ export function Header() {
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, ctxVersion]);
+
+  // The billing page announces subscription changes (payment confirmed,
+  // subscription deleted by an admin...) so nav, banner and the access gate
+  // update without a reload.
+  useEffect(() => {
+    const onBillingChanged = () => setCtxVersion((v) => v + 1);
+    window.addEventListener('myjobbs:billing-changed', onBillingChanged);
+    return () => window.removeEventListener('myjobbs:billing-changed', onBillingChanged);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;

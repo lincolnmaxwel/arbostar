@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useLivePolling } from '@/lib/useLivePolling';
 import styles from '../app/admin/users/admin-users.module.css';
 
 type Phase = 'exempt' | 'subscribed' | 'past_due' | 'trial' | 'trial_ended' | 'canceled';
@@ -64,20 +65,23 @@ export function AdminSubscriptionsClient() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
 
+  const hasData = useRef(false);
+
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/subscriptions', { cache: 'no-store' });
     if (!res.ok) {
-      setError(res.status === 403 ? 'Admin access required.' : 'Could not load subscriptions.');
+      // A failed background refresh must not replace a list that is on screen.
+      if (!hasData.current) setError(res.status === 403 ? 'Admin access required.' : 'Could not load subscriptions.');
       setLoading(false);
       return;
     }
+    hasData.current = true;
     setData((await res.json()) as Overview);
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Live: new subscriptions, webhook updates and deletions show up on their own.
+  useLivePolling(load, 5000);
 
   const rows = useMemo(() => {
     if (!data) return [];

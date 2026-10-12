@@ -65,7 +65,13 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.headerRow}>
-          <div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={company.name ?? 'Company logo'} className={styles.logo} />
+          ) : (
+            <span />
+          )}
+          <div className={styles.invoiceInfo}>
             <h1 className={styles.title}>Invoice #{invoice.number}</h1>
             <p className={styles.meta}>
               {invoice.quote ? `Quote #${invoice.quote.number} · ` : ''}
@@ -75,10 +81,6 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
               <PaymentStatusBadge status={invoice.paymentStatus} />
             </div>
           </div>
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={company.name ?? 'Company logo'} className={styles.logo} />
-          )}
         </div>
 
         <div className={styles.actions}>

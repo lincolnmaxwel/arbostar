@@ -53,18 +53,19 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   const marginX = doc.page.margins.left;
   const contentWidth = pageWidth - marginX * 2;
 
-  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(22).text(`Invoice #${opts.invoiceNumber}`, marginX, 50);
+  // Logo on the left, invoice identity right-aligned on the right.
+  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(22).text(`Invoice #${opts.invoiceNumber}`, marginX, 50, { width: contentWidth, align: 'right' });
   const metaParts = [`${opts.date.toLocaleDateString()}`];
   if (opts.quoteNumber !== undefined) metaParts.unshift(`Quote #${opts.quoteNumber}`);
-  doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(metaParts.join(' · '), marginX, 78);
+  doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(metaParts.join(' · '), marginX, 78, { width: contentWidth, align: 'right' });
   if (opts.period) {
-    doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(`Period: ${opts.period}`, marginX, 92);
+    doc.fillColor(GRAY).font('Helvetica').fontSize(9).text(`Period: ${opts.period}`, marginX, 92, { width: contentWidth, align: 'right' });
   }
 
   if (opts.company.logoPath) {
     try {
       const logoBuffer = await readFile(path.join(process.cwd(), 'uploads', 'company', opts.company.logoPath));
-      doc.image(logoBuffer, pageWidth - marginX - 100, 45, { fit: [100, 60] });
+      doc.image(logoBuffer, marginX, 45, { fit: [100, 60] });
     } catch {
       // Logo file missing on disk — skip it rather than fail the whole PDF.
     }

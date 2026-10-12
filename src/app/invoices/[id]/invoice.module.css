@@ -86,6 +86,15 @@
   cursor: default;
 }
 
+.invoiceInfo {
+  text-align: right;
+}
+
+.invoiceInfo .paymentRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .logo {
   max-width: 120px;
   max-height: 72px;
@@ -204,7 +213,15 @@
   }
 
   .headerRow {
-    flex-direction: column-reverse;
+    flex-direction: column;
+  }
+
+  .invoiceInfo {
+    text-align: left;
+  }
+
+  .invoiceInfo .paymentRow {
+    justify-content: flex-start;
   }
 
   .totals {

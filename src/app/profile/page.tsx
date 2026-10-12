@@ -16,6 +16,7 @@ interface CompanyProfile {
   phone: string | null;
   email: string | null;
   address: string | null;
+  gstNumber: string | null;
   logoUrl: string | null;
 }
 
@@ -47,6 +48,7 @@ export default function ProfilePage() {
   const [companyPhone, setCompanyPhone] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
+  const [companyGstNumber, setCompanyGstNumber] = useState('');
   const [companySaving, setCompanySaving] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [companySaved, setCompanySaved] = useState(false);
@@ -72,6 +74,7 @@ export default function ProfilePage() {
         setCompanyPhone(body.company.phone ?? '');
         setCompanyEmail(body.company.email ?? '');
         setCompanyAddress(body.company.address ?? '');
+        setCompanyGstNumber(body.company.gstNumber ?? '');
       });
   }, []);
 
@@ -103,7 +106,7 @@ export default function ProfilePage() {
     const res = await fetch('/api/company', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: companyName, phone: companyPhone, email: companyEmail, address: companyAddress }),
+      body: JSON.stringify({ name: companyName, phone: companyPhone, email: companyEmail, address: companyAddress, gstNumber: companyGstNumber }),
     });
     setCompanySaving(false);
     if (!res.ok) {
@@ -238,7 +241,7 @@ export default function ProfilePage() {
 
       <div className={styles.card}>
         <h2 className={styles.sectionTitle}>Service provider details</h2>
-        <p className={styles.sectionHint}>Shown to the client on every quote — this is your business&apos;s own name, phone, email, and address, not the client&apos;s.</p>
+        <p className={styles.sectionHint}>Shown to the client on every quote — this is your business&apos;s own name, phone, email, address, and GST number, not the client&apos;s.</p>
         {companyError && <div className={styles.error}>{companyError}</div>}
         {companySaved && <div className={styles.success}>Saved.</div>}
 
@@ -287,6 +290,16 @@ export default function ProfilePage() {
           <div className={styles.field}>
             <label htmlFor="companyAddress">Address</label>
             <input id="companyAddress" className={styles.input} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="companyGstNumber">GST number</label>
+            <input
+              id="companyGstNumber"
+              className={styles.input}
+              value={companyGstNumber}
+              placeholder="e.g. 123456789 RT0001"
+              onChange={(e) => setCompanyGstNumber(e.target.value)}
+            />
           </div>
           <button type="submit" className={styles.button} disabled={companySaving}>
             {companySaving ? 'Saving...' : 'Save'}

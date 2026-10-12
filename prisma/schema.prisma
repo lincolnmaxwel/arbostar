@@ -211,6 +211,9 @@ model CompanyProfile {
   phone     String?
   email     String?
   address   String?
+  // GST registration number — printed on invoices and quotes as the
+  // provider's tax identity.
+  gstNumber String?
   logoPath  String?
   updatedAt DateTime @updatedAt
 }

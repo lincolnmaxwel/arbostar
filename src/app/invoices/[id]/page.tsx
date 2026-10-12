@@ -98,13 +98,14 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             {invoice.serviceAddress && <p className={styles.partyLine}>Service address: {invoice.serviceAddress}</p>}
           </div>
 
-          {(company.name || company.phone || company.email || company.address) && (
+          {(company.name || company.phone || company.email || company.address || company.gstNumber) && (
             <div className={styles.party}>
               <h2 className={styles.partyLabel}>From</h2>
               {company.name && <p className={styles.partyName}>{company.name}</p>}
               {company.phone && <p className={styles.partyLine}>{company.phone}</p>}
               {company.email && <p className={styles.partyLine}>{company.email}</p>}
               {company.address && <p className={styles.partyLine}>{company.address}</p>}
+              {company.gstNumber && <p className={styles.partyLine}>GST #: {company.gstNumber}</p>}
             </div>
           )}
         </div>
@@ -141,7 +142,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
             <span>{formatMoney(Number(invoice.subtotal))}</span>
           </div>
           <div className={styles.totalRow}>
-            <span>Tax ({(Number(invoice.taxRate) * 100).toFixed(1)}%)</span>
+            <span>GST ({(Number(invoice.taxRate) * 100).toFixed(1)}%)</span>
             <span>{formatMoney(Number(invoice.taxAmount))}</span>
           </div>
           <div className={`${styles.totalRow} ${styles.grandTotal}`}>

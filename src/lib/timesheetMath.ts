@@ -100,7 +100,7 @@ export function computeTimesheetTotals(input: TimesheetTotalsInput, taxRate: num
 
 export function validateTaxRate(taxRate: number): string | null {
   if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1) {
-    return 'Tax rate must be between 0 and 1.';
+    return 'GST rate must be between 0 and 1.';
   }
   return null;
 }

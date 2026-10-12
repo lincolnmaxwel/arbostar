@@ -581,7 +581,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
           <div className={styles.totalItemValue}>{formatMoney(totals.subtotal)}</div>
         </div>
         <div className={styles.totalItem}>
-          <div className={styles.totalItemLabel}>Tax ({(formState.taxRate * 100).toFixed(1)}%)</div>
+          <div className={styles.totalItemLabel}>GST ({(formState.taxRate * 100).toFixed(1)}%)</div>
           <div className={styles.totalItemValue}>{formatMoney(totals.taxAmount)}</div>
         </div>
         <div className={styles.totalItem}>

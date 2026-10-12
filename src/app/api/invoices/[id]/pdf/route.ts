@@ -76,7 +76,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       address: invoice.client.address,
     },
     serviceAddress: invoice.serviceAddress,
-    company: { name: company.name, phone: company.phone, email: company.email, address: company.address, logoPath: company.logoPath },
+    company: { name: company.name, phone: company.phone, email: company.email, address: company.address, gstNumber: company.gstNumber, logoPath: company.logoPath },
     items,
     subtotal: Number(invoice.subtotal),
     taxRate: Number(invoice.taxRate),

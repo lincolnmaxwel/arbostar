@@ -411,7 +411,7 @@ export function QuoteView({ draftId }: { draftId: string }) {
           <span>{formatMoney(totals.subtotal)}</span>
         </div>
         <div className={styles.totalRow}>
-          <span>Tax ({(draft.taxRate * 100).toFixed(1)}%)</span>
+          <span>GST ({(draft.taxRate * 100).toFixed(1)}%)</span>
           <span>{formatMoney(totals.taxAmount)}</span>
         </div>
         <div className={`${styles.totalRow} ${styles.grandTotal}`}>

@@ -97,6 +97,15 @@ describe('/api/company (per-user billing profile)', () => {
     expect(body.company.address).toBe('1 Test St');
   });
 
+  it('PATCH stores the GST number and GET returns it', async () => {
+    asUser(userId);
+    const res = await PATCH(patchReq({ gstNumber: '  123456789 RT0001  ' }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).company.gstNumber).toBe('123456789 RT0001');
+    const got = await GET();
+    expect((await got.json()).company.gstNumber).toBe('123456789 RT0001');
+  });
+
   it('PATCH rejects an invalid email', async () => {
     asUser(userId);
     const res = await PATCH(patchReq({ email: 'not-an-email' }));

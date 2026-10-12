@@ -22,7 +22,7 @@ export interface InvoicePdfOptions {
   period?: string;
   client: { name: string; email?: string | null; phone?: string | null; address?: string | null };
   serviceAddress?: string | null;
-  company: { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; logoPath?: string | null };
+  company: { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstNumber?: string | null; logoPath?: string | null };
   items: InvoicePdfItem[];
   subtotal: number;
   taxRate: number;
@@ -101,7 +101,12 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(DARK).text(opts.company.name || '', fromX, fromY, { width: colWidth });
   fromY += 16;
   doc.font('Helvetica').fontSize(9).fillColor(GRAY);
-  const fromLines = [opts.company.phone, opts.company.email, opts.company.address].filter((line): line is string => !!line);
+  const fromLines = [
+    opts.company.phone,
+    opts.company.email,
+    opts.company.address,
+    opts.company.gstNumber ? `GST #: ${opts.company.gstNumber}` : null,
+  ].filter((line): line is string => !!line);
   for (const line of fromLines) {
     doc.text(line, fromX, fromY, { width: colWidth });
     fromY += doc.heightOfString(line, { width: colWidth }) + 3;
@@ -172,7 +177,7 @@ export async function buildInvoicePdf(opts: InvoicePdfOptions): Promise<Buffer> 
   }
 
   totalsRow('Subtotal', formatMoney(opts.subtotal), false);
-  totalsRow(`Tax (${(opts.taxRate * 100).toFixed(1)}%)`, formatMoney(opts.taxAmount), false);
+  totalsRow(`GST (${(opts.taxRate * 100).toFixed(1)}%)`, formatMoney(opts.taxAmount), false);
   doc.moveTo(totalsX, y).lineTo(totalsX + totalsWidth, y).strokeColor(BORDER).stroke();
   y += 8;
   totalsRow('Total', formatMoney(opts.total), true);

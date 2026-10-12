@@ -58,8 +58,8 @@ describe('timesheetMath', () => {
     expect(validateTaxRate(0.05)).toBeNull();
     expect(validateTaxRate(0)).toBeNull();
     expect(validateTaxRate(1)).toBeNull();
-    expect(validateTaxRate(-0.1)).toBe('Tax rate must be between 0 and 1.');
-    expect(validateTaxRate(1.1)).toBe('Tax rate must be between 0 and 1.');
+    expect(validateTaxRate(-0.1)).toBe('GST rate must be between 0 and 1.');
+    expect(validateTaxRate(1.1)).toBe('GST rate must be between 0 and 1.');
   });
 
   it('validates products: names, positive quantities, non-negative prices', () => {

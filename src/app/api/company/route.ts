@@ -24,6 +24,7 @@ const patchSchema = z.object({
   phone: z.string().optional(),
   email: z.union([z.literal(''), z.string().email()]).optional(),
   address: z.string().optional(),
+  gstNumber: z.string().trim().max(40).optional(),
 });
 
 export async function PATCH(req: NextRequest) {

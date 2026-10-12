@@ -15,6 +15,7 @@ interface PatchUserBody {
   status?: unknown;
   hourlyRate?: unknown;
   password?: unknown;
+  billingExempt?: unknown;
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -44,6 +45,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     status?: UserStatus;
     hourlyRate?: number;
     passwordHash?: string;
+    billingExempt?: boolean;
   } = {};
 
   if (body.name !== undefined) {
@@ -84,6 +86,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Hourly rate cannot be negative.' }, { status: 400 });
     }
     data.hourlyRate = rate;
+  }
+
+  if (body.billingExempt !== undefined) {
+    if (typeof body.billingExempt !== 'boolean') {
+      return NextResponse.json({ error: 'billingExempt must be true or false.' }, { status: 400 });
+    }
+    data.billingExempt = body.billingExempt;
   }
 
   if (body.password !== undefined) {

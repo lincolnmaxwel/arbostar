@@ -1,0 +1,282 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { resetViewContext } from '@/lib/clientUserContext';
+import type { BillingInfo } from '@/lib/billing';
+import styles from '../app/billing/billing.module.css';
+
+interface BillingResponse {
+  billing: BillingInfo;
+  configured: boolean;
+  plan: { amount: number; currency: string; interval: string } | null;
+  trialDays: number;
+  renewWindowDays: number;
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+const PHASE_BADGE: Record<BillingInfo['phase'], { label: string; tone: string }> = {
+  exempt: { label: 'No subscription needed', tone: styles.badgeGood },
+  subscribed: { label: 'Active', tone: styles.badgeGood },
+  past_due: { label: 'Payment issue', tone: styles.badgeBad },
+  trial: { label: 'Free trial', tone: styles.badgeInfo },
+  trial_ended: { label: 'Trial ended', tone: styles.badgeBad },
+  canceled: { label: 'Canceled', tone: styles.badgeBad },
+};
+
+export function BillingClient() {
+  const [data, setData] = useState<BillingResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'checkout' | 'portal' | 'renew' | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const load = useCallback(async (): Promise<BillingResponse | null> => {
+    const res = await fetch('/api/billing', { cache: 'no-store' });
+    if (!res.ok) {
+      setError('Could not load your subscription. Please try again.');
+      setLoading(false);
+      return null;
+    }
+    const body = (await res.json()) as BillingResponse;
+    setData(body);
+    setLoading(false);
+    return body;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+
+    load().then((first) => {
+      if (cancelled || !first) return;
+      if (checkout === 'canceled') {
+        setNotice('Checkout was canceled. You have not been charged.');
+      } else if (checkout === 'success') {
+        // The Stripe webhook may land a moment after the redirect; poll briefly.
+        setNotice('Thanks! Confirming your payment...');
+        let tries = 0;
+        const tick = async () => {
+          const latest = await load();
+          if (cancelled) return;
+          const live = latest && (latest.billing.phase === 'subscribed' || latest.billing.phase === 'past_due');
+          if (live) {
+            setNotice('Your subscription is active. Thank you!');
+            resetViewContext();
+            return;
+          }
+          tries += 1;
+          if (tries < 8) pollRef.current = setTimeout(tick, 2000);
+          else setNotice('Your payment is still being confirmed. This page will update shortly; you can also refresh.');
+        };
+        pollRef.current = setTimeout(tick, 1500);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
+    };
+  }, [load]);
+
+  async function go(kind: 'checkout' | 'portal') {
+    setBusy(kind);
+    setError(null);
+    try {
+      const res = await fetch(`/api/billing/${kind}`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.url) {
+        setError(body.error ?? 'Something went wrong. Please try again.');
+        return;
+      }
+      window.location.href = body.url as string;
+    } catch {
+      setError('Network error. Check your connection and try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function renew() {
+    setBusy('renew');
+    setError(null);
+    try {
+      const res = await fetch('/api/billing/renew', { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? 'Could not renew the subscription.');
+        return;
+      }
+      setNotice('Your subscription will renew automatically. Thank you!');
+      resetViewContext();
+      await load();
+    } catch {
+      setError('Network error. Check your connection and try again.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (loading) return <p>Loading your subscription...</p>;
+  if (!data) {
+    return (
+      <div className={styles.wrap}>
+        <p className={`${styles.alert} ${styles.alertError}`} role="alert">
+          {error ?? 'Could not load your subscription.'}
+        </p>
+      </div>
+    );
+  }
+
+  const { billing, plan, configured } = data;
+  const badge = PHASE_BADGE[billing.phase];
+  const price = plan
+    ? `${plan.currency} $${plan.amount.toFixed(2)} / ${plan.interval}`
+    : null;
+  const unavailable = !configured && !(billing.phase === 'exempt');
+
+  return (
+    <div className={styles.wrap}>
+      <h1 className={styles.title}>Subscription</h1>
+
+      {error && (
+        <p className={`${styles.alert} ${styles.alertError}`} role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className={`${styles.alert} ${styles.alertOk}`} role="status">
+          {notice}
+        </p>
+      )}
+      {unavailable && (
+        <p className={`${styles.alert} ${styles.alertWarn}`} role="status">
+          Online payments are not available yet. Please contact support to activate your subscription.
+        </p>
+      )}
+
+      <section className={styles.card}>
+        <div className={styles.statusRow}>
+          <span className={`${styles.badge} ${badge.tone}`}>{badge.label}</span>
+          {price && <span className={styles.plan}>MyJobbs · {price}</span>}
+        </div>
+
+        {billing.phase === 'exempt' && (
+          <p className={styles.lead}>Your account is not billed. There is nothing to manage here.</p>
+        )}
+
+        {billing.phase === 'trial' && (
+          <p className={styles.lead}>
+            You are on a free trial with {plural(billing.daysLeft ?? 0, 'day')} left. Subscribe any time: you will not be
+            charged until the trial ends{billing.trialEndsAt ? ` on ${formatDate(billing.trialEndsAt)}` : ''}.
+          </p>
+        )}
+
+        {billing.phase === 'trial_ended' && (
+          <p className={styles.lead}>
+            Your free trial has ended. Your data is safe: subscribe to pick up right where you left off.
+          </p>
+        )}
+
+        {billing.phase === 'canceled' && (
+          <p className={styles.lead}>
+            Your subscription has ended. Your data is safe: subscribe again to get back in.
+          </p>
+        )}
+
+        {billing.phase === 'subscribed' && billing.autoRenews && (
+          <p className={styles.lead}>
+            Your subscription renews automatically on {formatDate(billing.periodEnd)}.
+          </p>
+        )}
+
+        {billing.phase === 'subscribed' && billing.cancelAtPeriodEnd && (
+          <p className={styles.lead}>
+            Your subscription is set to end on {formatDate(billing.periodEnd)} ({plural(billing.daysLeft ?? 0, 'day')}{' '}
+            left). Renew to keep your access without interruption.
+          </p>
+        )}
+
+        {billing.phase === 'past_due' && (
+          <p className={styles.lead}>
+            We could not process your last payment. Update your payment method to avoid losing access.
+          </p>
+        )}
+
+        {billing.phase !== 'exempt' && (
+          <dl className={styles.facts}>
+            {billing.phase === 'trial' && (
+              <>
+                <div className={styles.fact}>
+                  <dt>Trial ends</dt>
+                  <dd>{formatDate(billing.trialEndsAt)}</dd>
+                </div>
+                <div className={styles.fact}>
+                  <dt>Days left</dt>
+                  <dd>{billing.daysLeft}</dd>
+                </div>
+              </>
+            )}
+            {(billing.phase === 'subscribed' || billing.phase === 'past_due') && (
+              <>
+                <div className={styles.fact}>
+                  <dt>{billing.cancelAtPeriodEnd ? 'Ends on' : 'Next renewal'}</dt>
+                  <dd>{formatDate(billing.periodEnd)}</dd>
+                </div>
+                <div className={styles.fact}>
+                  <dt>Days left</dt>
+                  <dd>{billing.daysLeft}</dd>
+                </div>
+              </>
+            )}
+            {billing.phase === 'canceled' && (
+              <div className={styles.fact}>
+                <dt>Ended</dt>
+                <dd>{formatDate(billing.periodEnd)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        <div className={styles.actions}>
+          {billing.canSubscribe && configured && (
+            <button type="button" className={styles.primary} disabled={busy !== null} onClick={() => go('checkout')}>
+              {busy === 'checkout' ? 'Redirecting...' : billing.phase === 'trial' ? 'Subscribe now' : 'Subscribe'}
+            </button>
+          )}
+          {billing.canRenew && (
+            <button type="button" className={styles.primary} disabled={busy !== null} onClick={renew}>
+              {busy === 'renew' ? 'Renewing...' : 'Renew subscription'}
+            </button>
+          )}
+          {billing.phase === 'past_due' && configured && billing.canManage && (
+            <button type="button" className={styles.primary} disabled={busy !== null} onClick={() => go('portal')}>
+              {busy === 'portal' ? 'Opening...' : 'Update payment method'}
+            </button>
+          )}
+          {billing.canManage && configured && billing.phase !== 'past_due' && (
+            <button type="button" className={styles.secondary} disabled={busy !== null} onClick={() => go('portal')}>
+              {busy === 'portal' ? 'Opening...' : 'Manage billing'}
+            </button>
+          )}
+        </div>
+
+        {billing.phase !== 'exempt' && (
+          <p className={styles.note}>
+            Payments are processed securely by Stripe. Use &ldquo;Manage billing&rdquo; to update your card, see past invoices or
+            cancel.
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}

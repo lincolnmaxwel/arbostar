@@ -6,6 +6,7 @@ import { requireAdminSession, auditAdminAction, UnauthorizedError, ForbiddenErro
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
 import { generateInviteToken, inviteExpiry, inviteUrl, INVITE_TTL_DAYS } from '@/lib/invites';
 import { sendInviteEmail } from '@/lib/email';
+import { evaluateBilling, trialEndsAtForNewUser } from '@/lib/billing';
 
 const FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm', 'quotes'];
 const ROLES: Role[] = ['admin', 'staff'];
@@ -136,6 +137,7 @@ export async function POST(req: Request) {
       role,
       status,
       hourlyRate,
+      trialEndsAt: await trialEndsAtForNewUser(),
       featureFlags: {
         create: features.map((feature) => ({ feature, enabled: true })),
       },
@@ -176,7 +178,15 @@ function serializeUser(u: {
   hourlyRate: unknown;
   createdAt: Date;
   featureFlags?: { feature: FeatureKey; enabled: boolean }[];
+  billingExempt: boolean;
+  trialEndsAt: Date | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  subscriptionStatus: string | null;
+  subscriptionPeriodEnd: Date | null;
+  subscriptionCancelAtPeriodEnd: boolean;
 }) {
+  const billing = evaluateBilling(u);
   return {
     id: u.id,
     name: u.name,
@@ -185,6 +195,15 @@ function serializeUser(u: {
     status: u.status,
     hourlyRate: Number(u.hourlyRate),
     createdAt: u.createdAt,
+    billingExempt: u.billingExempt,
+    billing: {
+      phase: billing.phase,
+      access: billing.access,
+      trialEndsAt: billing.trialEndsAt,
+      periodEnd: billing.periodEnd,
+      cancelAtPeriodEnd: billing.cancelAtPeriodEnd,
+      subscriptionStatus: billing.subscriptionStatus,
+    },
     features: Object.fromEntries(
       FEATURES.map((f) => [f, u.featureFlags?.find((ff) => ff.feature === f)?.enabled ?? false]),
     ),

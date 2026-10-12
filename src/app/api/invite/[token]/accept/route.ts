@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { hashInviteToken, lookupInvite } from '@/lib/invites';
+import { trialEndsAtForNewUser } from '@/lib/billing';
 
 class InviteAlreadyUsedError extends Error {}
 
@@ -38,6 +39,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const trialEndsAt = await trialEndsAtForNewUser();
   try {
     const user = await prisma.$transaction(async (tx) => {
       // Burn the token first; count 0 means a concurrent accept already won.
@@ -55,6 +57,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
           role: invite.role,
           status: 'active',
           hourlyRate: invite.hourlyRate,
+          trialEndsAt,
           featureFlags: { create: invite.features.map((feature) => ({ feature, enabled: true })) },
         },
       });

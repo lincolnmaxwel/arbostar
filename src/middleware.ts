@@ -11,4 +11,4 @@ export default withAuth({
   pages: authOptions.pages,
 });
 
-export const config = { matcher: ['/quotes/:path*', '/profile/:path*', '/clients/:path*', '/invoices/:path*', '/financial/:path*','/admin/:path*', '/timesheet/:path*'] };
+export const config = { matcher: ['/quotes/:path*', '/profile/:path*', '/clients/:path*', '/invoices/:path*', '/financial/:path*','/admin/:path*', '/timesheet/:path*', '/billing/:path*'] };

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { NewQuoteLink } from './NewQuoteLink';
 import { getViewContext, resetViewContext } from '@/lib/clientUserContext';
+import type { BillingInfo } from '@/lib/billing';
 import styles from './Header.module.css';
 
 interface HeaderUser {
@@ -24,6 +25,7 @@ export function Header() {
   const [actorRole, setActorRole] = useState<string | null>(null);
   const [isViewAs, setIsViewAs] = useState(false);
   const [targetName, setTargetName] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [features, setFeatures] = useState<{ quotes: boolean; invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
   const [users, setUsers] = useState<HeaderUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -37,6 +39,7 @@ export function Header() {
       setActorRole(ctx.actorRole);
       setIsViewAs(ctx.isViewAs);
       setTargetName(ctx.targetName);
+      setBilling(ctx.billing ?? null);
       setFeatures({
         quotes: ctx.features.quotes,
         invoices: ctx.features.invoices,
@@ -90,6 +93,16 @@ export function Header() {
       .finally(() => setUsersLoading(false));
   }, [viewAsOpen, actorRole]);
 
+  // A lapsed trial/subscription locks the app: send the user to the billing
+  // page (the only place that can fix it). Admins viewing as someone else are
+  // left alone so they can still inspect that account.
+  useEffect(() => {
+    if (!billing || billing.access || isViewAs) return;
+    const open = pathname.startsWith('/billing') || pathname.startsWith('/profile') || pathname.startsWith('/admin');
+    const isPublic = pathname === '/' || pathname === '/login' || pathname.startsWith('/portal/') || pathname.startsWith('/invite/');
+    if (!open && !isPublic) router.replace('/billing');
+  }, [billing, isViewAs, pathname, router]);
+
   if (pathname === '/' || pathname === '/login' || pathname.startsWith('/portal/') || pathname.startsWith('/invite/')) return null;
 
   async function handleViewAs(userId: string) {
@@ -114,7 +127,10 @@ export function Header() {
     window.location.href = '/quotes';
   }
 
+  const billingNotice = !isViewAs && !pathname.startsWith('/billing') ? describeBillingNotice(billing) : null;
+
   return (
+    <>
     <header className={styles.header}>
       <div className={styles.inner}>
         <Link href="/quotes" className={styles.brand}>
@@ -211,6 +227,9 @@ export function Header() {
                   <Link href="/profile" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     Profile
                   </Link>
+                  <Link href="/billing" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                    Subscription
+                  </Link>
                   <button
                     type="button"
                     className={styles.userMenuItem}
@@ -230,5 +249,42 @@ export function Header() {
         </div>
       </div>
     </header>
+    {billingNotice && (
+      <div className={billingNotice.urgent ? styles.billingBannerUrgent : styles.billingBanner} role="status">
+        <span>{billingNotice.text}</span>
+        <Link href="/billing" className={styles.billingBannerLink}>
+          {billingNotice.cta}
+        </Link>
+      </div>
+    )}
+    </>
   );
+}
+
+function describeBillingNotice(billing: BillingInfo | null): { text: string; cta: string; urgent: boolean } | null {
+  if (!billing || billing.phase === 'exempt') return null;
+  const days = billing.daysLeft ?? 0;
+  const dayLabel = days === 1 ? '1 day' : `${days} days`;
+
+  if (!billing.access) {
+    return {
+      text:
+        billing.phase === 'canceled'
+          ? 'Your subscription has ended. Subscribe to keep using MyJobbs.'
+          : 'Your free trial has ended. Subscribe to keep using MyJobbs.',
+      cta: 'Subscribe',
+      urgent: true,
+    };
+  }
+  if (billing.phase === 'past_due') {
+    return { text: 'We could not process your last payment. Please update your payment method.', cta: 'Fix payment', urgent: true };
+  }
+  if (!billing.inRenewWindow) return null;
+  if (billing.phase === 'trial') {
+    return { text: `Your free trial ends in ${dayLabel}.`, cta: 'Subscribe', urgent: false };
+  }
+  if (billing.canRenew) {
+    return { text: `Your subscription ends in ${dayLabel}.`, cta: 'Renew', urgent: false };
+  }
+  return null;
 }

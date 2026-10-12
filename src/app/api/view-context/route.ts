@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
 import { getFeatureFlags } from '@/lib/features';
+import { getBillingForUser } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export async function GET() {
   }
 
   const features = await getFeatureFlags(scope.ownerUserId);
+  const billing = await getBillingForUser(scope.ownerUserId);
 
   return NextResponse.json({
     actorUserId: scope.actorUserId,
@@ -44,5 +46,6 @@ export async function GET() {
     isViewAs: scope.isViewAs,
     targetName,
     features,
+    billing,
   });
 }

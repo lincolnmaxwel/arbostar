@@ -18,6 +18,14 @@ interface AdminUser {
   hourlyRate: number;
   createdAt: string;
   features: Record<FeatureKey, boolean>;
+  billingExempt: boolean;
+  billing: {
+    phase: 'exempt' | 'subscribed' | 'past_due' | 'trial' | 'trial_ended' | 'canceled';
+    access: boolean;
+    trialEndsAt: string | null;
+    periodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  };
 }
 
 interface PendingInvite {
@@ -37,6 +45,28 @@ const FEATURES: { key: FeatureKey; label: string }[] = [
   { key: 'clients_crm', label: 'Clients CRM' },
 ];
 
+function billingLabel(b: AdminUser['billing'], exempt: boolean, role: Role): { text: string; detail: string | null } {
+  const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : null);
+  if (exempt) return { text: 'Exempt', detail: 'Not billed' };
+  switch (b.phase) {
+    case 'exempt':
+      return { text: role === 'admin' ? 'Admin' : 'Not billed', detail: null };
+    case 'trial':
+      return { text: 'Trial', detail: `ends ${date(b.trialEndsAt) ?? '-'}` };
+    case 'subscribed':
+      return {
+        text: 'Subscribed',
+        detail: b.cancelAtPeriodEnd ? `ends ${date(b.periodEnd) ?? '-'}` : `renews ${date(b.periodEnd) ?? '-'}`,
+      };
+    case 'past_due':
+      return { text: 'Past due', detail: 'payment failed' };
+    case 'canceled':
+      return { text: 'Canceled', detail: 'locked' };
+    default:
+      return { text: 'Trial ended', detail: 'locked' };
+  }
+}
+
 const STATUS_LABEL: Record<UserStatus, string> = {
   active: 'Active',
   inactive: 'Inactive',
@@ -54,6 +84,9 @@ export function AdminUsersClient() {
   const [rateValues, setRateValues] = useState<Record<string, string>>({});
   const [passwordResetFor, setPasswordResetFor] = useState<string | null>(null);
   const [passwordValue, setPasswordValue] = useState('');
+  const [trialDays, setTrialDays] = useState('15');
+  const [savedTrialDays, setSavedTrialDays] = useState<number | null>(null);
+  const [trialSaving, setTrialSaving] = useState(false);
 
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [invitePending, setInvitePending] = useState<string | null>(null);
@@ -87,6 +120,12 @@ export function AdminUsersClient() {
       for (const u of body.users) next[u.id] = String(u.hourlyRate);
       return { ...prev, ...next };
     });
+    const settingsRes = await fetch('/api/admin/billing-settings');
+    if (settingsRes.ok) {
+      const settings = await settingsRes.json();
+      setTrialDays(String(settings.trialDays));
+      setSavedTrialDays(settings.trialDays);
+    }
     const invitesRes = await fetch('/api/admin/invites');
     if (invitesRes.ok) {
       const invitesBody = await invitesRes.json();
@@ -276,6 +315,42 @@ export function AdminUsersClient() {
     }
   }
 
+  async function handleSaveTrialDays() {
+    const days = Number(trialDays);
+    if (!Number.isInteger(days) || days < 0 || days > 365) {
+      setError('Trial length must be a whole number of days between 0 and 365.');
+      return;
+    }
+    setTrialSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/billing-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trialDays: days }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? 'Could not save the trial length.');
+        return;
+      }
+      setSavedTrialDays(days);
+      setNotice(`New accounts will get a ${days}-day free trial.`);
+    } finally {
+      setTrialSaving(false);
+    }
+  }
+
+  async function handleBillingExempt(user: AdminUser, exempt: boolean) {
+    const result = await patchUser(user.id, { billingExempt: exempt });
+    if (!result.ok) {
+      setError(result.error ?? 'Update failed.');
+      return;
+    }
+    setNotice(exempt ? `${user.email} is exempt from billing.` : `${user.email} now follows the normal trial/subscription rules.`);
+    await load();
+  }
+
   async function handleDeleteUser(user: AdminUser) {
     if (!window.confirm(`Permanently delete ${user.name} (${user.email})? This will permanently delete all of this user's clients, quotes, invoices, and timesheet entries. This cannot be undone.`)) {
       return;
@@ -346,6 +421,37 @@ export function AdminUsersClient() {
           aria-controls="create-user-form"
         >
           {showCreate ? 'Cancel' : '+ New user'}
+        </button>
+      </div>
+
+      <div className={styles.createForm} style={{ marginBottom: 24 }}>
+        <h2 className={styles.sectionTitle}>Subscription settings</h2>
+        <div className={styles.fieldGrid}>
+          <div className={styles.field}>
+            <label htmlFor="trial-days">Free trial length (days)</label>
+            <input
+              id="trial-days"
+              type="number"
+              min="0"
+              max="365"
+              step="1"
+              className={styles.input}
+              value={trialDays}
+              onChange={(e) => setTrialDays(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className={styles.userEmail}>
+          Applies to accounts created from now on; existing trials keep their end date. Use 0 to require a subscription
+          right away.
+        </p>
+        <button
+          type="button"
+          className={styles.submitButton}
+          disabled={trialSaving || Number(trialDays) === savedTrialDays}
+          onClick={handleSaveTrialDays}
+        >
+          {trialSaving ? 'Saving...' : 'Save trial length'}
         </button>
       </div>
 
@@ -527,6 +633,7 @@ export function AdminUsersClient() {
                 <th>Role</th>
                 <th>Status</th>
                 <th>Hourly rate</th>
+                <th>Billing</th>
                 <th>Features</th>
                 <th>Actions</th>
               </tr>
@@ -578,6 +685,23 @@ export function AdminUsersClient() {
                       }}
                       aria-label={`Hourly rate for ${u.email}`}
                     />
+                  </td>
+                  <td>
+                    <div className={styles.userName}>{billingLabel(u.billing, u.billingExempt, u.role).text}</div>
+                    {billingLabel(u.billing, u.billingExempt, u.role).detail && (
+                      <div className={styles.userEmail}>{billingLabel(u.billing, u.billingExempt, u.role).detail}</div>
+                    )}
+                    {u.role !== 'admin' && (
+                      <label className={styles.checkboxLabel}>
+                        <input
+                          type="checkbox"
+                          checked={u.billingExempt}
+                          disabled={savingUserId === u.id}
+                          onChange={(e) => handleBillingExempt(u, e.target.checked)}
+                        />
+                        Exempt
+                      </label>
+                    )}
                   </td>
                   <td>
                     <div className={styles.featureToggles}>

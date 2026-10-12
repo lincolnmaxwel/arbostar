@@ -1,4 +1,5 @@
 import { localDb } from '@/lib/localDb';
+import type { BillingInfo } from '@/lib/billing';
 
 export interface ViewContext {
   actorUserId: string;
@@ -12,6 +13,8 @@ export interface ViewContext {
     timesheet: boolean;
     clients_crm: boolean;
   };
+  /** Subscription/trial state of the effective owner (null if unavailable). */
+  billing: BillingInfo | null;
 }
 
 let cachedContext: ViewContext | null = null;

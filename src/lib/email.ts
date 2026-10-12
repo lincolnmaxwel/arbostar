@@ -408,3 +408,32 @@ export async function sendInviteEmail(opts: SendInviteEmailOptions): Promise<voi
     html,
   });
 }
+
+export interface SendPaymentFailedEmailOptions {
+  to: string;
+  name: string;
+  billingUrl: string;
+}
+
+// Sent when Stripe could not charge the subscription card. Stripe keeps
+// retrying for a while, so this just tells the user to fix the payment method.
+export async function sendPaymentFailedEmail(opts: SendPaymentFailedEmailOptions): Promise<void> {
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p>We could not process the payment for your <strong>MyJobbs</strong> subscription. Please update your payment method so your account keeps working without interruption.</p>
+      <p style="margin:24px 0;">
+        <a href="${opts.billingUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Update payment method
+        </a>
+      </p>
+      <p style="color:#5a6785;font-size:13px;">We will retry the charge automatically in the next few days.</p>
+    </div>
+  `);
+
+  await sendGraphMail({
+    to: opts.to,
+    subject: 'Action needed: payment failed for your MyJobbs subscription',
+    html,
+  });
+}

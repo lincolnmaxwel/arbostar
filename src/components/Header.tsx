@@ -90,7 +90,7 @@ export function Header() {
       .finally(() => setUsersLoading(false));
   }, [viewAsOpen, actorRole]);
 
-  if (pathname === '/login' || pathname.startsWith('/portal/')) return null;
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/portal/') || pathname.startsWith('/invite/')) return null;
 
   async function handleViewAs(userId: string) {
     const res = await fetch('/api/admin/view-as', {

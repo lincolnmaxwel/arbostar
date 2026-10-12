@@ -3,6 +3,7 @@ import { Providers } from '@/components/Providers';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import { SyncLoopStarter } from '@/components/SyncLoopStarter';
 import { Header } from '@/components/Header';
+import { AppMain } from '@/components/AppMain';
 
 export const metadata = {
   title: 'MyJobbs',
@@ -23,9 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>
           <Header />
-          <main style={{ maxWidth: 'var(--max-width)', margin: '0 auto', padding: '24px 16px' }}>
-            {children}
-          </main>
+          <AppMain>{children}</AppMain>
           <ServiceWorkerRegistration />
           <SyncLoopStarter />
         </Providers>

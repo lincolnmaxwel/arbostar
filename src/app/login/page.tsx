@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import styles from './login.module.css';
 
@@ -119,6 +120,14 @@ export default function LoginPage() {
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+        <div className={styles.links}>
+          <Link href="/forgot-password" className={styles.linkButton}>
+            Forgot your password?
+          </Link>
+          <Link href="/" className={`${styles.linkButton} ${styles.linkButtonOutline}`}>
+            Back to home
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -44,7 +44,7 @@ export async function deleteClientCascade(clientId: string): Promise<{ quoteIds:
 /**
  * Delete a user and everything they own: timesheet entries, invoices,
  * quotes (by createdById), clients, company profile, then the user row.
- * ServiceCatalogItem and UserFeatureFlag cascade with the User; AuditLog
+ * ServiceCatalogItem, UserFeatureFlag and PasswordReset cascade with the User; AuditLog
  * target rows become null. UserInvite has no foreign key, so its rows are
  * removed explicitly: invitations addressed to this user's email (pending or
  * accepted) and invitations this user sent as an admin. Runs in its own transaction. Returns the deleted

@@ -409,6 +409,37 @@ export async function sendInviteEmail(opts: SendInviteEmailOptions): Promise<voi
   });
 }
 
+export interface SendPasswordResetEmailOptions {
+  to: string;
+  name: string;
+  resetUrl: string;
+  expiresInMinutes: number;
+}
+
+// "Forgot password" link: one-time, short-lived.
+export async function sendPasswordResetEmail(opts: SendPasswordResetEmailOptions): Promise<void> {
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p>We received a request to reset the password for your <strong>MyJobbs</strong> account. Use the button below to choose a new one:</p>
+      <p style="margin:24px 0;">
+        <a href="${opts.resetUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Reset my password
+        </a>
+      </p>
+      <p style="color:#5a6785;font-size:13px;">This link works once and expires in ${opts.expiresInMinutes} minutes. If the button does not work, copy this address into your browser:<br/>
+        <span style="word-break:break-all;">${escapeHtml(opts.resetUrl)}</span></p>
+      <p style="color:#5a6785;font-size:13px;">If you did not ask for this, you can ignore this email. Your password will not change.</p>
+    </div>
+  `);
+
+  await sendGraphMail({
+    to: opts.to,
+    subject: 'Reset your MyJobbs password',
+    html,
+  });
+}
+
 export interface SendPaymentFailedEmailOptions {
   to: string;
   name: string;

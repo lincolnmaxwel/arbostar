@@ -99,6 +99,7 @@ model User {
   companyProfile    CompanyProfile?
   auditLogTargets   AuditLog[]
   serviceCatalogItems ServiceCatalogItem[]
+  passwordResets    PasswordReset[]
 
   // Billing (Stripe). Access rule lives in src/lib/billing.ts: admins and
   // billingExempt users are never gated; everyone else needs a live trial
@@ -111,6 +112,20 @@ model User {
   subscriptionStatus           String?
   subscriptionPeriodEnd        DateTime?
   subscriptionCancelAtPeriodEnd Boolean  @default(false)
+}
+
+// One-time "forgot password" link. Only the SHA-256 of the token is stored.
+// createdAt doubles as the rate-limit clock (one email per user per 30 min).
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Small key/value table for admin-editable global settings (e.g. trial_days).

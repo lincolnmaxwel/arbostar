@@ -131,6 +131,48 @@
   box-shadow: none;
 }
 
+.links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.linkButton:hover {
+  background: var(--color-bg);
+  text-decoration: underline;
+}
+
+.linkButtonOutline {
+  width: 100%;
+  border: 1px solid var(--color-border);
+}
+
+.success {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  margin-bottom: 8px;
+}
+
 .error {
   background: var(--color-error-bg);
   color: var(--color-error);

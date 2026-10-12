@@ -16,15 +16,24 @@ ALTER TABLE "Invoice" ALTER COLUMN "quoteId" DROP NOT NULL;
 ALTER TABLE "CompanyProfile" ADD COLUMN "userId" TEXT;
 ALTER TABLE "AuditLog" ADD COLUMN "targetUserId" TEXT;
 
--- The existing deployment must contain this admin. Fail instead of assigning
--- rows to an arbitrary user if that invariant is false.
+-- An existing deployment must contain this admin. Fail instead of assigning
+-- legacy rows to an arbitrary user if that invariant is false. A brand-new,
+-- empty database (no legacy rows at all) has nothing to backfill, so it is
+-- allowed through; the admin is created afterwards by the seed script.
 DO $$
 DECLARE admin_id TEXT;
 BEGIN
   SELECT "id" INTO admin_id FROM "User"
   WHERE "email" = 'admin@tiptoptreesltd.com' LIMIT 1;
   IF admin_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot backfill per-user ownership: seeded admin is missing';
+    IF EXISTS (SELECT 1 FROM "User")
+       OR EXISTS (SELECT 1 FROM "Client")
+       OR EXISTS (SELECT 1 FROM "Quote")
+       OR EXISTS (SELECT 1 FROM "Invoice")
+       OR EXISTS (SELECT 1 FROM "CompanyProfile") THEN
+      RAISE EXCEPTION 'Cannot backfill per-user ownership: seeded admin is missing';
+    END IF;
+    RETURN;
   END IF;
 
   UPDATE "User" SET "status" = 'active', "hourlyRate" = 0;

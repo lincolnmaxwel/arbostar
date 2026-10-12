@@ -4,6 +4,7 @@ import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
+import { mailSenderFromProfile } from '@/lib/mailSender';
 import { buildInvoicePdf } from '@/lib/invoicePdf';
 
 // Marks a scheduled job Completed and generates its (one and only) Invoice —
@@ -96,6 +97,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // invoice itself is still created and downloadable.
     if (quote.client.email) await sendInvoiceEmail({
       to: quote.client.email,
+      sender: mailSenderFromProfile(company),
       clientName: quote.client.name,
       invoiceNumber: invoice.number,
       quoteNumber: quote.number,

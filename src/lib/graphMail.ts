@@ -3,6 +3,11 @@
 // user sign-in involved. Requires the app to have application permission
 // Mail.Send (admin-consented) and AZURE_SENDER_EMAIL to be a real mailbox
 // the app is allowed to send as.
+//
+// When RESEND_API_KEY is set, mail goes through Resend instead (see
+// resendMail.ts) and the Azure variables are not needed.
+
+import { sendResendMail } from '@/lib/resendMail';
 
 interface GraphAttachment {
   filename: string;
@@ -14,6 +19,10 @@ interface SendGraphMailOptions {
   to: string;
   subject: string;
   html: string;
+  /** Display name for the From header (Resend only; Graph always uses the mailbox). */
+  fromName?: string;
+  /** Where client replies should go. */
+  replyTo?: string;
   attachments?: GraphAttachment[];
 }
 
@@ -49,6 +58,10 @@ async function getAccessToken(): Promise<string> {
 }
 
 export async function sendGraphMail(opts: SendGraphMailOptions): Promise<void> {
+  if (process.env.RESEND_API_KEY) {
+    return sendResendMail(opts);
+  }
+
   const token = await getAccessToken();
   const senderEmail = process.env.AZURE_SENDER_EMAIL;
 
@@ -63,6 +76,7 @@ export async function sendGraphMail(opts: SendGraphMailOptions): Promise<void> {
         subject: opts.subject,
         body: { contentType: 'HTML', content: opts.html },
         toRecipients: [{ emailAddress: { address: opts.to } }],
+        ...(opts.replyTo ? { replyTo: [{ emailAddress: { address: opts.replyTo } }] } : {}),
         attachments: opts.attachments?.map((a) => ({
           '@odata.type': '#microsoft.graph.fileAttachment',
           name: a.filename,

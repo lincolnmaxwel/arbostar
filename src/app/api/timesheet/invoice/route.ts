@@ -13,6 +13,7 @@ import {
 } from '@/lib/timesheetMath';
 import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
+import { mailSenderFromProfile } from '@/lib/mailSender';
 import { buildInvoicePdf } from '@/lib/invoicePdf';
 
 const invoiceSchema = z.object({
@@ -295,6 +296,7 @@ export async function POST(req: NextRequest) {
     // No email on file → skip sending; the invoice is still created.
     if (client.email) await sendInvoiceEmail({
       to: client.email,
+      sender: mailSenderFromProfile(company),
       clientName: client.name,
       invoiceNumber: invoice.number,
       period,

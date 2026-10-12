@@ -1,5 +1,6 @@
 import { formatMoney } from '@/lib/quoteMath';
 import { sendGraphMail } from '@/lib/graphMail';
+import type { MailSender } from '@/lib/mailSender';
 
 function escapeHtml(value: string): string {
   return value
@@ -20,6 +21,8 @@ export interface SendQuoteApprovalEmailItem {
 }
 
 export interface SendQuoteApprovalEmailOptions {
+  /** Display name + reply-to of the owner who sends this email. */
+  sender?: MailSender;
   to: string;
   clientName: string;
   portalUrl: string;
@@ -89,12 +92,16 @@ export async function sendQuoteApprovalEmail(opts: SendQuoteApprovalEmailOptions
 
   await sendGraphMail({
     to: opts.to,
+    fromName: opts.sender?.fromName,
+    replyTo: opts.sender?.replyTo,
     subject: 'Your estimate is ready for review',
     html,
   });
 }
 
 export interface SendBookingProposalEmailOptions {
+  /** Display name + reply-to of the owner who sends this email. */
+  sender?: MailSender;
   to: string;
   clientName: string;
   portalUrl: string;
@@ -149,6 +156,8 @@ export async function sendBookingProposalEmail(opts: SendBookingProposalEmailOpt
 
   await sendGraphMail({
     to: opts.to,
+    fromName: opts.sender?.fromName,
+    replyTo: opts.sender?.replyTo,
     subject: 'Scheduling options for your approved estimate',
     html,
   });
@@ -238,6 +247,8 @@ export async function sendBookingDecisionNotificationEmail(opts: SendBookingDeci
 }
 
 export interface SendPaymentReceivedEmailOptions {
+  /** Display name + reply-to of the owner who sends this email. */
+  sender?: MailSender;
   to: string;
   clientName: string;
   invoiceNumber: number;
@@ -284,12 +295,16 @@ export async function sendPaymentReceivedEmail(opts: SendPaymentReceivedEmailOpt
 
   await sendGraphMail({
     to: opts.to,
+    fromName: opts.sender?.fromName,
+    replyTo: opts.sender?.replyTo,
     subject: `Payment received — Invoice #${opts.invoiceNumber}`,
     html,
   });
 }
 
 export interface SendInvoiceEmailOptions {
+  /** Display name + reply-to of the owner who sends this email. */
+  sender?: MailSender;
   to: string;
   clientName: string;
   invoiceNumber: number;
@@ -347,6 +362,8 @@ export async function sendInvoiceEmail(opts: SendInvoiceEmailOptions): Promise<v
 
   await sendGraphMail({
     to: opts.to,
+    fromName: opts.sender?.fromName,
+    replyTo: opts.sender?.replyTo,
     subject: `Invoice #${opts.invoiceNumber}`,
     html,
     attachments: opts.pdfBuffer

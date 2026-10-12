@@ -4,6 +4,7 @@ import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/
 import { prisma } from '@/lib/db';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { sendBookingProposalEmail } from '@/lib/email';
+import { getMailSender } from '@/lib/mailSender';
 
 const roundSchema = z.object({
   options: z
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     if (quote.client.email) await sendBookingProposalEmail({
       to: quote.client.email,
+      sender: await getMailSender(scope.ownerUserId),
       clientName: quote.client.name,
       portalUrl,
       roundNumber: nextRoundNumber,

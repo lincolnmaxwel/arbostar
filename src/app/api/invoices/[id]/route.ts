@@ -4,6 +4,7 @@ import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
 import { getCompanyProfile, companyLogoUrl } from '@/lib/companyProfile';
 import { sendPaymentReceivedEmail } from '@/lib/email';
+import { mailSenderFromProfile } from '@/lib/mailSender';
 
 const INVOICE_INCLUDE = {
   client: true,
@@ -88,6 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         : invoice.quote?.items.map((item) => ({ title: item.title, price: Number(item.price) })) ?? [];
     if (invoice.client.email) await sendPaymentReceivedEmail({
       to: invoice.client.email,
+      sender: mailSenderFromProfile(company),
       clientName: invoice.client.name,
       invoiceNumber: invoice.number,
       companyName: company.name ?? undefined,

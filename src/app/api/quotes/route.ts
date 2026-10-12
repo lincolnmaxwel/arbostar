@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { calculateTotals } from '@/lib/quoteMath';
 import { sendQuoteApprovalEmail } from '@/lib/email';
+import { getMailSender } from '@/lib/mailSender';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 
 class ItemOwnershipConflictError extends Error {
@@ -195,6 +196,7 @@ export async function POST(req: NextRequest) {
     const portalUrl = `${process.env.NEXTAUTH_URL}/portal/${quote.publicToken}`;
     await sendQuoteApprovalEmail({
       to: client.email,
+      sender: await getMailSender(ownerUserId),
       clientName: client.name,
       portalUrl,
       items: quote.items

@@ -64,6 +64,7 @@ export function AdminSubscriptionsClient() {
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
+  const [trialDates, setTrialDates] = useState<Record<string, string>>({});
 
   const hasData = useRef(false);
 
@@ -146,6 +147,32 @@ export function AdminSubscriptionsClient() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  // <input type="date"> works in the admin's local calendar; the trial ends at
+  // the end of the chosen day.
+  function localDateValue(iso: string | null): string {
+    return iso ? new Date(iso).toLocaleDateString('en-CA') : '';
+  }
+
+  function setTrialDate(s: SubscriptionRow) {
+    const value = trialDates[s.id] ?? localDateValue(s.trialEndsAt);
+    if (!value) {
+      setError('Pick a date first.');
+      return;
+    }
+    const endOfDay = new Date(`${value}T23:59:59`);
+    if (Number.isNaN(endOfDay.getTime())) {
+      setError('Pick a valid date.');
+      return;
+    }
+    const lapses = endOfDay.getTime() <= Date.now();
+    const lockNote =
+      lapses && !(s.phase === 'subscribed' || s.phase === 'past_due')
+        ? ' This ends the trial now and locks the account until it subscribes.'
+        : '';
+    if (!window.confirm(`Set the trial of ${s.email} to end on ${value}?${lockNote}`)) return;
+    patchUser(s.id, { trialEndsAt: endOfDay.toISOString() }, `Trial end for ${s.email} set to ${value}.`);
   }
 
   function extendTrial(s: SubscriptionRow) {
@@ -319,6 +346,22 @@ export function AdminSubscriptionsClient() {
                           onClick={() => extendTrial(s)}
                         >
                           Extend trial
+                        </button>
+                        <input
+                          type="date"
+                          className={styles.input}
+                          style={{ width: 150 }}
+                          value={trialDates[s.id] ?? localDateValue(s.trialEndsAt)}
+                          onChange={(e) => setTrialDates((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          aria-label={`Trial end date for ${s.email}`}
+                        />
+                        <button
+                          type="button"
+                          className={styles.actionButton}
+                          disabled={busyId === s.id}
+                          onClick={() => setTrialDate(s)}
+                        >
+                          Set trial end
                         </button>
                         <button
                           type="button"

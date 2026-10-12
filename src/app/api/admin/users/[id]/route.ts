@@ -18,6 +18,8 @@ interface PatchUserBody {
   billingExempt?: unknown;
   /** Push the trial end out by this many days (from today if it already lapsed). */
   extendTrialDays?: unknown;
+  /** Set the trial end to an exact moment (ISO string); may shorten or extend. */
+  trialEndsAt?: unknown;
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -96,6 +98,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'billingExempt must be true or false.' }, { status: 400 });
     }
     data.billingExempt = body.billingExempt;
+  }
+
+  if (body.trialEndsAt !== undefined) {
+    if (body.extendTrialDays !== undefined) {
+      return NextResponse.json({ error: 'Send either trialEndsAt or extendTrialDays, not both.' }, { status: 400 });
+    }
+    const parsed = typeof body.trialEndsAt === 'string' ? new Date(body.trialEndsAt) : null;
+    const max = Date.now() + 5 * 365 * 24 * 60 * 60 * 1000;
+    if (!parsed || Number.isNaN(parsed.getTime()) || parsed.getFullYear() < 2020 || parsed.getTime() > max) {
+      return NextResponse.json({ error: 'Enter a valid trial end date (not more than 5 years ahead).' }, { status: 400 });
+    }
+    data.trialEndsAt = parsed;
   }
 
   if (body.extendTrialDays !== undefined) {

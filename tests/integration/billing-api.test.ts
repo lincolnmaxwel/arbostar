@@ -333,4 +333,34 @@ describe('billing: access gate, webhook and admin settings', () => {
     expect(await syncSubscription(fresh)).toBe(user.id);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).subscriptionStatus).toBe('active');
   });
+
+  it('admin sets the trial end to an exact date, shortening or extending it', async () => {
+    const user = await makeUser({ trialEndsAt: new Date(Date.now() + 10 * DAY) });
+    const setEnd = (trialEndsAt: unknown, extra: Record<string, unknown> = {}) =>
+      patchUser(
+        new Request(`http://localhost/api/admin/users/${user.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ trialEndsAt, ...extra }),
+        }),
+        { params: { id: user.id } },
+      );
+
+    // Shorten to a past moment: the trial is over and the account locks.
+    const past = new Date(Date.now() - 2 * DAY);
+    expect((await setEnd(past.toISOString())).status).toBe(200);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).trialEndsAt?.getTime()).toBe(past.getTime());
+    expect(await isFeatureEnabled(user.id, 'quotes')).toBe(false);
+
+    // Extend to a specific future date: access is back.
+    const future = new Date(Date.now() + 40 * DAY);
+    expect((await setEnd(future.toISOString())).status).toBe(200);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).trialEndsAt?.getTime()).toBe(future.getTime());
+    expect(await isFeatureEnabled(user.id, 'quotes')).toBe(true);
+
+    // Invalid input.
+    expect((await setEnd('not-a-date')).status).toBe(400);
+    expect((await setEnd(12345)).status).toBe(400);
+    expect((await setEnd(new Date(Date.now() + 10 * 365 * DAY).toISOString())).status).toBe(400);
+    expect((await setEnd(future.toISOString(), { extendTrialDays: 5 })).status).toBe(400);
+  });
 });

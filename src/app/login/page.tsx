@@ -70,7 +70,7 @@ export default function LoginPage() {
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/myjobbs-logo.png" alt="MyJobbs.com" className={styles.logo} />
+          <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.logo} />
         </h1>
         <p className={styles.subtitle}>Sign in to your account</p>
 

@@ -21,7 +21,7 @@ export default async function InvitePage({ params }: { params: { token: string }
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/myjobbs-logo.png" alt="MyJobbs.com" className={styles.logo} />
+          <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.logo} />
         </h1>
 
         {lookup.state === 'valid' ? (

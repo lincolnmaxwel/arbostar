@@ -14,7 +14,7 @@ export function appBaseUrl(): string {
 }
 
 export function brandLogoUrl(): string {
-  return `${appBaseUrl()}/brand/myjobbs-logo.png`;
+  return `${appBaseUrl()}/brand/myjobbs-logo2.png`;
 }
 
 export function emailLayout(bodyHtml: string): string {
@@ -37,7 +37,7 @@ export function emailLayout(bodyHtml: string): string {
             <tr>
               <td align="left" style="padding:22px 28px 6px;background:#ffffff;">
                 <a href="${base}" style="text-decoration:none;">
-                  <img src="${brandLogoUrl()}" alt="MyJobbs.com" width="170" style="display:block;border:0;outline:none;height:auto;width:170px;max-width:100%;" />
+                  <img src="${brandLogoUrl()}" alt="MyJobbs.com" width="190" style="display:block;border:0;outline:none;height:auto;width:190px;max-width:100%;" />
                 </a>
               </td>
             </tr>

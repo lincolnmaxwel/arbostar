@@ -119,7 +119,7 @@ export function Header() {
       <div className={styles.inner}>
         <Link href="/quotes" className={styles.brand}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/myjobbs-logo.png" alt="MyJobbs.com" className={styles.brandLogo} />
+          <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.brandLogo} />
         </Link>
         <nav className={styles.nav} aria-label="Primary navigation">
           <div className={styles.mainNav}>

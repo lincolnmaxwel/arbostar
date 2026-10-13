@@ -117,7 +117,7 @@ describe('user invitations', () => {
     await invite(email, { role: 'admin' });
     const token = tokenFromLastEmail();
 
-    const res = await accept(token, { password: 'my-new-pass', name: 'Real Name' });
+    const res = await accept(token, { password: 'My-new-pass1', name: 'Real Name' });
     expect(res.status).toBe(201);
 
     const user = await prisma.user.findUniqueOrThrow({ where: { email }, include: { featureFlags: true } });
@@ -125,7 +125,7 @@ describe('user invitations', () => {
     expect(user.role).toBe('admin');
     expect(user.status).toBe('active');
     expect(Number(user.hourlyRate)).toBe(30);
-    expect(await bcrypt.compare('my-new-pass', user.passwordHash)).toBe(true);
+    expect(await bcrypt.compare('My-new-pass1', user.passwordHash)).toBe(true);
     expect(user.featureFlags.filter((f) => f.enabled).map((f) => f.feature).sort()).toEqual(['invoices', 'quotes']);
   });
 
@@ -133,11 +133,11 @@ describe('user invitations', () => {
     const email = `once-${randomUUID()}@example.com`;
     await invite(email);
     const token = tokenFromLastEmail();
-    expect((await accept(token, { password: 'first-pass' })).status).toBe(201);
-    const second = await accept(token, { password: 'second-pass' });
+    expect((await accept(token, { password: 'First-pass1' })).status).toBe(201);
+    const second = await accept(token, { password: 'Second-pass1' });
     expect(second.status).toBe(410);
     const user = await prisma.user.findUniqueOrThrow({ where: { email } });
-    expect(await bcrypt.compare('first-pass', user.passwordHash)).toBe(true);
+    expect(await bcrypt.compare('First-pass1', user.passwordHash)).toBe(true);
   });
 
   it('rejects short passwords, unknown tokens and expired invites', async () => {
@@ -146,10 +146,10 @@ describe('user invitations', () => {
     const token = tokenFromLastEmail();
 
     expect((await accept(token, { password: '123' })).status).toBe(400);
-    expect((await accept('x'.repeat(43), { password: 'long-enough' })).status).toBe(404);
+    expect((await accept('x'.repeat(43), { password: 'Long-enough1' })).status).toBe(404);
 
     await prisma.userInvite.updateMany({ where: { email }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    expect((await accept(token, { password: 'long-enough' })).status).toBe(410);
+    expect((await accept(token, { password: 'Long-enough1' })).status).toBe(410);
     expect(await prisma.user.findUnique({ where: { email } })).toBeNull();
   });
 
@@ -161,8 +161,8 @@ describe('user invitations', () => {
     const second = tokenFromLastEmail();
     expect(first).not.toBe(second);
     expect(await prisma.userInvite.count({ where: { email, acceptedAt: null } })).toBe(1);
-    expect((await accept(first, { password: 'long-enough' })).status).toBe(404);
-    expect((await accept(second, { password: 'long-enough' })).status).toBe(201);
+    expect((await accept(first, { password: 'Long-enough1' })).status).toBe(404);
+    expect((await accept(second, { password: 'Long-enough1' })).status).toBe(201);
   });
 
   it('resend issues a fresh link and invalidates the old one; revoke removes the invite', async () => {
@@ -175,21 +175,21 @@ describe('user invitations', () => {
     expect(resent.status).toBe(200);
     const newToken = tokenFromLastEmail();
     expect(newToken).not.toBe(oldToken);
-    expect((await accept(oldToken, { password: 'long-enough' })).status).toBe(404);
+    expect((await accept(oldToken, { password: 'Long-enough1' })).status).toBe(404);
 
     const list = await (await listInvites()).json();
     expect(list.invites.some((i: { email: string }) => i.email === email)).toBe(true);
 
     const revoked = await revokeInvite(new Request('http://localhost'), { params: { id: row.id } });
     expect(revoked.status).toBe(200);
-    expect((await accept(newToken, { password: 'long-enough' })).status).toBe(404);
+    expect((await accept(newToken, { password: 'Long-enough1' })).status).toBe(404);
   });
 
   it('deleting a user also deletes the invitations addressed to them and those they sent', async () => {
     // Accepted invite addressed to the user.
     const email = `gone-${randomUUID()}@example.com`;
     await invite(email, { role: 'admin' });
-    await accept(tokenFromLastEmail(), { password: 'long-enough' });
+    await accept(tokenFromLastEmail(), { password: 'Long-enough1' });
     const gone = await prisma.user.findUniqueOrThrow({ where: { email } });
 
     // Pending invite sent by that user (they are an admin now).

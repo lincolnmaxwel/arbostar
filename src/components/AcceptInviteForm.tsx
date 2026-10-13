@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
+import { PasswordMatch, PasswordRequirements } from '@/components/PasswordRequirements';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import styles from '@/app/login/login.module.css';
 
 export function AcceptInviteForm({ token, email, name }: { token: string; email: string; name: string }) {
@@ -16,8 +18,9 @@ export function AcceptInviteForm({ token, email, name }: { token: string; email:
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     if (password !== confirm) {
@@ -99,6 +102,7 @@ export function AcceptInviteForm({ token, email, name }: { token: string; email:
           </button>
         </div>
       </div>
+      <PasswordRequirements password={password} />
       <div className={styles.field}>
         <label htmlFor="invite-confirm">Confirm password</label>
         <input
@@ -112,6 +116,7 @@ export function AcceptInviteForm({ token, email, name }: { token: string; email:
           required
         />
       </div>
+      <PasswordMatch password={password} confirm={confirm} />
       <button className={styles.button} type="submit" disabled={submitting}>
         {submitting ? 'Creating account...' : 'Create account'}
       </button>

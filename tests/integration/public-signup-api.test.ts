@@ -36,7 +36,7 @@ function verifyReq(token: string) {
 const SUCCESS_MESSAGE =
   'Check your email to confirm your address. Your account will be ready as soon as you confirm.';
 
-async function doSignup(email: string, password = 'my-new-pass') {
+async function doSignup(email: string, password = 'My-new-pass1') {
   const res = await signupReq({ name: 'New Person', email, password, acceptTerms: true });
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ ok: true, message: SUCCESS_MESSAGE });
@@ -72,7 +72,7 @@ describe('public sign-up', () => {
     const email = `new-${randomUUID()}@example.com`;
     emails.push(email);
 
-    const res = await signupReq({ name: 'New Person', email: email.toUpperCase(), password: 'super-secret', acceptTerms: true });
+    const res = await signupReq({ name: 'New Person', email: email.toUpperCase(), password: 'Super-secret1', acceptTerms: true });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, message: SUCCESS_MESSAGE });
     expect(sendMock).toHaveBeenCalledTimes(1);
@@ -83,8 +83,8 @@ describe('public sign-up', () => {
     const row = await prisma.pendingSignup.findFirstOrThrow({ where: { email } });
     const token = tokenFromLastEmail();
     expect(row.passwordHash).not.toBeNull();
-    expect(row.passwordHash).not.toContain('super-secret');
-    expect(await bcrypt.compare('super-secret', row.passwordHash!)).toBe(true);
+    expect(row.passwordHash).not.toContain('Super-secret1');
+    expect(await bcrypt.compare('Super-secret1', row.passwordHash!)).toBe(true);
     expect(row.termsVersion).toBe(TERMS_VERSION);
     expect(row.tokenHash).toBe(hashSignupToken(token));
     expect(row.tokenHash).not.toContain(token);
@@ -95,14 +95,17 @@ describe('public sign-up', () => {
 
   it('rejects invalid input', async () => {
     const email = `bad-${randomUUID()}@example.com`;
-    expect((await signupReq({ name: 'X', email, password: 'long-enough', acceptTerms: true })).status).toBe(400);
-    expect((await signupReq({ name: 'Valid Name', email: 'not-an-email', password: 'long-enough', acceptTerms: true })).status).toBe(400);
+    expect((await signupReq({ name: 'X', email, password: 'Long-enough1', acceptTerms: true })).status).toBe(400);
+    expect((await signupReq({ name: 'Valid Name', email: 'not-an-email', password: 'Long-enough1', acceptTerms: true })).status).toBe(400);
     const short = await signupReq({ name: 'Valid Name', email, password: '123', acceptTerms: true });
     expect(short.status).toBe(400);
-    expect((await short.json()).error).toBe('Password must be at least 6 characters.');
+    expect((await short.json()).error).toContain('at least 6 characters');
+    const weak = await signupReq({ name: 'Valid Name', email, password: 'alllowercase', acceptTerms: true });
+    expect(weak.status).toBe(400);
+    expect((await weak.json()).error).toContain('uppercase');
     expect((await signupReq({ name: 'Valid Name', email, password: 'x'.repeat(201), acceptTerms: true })).status).toBe(400);
-    expect((await signupReq({ name: 'Valid Name', email, password: 'long-enough', acceptTerms: false })).status).toBe(400);
-    const missingConsent = await signupReq({ name: 'Valid Name', email, password: 'long-enough' });
+    expect((await signupReq({ name: 'Valid Name', email, password: 'Long-enough1', acceptTerms: false })).status).toBe(400);
+    const missingConsent = await signupReq({ name: 'Valid Name', email, password: 'Long-enough1' });
     expect(missingConsent.status).toBe(400);
     expect((await missingConsent.json()).error).toBe('You must accept the Terms and Privacy Policy.');
     expect(sendMock).not.toHaveBeenCalled();
@@ -111,7 +114,7 @@ describe('public sign-up', () => {
 
   it('ignores honeypot submissions entirely', async () => {
     const email = `bot-${randomUUID()}@example.com`;
-    const res = await signupReq({ name: 'New Person', email, password: 'long-enough', acceptTerms: true, website: 'http://spam.example' });
+    const res = await signupReq({ name: 'New Person', email, password: 'Long-enough1', acceptTerms: true, website: 'http://spam.example' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, message: SUCCESS_MESSAGE });
     expect(sendMock).not.toHaveBeenCalled();
@@ -126,7 +129,7 @@ describe('public sign-up', () => {
     })).map((u) => u.email);
 
     for (const stored of [lower, mixed]) {
-      const res = await signupReq({ name: 'New Person', email: stored.toLowerCase(), password: 'long-enough', acceptTerms: true });
+      const res = await signupReq({ name: 'New Person', email: stored.toLowerCase(), password: 'Long-enough1', acceptTerms: true });
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({
         error: 'An account with this email already exists.',
@@ -142,7 +145,7 @@ describe('public sign-up', () => {
     emails.push(email);
     await doSignup(email);
 
-    const second = await signupReq({ name: 'New Person', email, password: 'long-enough', acceptTerms: true });
+    const second = await signupReq({ name: 'New Person', email, password: 'Long-enough1', acceptTerms: true });
     expect(second.status).toBe(429);
     const secondBody = await second.json();
     expect(secondBody.code).toBe('verification-pending');
@@ -168,7 +171,7 @@ describe('public sign-up', () => {
   it('confirming creates the user with the chosen password, trial, terms fields and features', async () => {
     const email = `confirm-${randomUUID()}@example.com`;
     emails.push(email);
-    const token = await doSignup(email, 'brand-new-pass');
+    const token = await doSignup(email, 'Brand-new-pass1');
 
     const res = await verifyReq(token);
     expect(res.status).toBe(201);
@@ -182,7 +185,7 @@ describe('public sign-up', () => {
     expect(user.name).toBe('New Person');
     expect(user.role).toBe('staff');
     expect(user.status).toBe('active');
-    expect(await bcrypt.compare('brand-new-pass', user.passwordHash)).toBe(true);
+    expect(await bcrypt.compare('Brand-new-pass1', user.passwordHash)).toBe(true);
     expect(user.trialEndsAt).not.toBeNull();
     expect(user.trialEndsAt!.getTime()).toBeGreaterThan(Date.now());
     expect(user.termsAcceptedAt).not.toBeNull();
@@ -264,7 +267,7 @@ describe('public sign-up', () => {
     emails.push(email);
     sendMock.mockRejectedValueOnce(new Error('smtp down'));
 
-    const res = await signupReq({ name: 'New Person', email, password: 'long-enough', acceptTerms: true });
+    const res = await signupReq({ name: 'New Person', email, password: 'Long-enough1', acceptTerms: true });
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'We could not send the verification email. Please try again.' });
     expect(await prisma.pendingSignup.count({ where: { email } })).toBe(0);

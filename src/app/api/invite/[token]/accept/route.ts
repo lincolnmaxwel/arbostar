@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import { hashInviteToken, lookupInvite } from '@/lib/invites';
 import { trialEndsAtForNewUser } from '@/lib/billing';
 
@@ -14,11 +15,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
   const password = typeof body?.password === 'string' ? body.password : '';
   const nameInput = typeof body?.name === 'string' ? body.name.trim() : '';
 
-  if (password.length < 6) {
-    return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
-  }
-  if (password.length > 200) {
-    return NextResponse.json({ error: 'Password is too long.' }, { status: 400 });
+  const problem = passwordProblem(password);
+  if (problem) {
+    return NextResponse.json({ error: problem }, { status: 400 });
   }
 
   const lookup = await lookupInvite(params.token);

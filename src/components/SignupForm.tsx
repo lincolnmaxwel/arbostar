@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { PasswordMatch, PasswordRequirements } from '@/components/PasswordRequirements';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
 
@@ -25,8 +27,9 @@ export function SignupForm() {
     setError(null);
     setEmailExists(false);
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const problem = passwordProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     if (password !== confirm) {
@@ -140,6 +143,7 @@ export function SignupForm() {
           </button>
         </div>
       </div>
+      <PasswordRequirements password={password} />
       <div className={styles.field}>
         <label htmlFor="signup-confirm">Confirm password</label>
         <input
@@ -155,6 +159,7 @@ export function SignupForm() {
           required
         />
       </div>
+      <PasswordMatch password={password} confirm={confirm} />
       <div className={signupStyles.termsField}>
         <input
           id="signup-terms"

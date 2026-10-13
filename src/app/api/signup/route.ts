@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
+import { passwordProblem } from '@/lib/passwordPolicy';
 import { TERMS_VERSION } from '@/lib/legal';
 import {
   SIGNUP_COOLDOWN_MINUTES,
@@ -38,11 +39,9 @@ export async function POST(req: Request) {
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
-  if (password.length < 6) {
-    return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
-  }
-  if (password.length > 200) {
-    return NextResponse.json({ error: 'Password is too long.' }, { status: 400 });
+  const problem = passwordProblem(password);
+  if (problem) {
+    return NextResponse.json({ error: problem }, { status: 400 });
   }
   if (body?.acceptTerms !== true) {
     return NextResponse.json({ error: 'You must accept the Terms and Privacy Policy.' }, { status: 400 });

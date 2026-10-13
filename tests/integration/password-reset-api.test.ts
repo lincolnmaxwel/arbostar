@@ -100,13 +100,13 @@ describe('forgot / reset password', () => {
 
     expect((await resetReq(token, 'abc')).status).toBe(400);
 
-    const ok = await resetReq(token, 'brand-new-password');
+    const ok = await resetReq(token, 'Brand-new-password1');
     expect(ok.status).toBe(200);
     const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    expect(await bcrypt.compare('brand-new-password', user.passwordHash)).toBe(true);
+    expect(await bcrypt.compare('Brand-new-password1', user.passwordHash)).toBe(true);
 
-    expect((await resetReq(token, 'another-password')).status).toBe(410);
-    expect((await resetReq('x'.repeat(43), 'another-password')).status).toBe(404);
+    expect((await resetReq(token, 'Another-password1')).status).toBe(410);
+    expect((await resetReq('x'.repeat(43), 'Another-password1')).status).toBe(404);
   });
 
   it('refuses an expired link', async () => {
@@ -114,6 +114,14 @@ describe('forgot / reset password', () => {
     await forgotReq(email);
     const token = tokenFromLastEmail();
     await prisma.passwordReset.updateMany({ where: { userId }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    expect((await resetReq(token, 'brand-new-password')).status).toBe(410);
+    expect((await resetReq(token, 'Brand-new-password1')).status).toBe(410);
+  });
+});
+
+describe('password strength on reset', () => {
+  it('rejects a password missing required character types', async () => {
+    const res = await resetReq('x'.repeat(43), 'alllowercase1');
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('uppercase');
   });
 });

@@ -2,42 +2,54 @@
 
 import { PASSWORD_RULES } from '@/lib/passwordPolicy';
 
-const listStyle: React.CSSProperties = {
-  listStyle: 'none',
-  margin: '-4px 0 16px',
-  padding: 0,
-  display: 'grid',
-  gap: 4,
-  fontSize: '0.8125rem',
-};
+const SEGMENT_COLORS = ['#dc2626', '#ea580c', '#f59e0b', '#84cc16', '#16a34a'];
 
-/** Live checklist of the password rules; each line turns green as it is met. */
+/**
+ * Compact strength meter: one segment per rule, filling and changing colour
+ * as rules are met, with a single line naming what is still missing.
+ */
 export function PasswordRequirements({ password }: { password: string }) {
+  const results = PASSWORD_RULES.map((rule) => ({ rule, met: rule.test(password) }));
+  const metCount = results.filter((r) => r.met).length;
+  const missing = results.filter((r) => !r.met).map((r) => r.rule.short);
+  const complete = metCount === PASSWORD_RULES.length;
+  const color = SEGMENT_COLORS[Math.max(metCount - 1, 0)];
+  const started = password.length > 0;
+
+  let hint = 'Use 6+ characters with upper and lower case, a number and a symbol.';
+  if (complete) hint = '✓ Strong password';
+  else if (started) hint = `Still needed: ${missing.join(', ')}`;
+
   return (
-    <ul style={listStyle} aria-label="Password requirements" aria-live="polite">
-      {PASSWORD_RULES.map((rule) => {
-        const met = rule.test(password);
-        return (
-          <li
+    <div style={{ margin: '-4px 0 16px' }}>
+      <div
+        role="img"
+        aria-label={`Password strength: ${metCount} of ${PASSWORD_RULES.length} requirements met`}
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${PASSWORD_RULES.length}, 1fr)`, gap: 4 }}
+      >
+        {PASSWORD_RULES.map((rule, index) => (
+          <span
             key={rule.id}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              color: met ? 'var(--color-success, #15803d)' : 'var(--color-text-secondary)',
+              height: 4,
+              borderRadius: 2,
+              background: index < metCount ? color : 'var(--color-border)',
+              transition: 'background 150ms ease',
             }}
-          >
-            <span aria-hidden="true" style={{ width: 16, textAlign: 'center', fontWeight: 700 }}>
-              {met ? '✓' : '○'}
-            </span>
-            <span>
-              {rule.label}
-              <span style={{ position: 'absolute', left: -9999 }}>{met ? ' (met)' : ' (not met)'}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+          />
+        ))}
+      </div>
+      <p
+        aria-live="polite"
+        style={{
+          margin: '6px 0 0',
+          fontSize: '0.8125rem',
+          color: complete ? 'var(--color-success, #15803d)' : 'var(--color-text-secondary)',
+        }}
+      >
+        {hint}
+      </p>
+    </div>
   );
 }
 

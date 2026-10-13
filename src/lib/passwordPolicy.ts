@@ -8,15 +8,17 @@ export const PASSWORD_MAX_LENGTH = 200;
 export interface PasswordRule {
   id: 'length' | 'lower' | 'upper' | 'number' | 'special';
   label: string;
+  /** Short noun phrase for compact UI ("an uppercase letter"). */
+  short: string;
   test: (password: string) => boolean;
 }
 
 export const PASSWORD_RULES: PasswordRule[] = [
-  { id: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, test: (p) => p.length >= PASSWORD_MIN_LENGTH },
-  { id: 'upper', label: 'One uppercase letter (A-Z)', test: (p) => /[A-Z]/.test(p) },
-  { id: 'lower', label: 'One lowercase letter (a-z)', test: (p) => /[a-z]/.test(p) },
-  { id: 'number', label: 'One number (0-9)', test: (p) => /[0-9]/.test(p) },
-  { id: 'special', label: 'One special character (e.g. ! @ # $ %)', test: (p) => /[^A-Za-z0-9]/.test(p) },
+  { id: 'length', label: `At least ${PASSWORD_MIN_LENGTH} characters`, short: `${PASSWORD_MIN_LENGTH}+ characters`, test: (p) => p.length >= PASSWORD_MIN_LENGTH },
+  { id: 'upper', label: 'One uppercase letter (A-Z)', short: 'uppercase letter', test: (p) => /[A-Z]/.test(p) },
+  { id: 'lower', label: 'One lowercase letter (a-z)', short: 'lowercase letter', test: (p) => /[a-z]/.test(p) },
+  { id: 'number', label: 'One number (0-9)', short: 'number', test: (p) => /[0-9]/.test(p) },
+  { id: 'special', label: 'One special character (e.g. ! @ # $ %)', short: 'special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 
 /** First problem as a sentence for API errors, or null when the password is acceptable. */

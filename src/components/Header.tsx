@@ -43,6 +43,9 @@ export function Header() {
   const viewAsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Public pages render no header and have no session: asking for the
+    // user context there only produces a 401 in the console.
+    if (isPublicPath(pathname)) return;
     let cancelled = false;
     getViewContext().then((ctx) => {
       if (cancelled || !ctx) return;

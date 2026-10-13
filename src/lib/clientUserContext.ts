@@ -19,6 +19,11 @@ export interface ViewContext {
 
 let cachedContext: ViewContext | null = null;
 let pendingFetch: Promise<ViewContext | null> | null = null;
+// After a 401 (signed out / public page) do not ask again for a while: the
+// background sync loop polls this every few seconds and would otherwise fill
+// the console with 401s for every visitor who is not signed in.
+const UNAUTHORIZED_BACKOFF_MS = 60_000;
+let unauthorizedUntil = 0;
 
 /**
  * Client-side source of the effective user context (see GET
@@ -29,9 +34,13 @@ let pendingFetch: Promise<ViewContext | null> | null = null;
  */
 export async function getViewContext(): Promise<ViewContext | null> {
   if (cachedContext) return cachedContext;
+  if (Date.now() < unauthorizedUntil) return null;
   if (!pendingFetch) {
     pendingFetch = fetch('/api/view-context', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res.status === 401) unauthorizedUntil = Date.now() + UNAUTHORIZED_BACKOFF_MS;
+        return res.ok ? res.json() : null;
+      })
       .then(async (body) => {
         if (!body) return null;
         cachedContext = body as ViewContext;
@@ -48,6 +57,7 @@ export async function getViewContext(): Promise<ViewContext | null> {
 /** Drop the cached context so the next call refetches (view-as switches). */
 export function resetViewContext(): void {
   cachedContext = null;
+  unauthorizedUntil = 0;
 }
 
 async function claimLegacyRows(ownerUserId: string): Promise<void> {

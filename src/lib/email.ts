@@ -417,27 +417,28 @@ export interface SendSignupVerificationEmailOptions {
   expiresInHours: number;
 }
 
-// Public sign-up: the account does not exist yet — the recipient follows the
-// one-time link to choose a password, which creates it and starts the trial.
+// Public sign-up: the account does not exist yet — confirming the one-time
+// link creates it (the password was already chosen at sign-up), so the email
+// only has to ask for the address confirmation.
 export async function sendSignupVerificationEmail(opts: SendSignupVerificationEmailOptions): Promise<void> {
   const html = emailLayout(`
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p>Hi ${escapeHtml(opts.name)},</p>
-      <p>Welcome to <strong>MyJobbs</strong>. Choose a password to activate your account and start your free trial:</p>
+      <p>Welcome to <strong>MyJobbs</strong>. Your free trial account is ready to use as soon as you confirm your email address:</p>
       <p style="margin:24px 0;">
         <a href="${opts.verifyUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
-          Create my account
+          Confirm my email
         </a>
       </p>
       <p style="color:#5a6785;font-size:13px;">This link works once and expires in ${opts.expiresInHours} hours. If the button does not work, copy this address into your browser:<br/>
         <span style="word-break:break-all;">${escapeHtml(opts.verifyUrl)}</span></p>
-      <p style="color:#5a6785;font-size:13px;">If you were not expecting this email, you can ignore it.</p>
+      <p style="color:#5a6785;font-size:13px;">If you were not expecting this email, you can ignore it. Your account will not be created unless you confirm.</p>
     </div>
   `);
 
   await sendGraphMail({
     to: opts.to,
-    subject: 'Verify your MyJobbs account',
+    subject: 'Confirm your MyJobbs email',
     html,
   });
 }

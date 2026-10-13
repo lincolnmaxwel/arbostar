@@ -36,9 +36,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [otherDevice, setOtherDevice] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   useEffect(() => {
-    setOtherDevice(new URLSearchParams(window.location.search).get('reason') === 'other-device');
+    const query = new URLSearchParams(window.location.search);
+    setOtherDevice(query.get('reason') === 'other-device');
+    setEmailVerified(query.get('verified') === '1');
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,6 +87,11 @@ export default function LoginPage() {
           <p className={styles.success} role="status">
             You were signed out because this account was signed in on another device. Only one device can use an
             account at a time.
+          </p>
+        )}
+        {emailVerified && !error && (
+          <p className={styles.success} role="status">
+            Email confirmed. Sign in to start your free trial.
           </p>
         )}
         {error && <p className={styles.error} role="alert">{error}</p>}

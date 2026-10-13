@@ -104,3 +104,48 @@ token single-use (410), expired (410), invalid (404), existing email (409). Clea
 
 `npx tsc --noEmit`, `npx next lint` clean; new tests pass; no new failures vs the known baseline (timesheetClient x5, per-user-isolation x1,
 flaky QuotesListPage). CLAUDE.md gets a short "Public sign-up" section (Programmer). Report back with the list of files changed.
+
+---
+
+## Amendment 2026-10-13 (owner request): password at sign-up, explicit "already registered"
+
+Replaces the flow/API parts above where they conflict.
+
+Flow: `/signup` asks name, email, password, confirm password, terms checkbox. Submit stores a `PendingSignup`
+(with the bcrypt hash of the password) and emails the verification link. The account does NOT exist and cannot sign in
+until the link is confirmed (it stays pending; it expires after 24 h and the user can sign up again).
+Confirming creates the user (trial starts at confirmation) and sends the user to `/login?verified=1`.
+
+Data: `PendingSignup.passwordHash String?` (new migration `20261015000001_pending_signup_password`; nullable only so
+rows created before this change still migrate; new rows always set it). Never log it.
+
+`POST /api/signup` body: `{ name, email, password, acceptTerms: true, website? }`.
+- Honeypot unchanged (generic 200, do nothing).
+- Validation 400: name 2-100, email valid, password 6-200 ("Password must be at least 6 characters."), terms.
+- Email already has a User (case-insensitive) -> **409** `{ error: 'An account with this email already exists.', code: 'email-exists' }`. No email sent.
+  (Owner explicitly chose clear UX over anti-enumeration here.)
+- Pending signup for this email created < SIGNUP_COOLDOWN_MINUTES ago -> **429**
+  `{ error: 'We already sent a verification link to this email a few minutes ago. Check your inbox and spam folder, or try again in N minutes.', code: 'verification-pending', retryAfterMinutes: N }`.
+- Otherwise replace older pending rows, create the new one with passwordHash, send the email, answer 200
+  `{ ok: true, message: 'Check your email to confirm your address. Your account will be ready as soon as you confirm.' }`.
+  If sending fails: delete the row and answer 502 `{ error: 'We could not send the verification email. Please try again.' }`.
+
+`POST /api/signup/verify/[token]`: no body needed any more. Same token states (404/410) and 409 if the email now has a user.
+Creates the user using `PendingSignup.passwordHash` (if null -> 410 "This sign-up link is no longer valid. Please sign up again.").
+Response 201 `{ ok: true, email }`.
+
+Email copy (`sendSignupVerificationEmail`): button "Confirm my email", text says the account is ready to use right after confirming.
+
+UI (Frontend Designer):
+- `SignupForm`: add Password + Confirm password (same show/hide toggle pattern as `ResetPasswordForm`), client-side checks
+  (>= 6 chars, match), show API errors inline; for `code === 'email-exists'` show the message plus links "Sign in" and "Forgot your password?".
+  Success state: "Check your email" panel showing the address typed, with note about spam folder and 24 h validity.
+- `/signup/verify/[token]` page + `VerifySignupForm`: no password fields any more. Valid link -> short text with the email and ONE
+  button "Confirm my email" (POST; never auto-confirm on GET because mail scanners prefetch links). On 201 go to `/login?verified=1`.
+  Problem states unchanged.
+- `/login`: when `?verified=1` show a success notice "Email confirmed. Sign in to start your free trial." (like the other-device notice).
+- Reuse existing CSS classes; stay at 360px width.
+
+Tests (Programmer): update `tests/integration/public-signup-api.test.ts` for the new contract (409 existing incl. mixed-case, 429 cooldown,
+400 password/terms, 200 stores a hash that is not the plaintext, verify creates user whose password works with bcrypt.compare, 410 reuse,
+send failure -> 502 and no row). Update the CLAUDE.md "Public sign-up" section.

@@ -38,8 +38,10 @@ export default async function VerifySignupPage({ params }: { params: { token: st
         </h1>
         {lookup.state === 'valid' ? (
           <>
-            <p className={styles.subtitle}>Choose a password to create your account and start your free trial.</p>
-            <VerifySignupForm token={params.token} email={lookup.signup.email} name={lookup.signup.name} />
+            <p className={styles.subtitle}>
+              Confirm <strong>{lookup.signup.email}</strong> to create your account and start your free trial.
+            </p>
+            <VerifySignupForm token={params.token} />
           </>
         ) : (
           <>

@@ -34,3 +34,17 @@
   white-space: nowrap;
   clip-path: inset(50%);
 }
+
+.successCopy {
+  margin-top: 8px;
+}
+
+.errorLinks {
+  margin-top: 8px;
+}
+
+.errorLinks a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}

@@ -367,13 +367,17 @@ model UserInvite {
 }
 
 // Public sign-up: someone started a free-trial account from the landing page.
-// The user row only exists once they follow the email link and choose a
-// password — until then only the SHA-256 of the one-time token is stored
-// (same pattern as UserInvite; no FK to User).
+// The user row only exists once they confirm their email — until then only the
+// SHA-256 of the one-time token is stored (same pattern as UserInvite; no FK
+// to User). The password is chosen at sign-up and stored here as a bcrypt
+// hash, so confirming only needs one click.
 model PendingSignup {
   id           String    @id @default(uuid())
   email        String
   name         String
+  // Nullable only so rows created before this field existed still migrate;
+  // new rows always set it.
+  passwordHash String?
   tokenHash    String    @unique
   termsVersion String
   expiresAt    DateTime

@@ -5,60 +5,82 @@ import Link from 'next/link';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
 
-const GENERIC_SUCCESS_MESSAGE =
-  'If this email can be used to create an account, a verification link is on its way.';
-
 export function SignupForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [website, setWebsite] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [emailExists, setEmailExists] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
 
-    setSubmitting(true);
     setError(null);
+    setEmailExists(false);
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setError('The passwords do not match.');
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const response = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, acceptTerms, website }),
+        body: JSON.stringify({ name, email, password, acceptTerms, website }),
       });
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         setError(body.error ?? 'Could not start your free trial. Please try again.');
+        setEmailExists(body.code === 'email-exists');
         setSubmitting(false);
         return;
       }
 
-      setSuccessMessage(body.message ?? GENERIC_SUCCESS_MESSAGE);
+      setSuccess(true);
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
       setSubmitting(false);
     }
   }
 
-  if (successMessage) {
+  if (success) {
     return (
-      <p className={styles.success} role="status" aria-live="polite">
-        {successMessage}
-      </p>
+      <section className={styles.success} role="status" aria-live="polite">
+        <strong>Check your email</strong>
+        <p className={signupStyles.successCopy}>
+          We sent a confirmation link to <strong>{email}</strong>. Check your inbox and spam folder, then use the link
+          within 24 hours to confirm your address.
+        </p>
+      </section>
     );
   }
 
   return (
     <form onSubmit={handleSubmit}>
       {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
+        <div className={styles.error} role="alert">
+          <p>{error}</p>
+          {emailExists && (
+            <p className={signupStyles.errorLinks}>
+              <Link href="/login">Sign in</Link> or <Link href="/forgot-password">Forgot your password?</Link>
+            </p>
+          )}
+        </div>
       )}
       <div className={styles.field}>
         <label htmlFor="signup-name">Name</label>
@@ -88,6 +110,48 @@ export function SignupForm() {
           onChange={(event) => setEmail(event.target.value)}
           disabled={submitting}
           maxLength={254}
+          required
+        />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor="signup-password">Password</label>
+        <div className={styles.passwordWrap}>
+          <input
+            id="signup-password"
+            className={`${styles.input} ${styles.passwordInput}`}
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            disabled={submitting}
+            minLength={6}
+            maxLength={200}
+            required
+          />
+          <button
+            type="button"
+            className={styles.passwordToggle}
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-pressed={showPassword}
+            tabIndex={-1}
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
+      </div>
+      <div className={styles.field}>
+        <label htmlFor="signup-confirm">Confirm password</label>
+        <input
+          id="signup-confirm"
+          className={styles.input}
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+          disabled={submitting}
+          minLength={6}
+          maxLength={200}
           required
         />
       </div>

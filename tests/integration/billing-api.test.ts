@@ -364,3 +364,23 @@ describe('billing: access gate, webhook and admin settings', () => {
     expect((await setEnd(future.toISOString(), { extendTrialDays: 5 })).status).toBe(400);
   });
 });
+
+describe('billing: payment history route', () => {
+  it('requires a session and returns an empty list when there is no Stripe customer', async () => {
+    const { GET: payments } = await import('@/app/api/billing/payments/route');
+    sessionMock.mockResolvedValue(null);
+    expect((await payments()).status).toBe(401);
+
+    const user = await prisma.user.create({
+      data: { name: 'No Stripe', email: `pay-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+    });
+    try {
+      sessionMock.mockResolvedValue({ user: { id: user.id, role: 'staff' } });
+      const res = await payments();
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ payments: [] });
+    } finally {
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+  });
+});

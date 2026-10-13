@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { resetViewContext } from '@/lib/clientUserContext';
 import { useLivePolling } from '@/lib/useLivePolling';
 import type { BillingInfo } from '@/lib/billing';
+import { PaymentHistory } from './PaymentHistory';
 import styles from '../app/billing/billing.module.css';
 
 interface BillingResponse {
@@ -307,6 +308,12 @@ export function BillingClient() {
           </p>
         )}
       </section>
+
+      {billing.phase !== 'exempt' && (
+        <div className={styles.cardGap}>
+          <PaymentHistory refreshKey={`${billing.phase}:${billing.periodEnd ?? ''}`} />
+        </div>
+      )}
     </div>
   );
 }

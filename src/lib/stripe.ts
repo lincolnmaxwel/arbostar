@@ -129,3 +129,51 @@ export async function getPlanPrice(): Promise<PlanPrice | null> {
     return null;
   }
 }
+
+export interface PaymentRow {
+  id: string;
+  number: string | null;
+  /** ISO date the invoice was issued. */
+  date: string;
+  description: string;
+  /** Amount in the smallest currency unit (cents). */
+  amount: number;
+  currency: string;
+  status: 'paid' | 'unpaid' | 'refunded';
+  hostedUrl: string | null;
+  pdfUrl: string | null;
+}
+
+/**
+ * Map a Stripe invoice to the row shown on the billing page, or null for
+ * invoices the customer should not see (drafts, voided, $0 trial invoices).
+ */
+export function toPaymentRow(invoice: Stripe.Invoice): PaymentRow | null {
+  if (invoice.status !== 'paid' && invoice.status !== 'open' && invoice.status !== 'uncollectible') return null;
+  const paid = invoice.status === 'paid';
+  const amount = paid ? invoice.amount_paid : invoice.amount_due;
+  if (amount <= 0) return null;
+  const firstLine = invoice.lines?.data?.[0]?.description?.trim();
+  return {
+    id: invoice.id ?? '',
+    number: invoice.number ?? null,
+    date: new Date(invoice.created * 1000).toISOString(),
+    description: firstLine || 'MyJobbs subscription',
+    amount,
+    currency: invoice.currency,
+    status: paid ? 'paid' : 'unpaid',
+    hostedUrl: invoice.hosted_invoice_url ?? null,
+    pdfUrl: invoice.invoice_pdf ?? null,
+  };
+}
+
+/** Everything this customer has been billed, newest first (Stripe is the source of truth). */
+export async function listPaymentHistory(customerId: string): Promise<PaymentRow[]> {
+  const rows: PaymentRow[] = [];
+  for await (const invoice of getStripe().invoices.list({ customer: customerId, limit: 100 })) {
+    const row = toPaymentRow(invoice);
+    if (row) rows.push(row);
+    if (rows.length >= 500) break;
+  }
+  return rows;
+}

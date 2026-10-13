@@ -158,3 +158,65 @@
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
 }
+
+/* ---- Payment history ---- */
+.historyTitle {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.historyScroll {
+  overflow-x: auto;
+}
+
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.historyTable th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.historyTable td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.historyTable tr:last-child td {
+  border-bottom: none;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.historyMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.historyLinks {
+  white-space: nowrap;
+}
+
+.historyLinks a {
+  margin-right: 12px;
+  font-weight: 600;
+}
+
+.cardGap {
+  margin-top: 16px;
+}

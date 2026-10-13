@@ -64,6 +64,22 @@ describe('single active session', () => {
     expect((await reread({ id: userId, role: 'staff' } as JWT)).revoked).toBe(true);
   });
 
+  it('blocking or deactivating the account revokes its open session with reason "account"', async () => {
+    const signedIn = await authorizeCredentials(email, 'correct-horse');
+    const token = await issueToken(signedIn!.sid);
+    expect((await reread(token)).revoked).toBe(false);
+
+    for (const status of ['blocked', 'inactive'] as const) {
+      await prisma.user.update({ where: { id: userId }, data: { status } });
+      const after = await reread(token);
+      expect(after.revoked).toBe(true);
+      expect(after.revokedReason).toBe('account');
+    }
+
+    await prisma.user.update({ where: { id: userId }, data: { status: 'active' } });
+    expect((await reread(token)).revoked).toBe(false);
+  });
+
   it('a deleted account is revoked', async () => {
     expect((await reread({ id: randomUUID(), role: 'staff', sid: 'x' } as JWT)).revoked).toBe(true);
   });

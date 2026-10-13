@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { NewQuoteLink } from './NewQuoteLink';
-import { getViewContext, resetViewContext } from '@/lib/clientUserContext';
+import { getViewContext, refreshViewContext, resetViewContext } from '@/lib/clientUserContext';
+import { useLivePolling } from '@/lib/useLivePolling';
 import type { BillingInfo } from '@/lib/billing';
 import styles from './Header.module.css';
 
@@ -27,7 +28,7 @@ function isPublicPath(pathname: string): boolean {
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const userEmail = session?.user?.email ?? null;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,6 +42,29 @@ export function Header() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const viewAsRef = useRef<HTMLDivElement>(null);
+
+  // Live: an admin changing this account (trial days, subscription, block,
+  // password) reaches the open session within seconds - no reload needed.
+  useLivePolling(async () => {
+    if (isPublicPath(pathname)) return;
+    const { ctx, unauthorized } = await refreshViewContext();
+    if (unauthorized) {
+      // Blocked / session replaced: let the session guard sign this tab out.
+      await updateSession();
+      return;
+    }
+    if (!ctx) return;
+    setActorRole(ctx.actorRole);
+    setIsViewAs(ctx.isViewAs);
+    setTargetName(ctx.targetName);
+    setBilling(ctx.billing ?? null);
+    setFeatures({
+      quotes: ctx.features.quotes,
+      invoices: ctx.features.invoices,
+      timesheet: ctx.features.timesheet,
+      clients_crm: ctx.features.clients_crm,
+    });
+  }, 10000);
 
   useEffect(() => {
     // Public pages render no header and have no session: asking for the

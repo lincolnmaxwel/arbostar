@@ -74,11 +74,24 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
       if (token.id) {
-        const row = await prisma.user.findUnique({ where: { id: token.id }, select: { sessionId: true } });
-        // Revoked when the account is gone or a newer sign-in replaced this
-        // one. A null sessionId is a legacy account: its old tokens stay valid
-        // until its next sign-in stamps an id.
-        token.revoked = !row || (row.sessionId !== null && row.sessionId !== token.sid);
+        const row = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: { sessionId: true, status: true },
+        });
+        // Revoked when the account is gone/blocked/deactivated, or a newer
+        // sign-in (or an admin password reset) replaced this one. A null
+        // sessionId is a legacy account: its old tokens stay valid until its
+        // next sign-in stamps an id.
+        if (!row || row.status !== 'active') {
+          token.revoked = true;
+          token.revokedReason = 'account';
+        } else if (row.sessionId !== null && row.sessionId !== token.sid) {
+          token.revoked = true;
+          token.revokedReason = 'other-device';
+        } else {
+          token.revoked = false;
+          token.revokedReason = undefined;
+        }
       }
       return token;
     },
@@ -86,7 +99,11 @@ export const authOptions: NextAuthOptions = {
       if (token.revoked) {
         // No user => every server check (`session?.user?.id`) treats this as
         // signed out; `revoked` lets the client explain why and clear the cookie.
-        return { expires: session.expires, revoked: true } as unknown as typeof session;
+        return {
+          expires: session.expires,
+          revoked: true,
+          revokedReason: token.revokedReason ?? 'other-device',
+        } as unknown as typeof session;
       }
       if (session.user) {
         session.user.id = token.id;

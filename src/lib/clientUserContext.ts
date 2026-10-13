@@ -54,6 +54,26 @@ export async function getViewContext(): Promise<ViewContext | null> {
   return pendingFetch;
 }
 
+/**
+ * Re-read the context from the server (bypassing the cache) so admin changes
+ * - trial days, subscription, feature flags - reach an open session. Used by
+ * the header's live polling.
+ */
+export async function refreshViewContext(): Promise<{ ctx: ViewContext | null; unauthorized: boolean }> {
+  try {
+    const res = await fetch('/api/view-context', { cache: 'no-store' });
+    if (res.status === 401) return { ctx: null, unauthorized: true };
+    if (!res.ok) return { ctx: cachedContext, unauthorized: false };
+    const body = (await res.json()) as ViewContext;
+    const ownerChanged = cachedContext?.ownerUserId !== body.ownerUserId;
+    cachedContext = body;
+    if (ownerChanged) await claimLegacyRows(body.ownerUserId);
+    return { ctx: body, unauthorized: false };
+  } catch {
+    return { ctx: cachedContext, unauthorized: false };
+  }
+}
+
 /** Drop the cached context so the next call refetches (view-as switches). */
 export function resetViewContext(): void {
   cachedContext = null;

@@ -133,3 +133,7 @@ Anyone can create an account from the landing page, no admin invitation needed. 
 ### Payment history
 
 The user's `/billing` page ends with a "Payment history" card (`src/components/PaymentHistory.tsx`) fed by `GET /api/billing/payments`, which lists the signed-in user's own Stripe invoices (`listPaymentHistory()` / `toPaymentRow()` in `src/lib/stripe.ts`: paid and unpaid with an amount, newest first, each with Stripe's hosted receipt and PDF links; drafts, void and $0 invoices are hidden). Stripe is the source of truth: nothing is stored locally, so there is no webhook/backfill to maintain. Empty list when the user has no Stripe customer or Stripe is not configured. Acts on the real user, never the view-as target.
+
+### Live account changes (block, password reset, trial days)
+
+An admin's change to an account reaches that user's open session within seconds, no reload: the `jwt` callback (`src/lib/auth.ts`) revokes a session when the user is no longer `active` (blocked/inactive/deleted, reason `account`) or its `User.sessionId` was rotated (newer sign-in or an admin password reset via `PATCH /api/admin/users/[id]`, reason `other-device`); `Providers.tsx` polls the session every 10 s and signs the tab out to `/login?reason=...`. The Header polls `/api/view-context` every 10 s (`refreshViewContext()`), so trial/subscription/feature-flag changes update nav, banner and the locked-account redirect to `/billing` live.

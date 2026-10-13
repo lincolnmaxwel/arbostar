@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
 import path from 'path';
 import { Role, UserStatus } from '@prisma/client';
@@ -49,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     status?: UserStatus;
     hourlyRate?: number;
     passwordHash?: string;
+    sessionId?: string;
     billingExempt?: boolean;
     trialEndsAt?: Date;
   } = {};
@@ -127,6 +129,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
     }
     data.passwordHash = await bcrypt.hash(password, 10);
+    // A new password ends every open session of that user (not the admin's own).
+    if (target.id !== actorId) data.sessionId = randomUUID();
   }
 
   // Self-lockout guard: an admin can never demote, disable, or block their

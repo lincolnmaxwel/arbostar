@@ -8,10 +8,17 @@ import { SessionProvider, signOut, useSession } from 'next-auth/react';
 // login page with an explanation.
 function RevokedSessionGuard() {
   const { data: session } = useSession();
-  const revoked = (session as { revoked?: boolean } | null)?.revoked === true;
+  const info = session as { revoked?: boolean; revokedReason?: string } | null;
+  const revoked = info?.revoked === true;
+  const reason = info?.revokedReason === 'account' ? 'account' : 'other-device';
   useEffect(() => {
-    if (revoked) void signOut({ callbackUrl: '/login?reason=other-device' });
-  }, [revoked]);
+    if (!revoked) return;
+    // redirect:false + a relative navigation: never depends on NEXTAUTH_URL
+    // matching the host the user is actually on.
+    void signOut({ redirect: false }).finally(() => {
+      window.location.href = `/login?reason=${reason}`;
+    });
+  }, [revoked, reason]);
   return null;
 }
 
@@ -19,7 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // refetchInterval only polls while a session exists, so public pages
   // (landing, client portal) are not affected.
   return (
-    <SessionProvider refetchInterval={30} refetchOnWindowFocus>
+    <SessionProvider refetchInterval={10} refetchOnWindowFocus>
       <RevokedSessionGuard />
       {children}
     </SessionProvider>

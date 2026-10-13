@@ -145,6 +145,8 @@ describe('/api/admin/users (admin management)', () => {
 
     const stored = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     expect(await bcrypt.compare('newpass99', stored.passwordHash)).toBe(true);
+    // An admin reset also rotates the session id, which signs the user out everywhere.
+    expect(stored.sessionId).toBeTruthy();
   });
 
   it('guards against disabling the last active admin', async () => {

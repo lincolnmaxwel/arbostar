@@ -35,12 +35,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [otherDevice, setOtherDevice] = useState(false);
+  const [signedOutNotice, setSignedOutNotice] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-    setOtherDevice(query.get('reason') === 'other-device');
+    const reason = query.get('reason');
+    if (reason === 'other-device') {
+      setSignedOutNotice(
+        'You were signed out because this account was signed in on another device, or an administrator changed it. Only one device can use an account at a time.',
+      );
+    } else if (reason === 'account') {
+      setSignedOutNotice('Your account has been blocked or deactivated. Contact support if you think this is a mistake.');
+    }
     setEmailVerified(query.get('verified') === '1');
   }, []);
 
@@ -83,10 +90,9 @@ export default function LoginPage() {
         </h1>
         <p className={styles.subtitle}>Sign in to your account</p>
 
-        {otherDevice && !error && (
+        {signedOutNotice && !error && (
           <p className={styles.success} role="status">
-            You were signed out because this account was signed in on another device. Only one device can use an
-            account at a time.
+            {signedOutNotice}
           </p>
         )}
         {emailVerified && !error && (

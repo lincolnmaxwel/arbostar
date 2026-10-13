@@ -14,8 +14,10 @@ declare module 'next-auth' {
       id: string;
       role: Role;
     } & DefaultSession['user'];
-    /** True when a newer sign-in on another device replaced this session. */
+    /** True when this session was revoked server-side (newer sign-in, admin reset, block). */
     revoked?: boolean;
+    /** 'account' = blocked/deactivated/deleted; 'other-device' = replaced sign-in or admin reset. */
+    revokedReason?: 'account' | 'other-device';
   }
 }
 
@@ -25,5 +27,6 @@ declare module 'next-auth/jwt' {
     role: Role;
     sid?: string;
     revoked?: boolean;
+    revokedReason?: 'account' | 'other-device';
   }
 }

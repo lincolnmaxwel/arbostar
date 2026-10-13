@@ -61,11 +61,27 @@ export async function POST() {
   const now = Date.now();
   const hasTrialLeft = !!user.trialEndsAt && user.trialEndsAt.getTime() - now > MIN_TRIAL_END_MS;
   const plan = hasTrialLeft ? await getPlanPrice() : null;
-  const prepay = hasTrialLeft && !!plan?.productId;
+  const prepay = hasTrialLeft && !!plan;
   let trialEnd: number | null = null;
   if (hasTrialLeft && user.trialEndsAt) {
     const end = prepay && plan ? addBillingInterval(user.trialEndsAt, plan.interval, plan.intervalCount) : user.trialEndsAt;
     trialEnd = Math.floor(end.getTime() / 1000);
+  }
+
+  // Stripe labels a deferred first charge as "N days free" (trial days + the
+  // prepaid period), which reads oddly. Spell out what is actually happening.
+  let explanation: string | null = null;
+  if (prepay && plan && user.trialEndsAt && trialEnd) {
+    const trialDaysLeft = Math.max(1, Math.ceil((user.trialEndsAt.getTime() - now) / (24 * 60 * 60 * 1000)));
+    const formatDay = (d: Date) =>
+      d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    const amount = new Intl.NumberFormat('en-CA', { style: 'currency', currency: plan.currency.toUpperCase() }).format(
+      plan.unitAmount / 100,
+    );
+    explanation =
+      `You are paying ${amount} today for your first month. Your ${trialDaysLeft} remaining free trial ` +
+      `day${trialDaysLeft === 1 ? '' : 's'} are kept, which is why the total free period is longer than your trial. ` +
+      `Your first renewal is on ${formatDay(new Date(trialEnd * 1000))}.`;
   }
 
   const base = appBaseUrl();
@@ -83,7 +99,7 @@ export async function POST() {
               {
                 price_data: {
                   currency: plan.currency.toLowerCase(),
-                  product: plan.productId,
+                  product_data: { name: 'MyJobbs - first month (paid today)' },
                   unit_amount: plan.unitAmount,
                 },
                 quantity: 1,
@@ -95,6 +111,7 @@ export async function POST() {
         metadata: { userId: user.id },
         ...(trialEnd ? { trial_end: trialEnd } : {}),
       },
+      ...(explanation ? { custom_text: { submit: { message: explanation } } } : {}),
       allow_promotion_codes: true,
       success_url: `${base}/billing?checkout=success`,
       cancel_url: `${base}/billing?checkout=canceled`,

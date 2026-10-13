@@ -15,6 +15,15 @@ interface HeaderUser {
   email: string;
 }
 
+// Pages that render without the app header (landing, auth flows, legal, the
+// public client portal).
+const PUBLIC_EXACT = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy'];
+const PUBLIC_PREFIXES = ['/portal/', '/invite/', '/signup/', '/reset-password/'];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_EXACT.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -109,11 +118,10 @@ export function Header() {
   useEffect(() => {
     if (!billing || billing.access || isViewAs) return;
     const open = pathname.startsWith('/billing') || pathname.startsWith('/profile') || pathname.startsWith('/admin');
-    const isPublic = pathname === '/' || pathname === '/login' || pathname.startsWith('/portal/') || pathname.startsWith('/invite/');
-    if (!open && !isPublic) router.replace('/billing');
+    if (!open && !isPublicPath(pathname)) router.replace('/billing');
   }, [billing, isViewAs, pathname, router]);
 
-  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/portal/') || pathname.startsWith('/invite/')) return null;
+  if (isPublicPath(pathname)) return null;
 
   async function handleViewAs(userId: string) {
     const res = await fetch('/api/admin/view-as', {

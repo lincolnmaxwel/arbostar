@@ -135,9 +135,17 @@ export default function LoginPage() {
           <Link href="/forgot-password" className={styles.linkButton}>
             Forgot your password?
           </Link>
+          <Link href="/signup" className={styles.linkButton}>
+            Create an account
+          </Link>
           <Link href="/" className={`${styles.linkButton} ${styles.linkButtonOutline}`}>
             Back to home
           </Link>
+          <div className={styles.legalLinks}>
+            <Link href="/terms">Terms of Service</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy">Privacy Policy</Link>
+          </div>
         </div>
       </div>
     </div>

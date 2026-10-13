@@ -159,9 +159,14 @@ export default async function LandingPage() {
             <a href="#features">Features</a>
             <a href="#how">How it works</a>
           </nav>
-          <Link href="/login" className={styles.navCta}>
-            Sign in
-          </Link>
+          <div className={styles.navActions}>
+            <Link href="/login" className={styles.navSignIn}>
+              Sign in
+            </Link>
+            <Link href="/signup" className={styles.navCta}>
+              Start free trial
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -178,12 +183,12 @@ export default async function LandingPage() {
                 with GST. It keeps working when the signal does not.
               </p>
               <div className={styles.heroActions}>
-                <Link href="/login" className={styles.primaryButton}>
+                <Link href="/signup" className={styles.primaryButton}>
+                  Start free trial
+                </Link>
+                <Link href="/login" className={styles.secondaryButton}>
                   Sign in
                 </Link>
-                <a href="#features" className={styles.secondaryButton}>
-                  See what it does
-                </a>
               </div>
               <ul className={styles.heroBadges}>
                 <li>Works offline</li>
@@ -282,10 +287,13 @@ export default async function LandingPage() {
         <section className={styles.ctaBand}>
           <div className={styles.container}>
             <h2 className={styles.ctaTitle}>Ready to quote smarter?</h2>
-            <p className={styles.ctaText}>Sign in to start building estimates, or ask your administrator for an invitation.</p>
-            <Link href="/login" className={styles.ctaButton}>
-              Sign in to MyJobbs
+            <p className={styles.ctaText}>Create your account and start quoting, scheduling, and invoicing from one place.</p>
+            <Link href="/signup" className={styles.ctaButton}>
+              Start free trial
             </Link>
+            <p className={styles.ctaSignIn}>
+              Already have an account? <Link href="/login">Sign in</Link>
+            </p>
           </div>
         </section>
       </main>
@@ -294,6 +302,10 @@ export default async function LandingPage() {
         <div className={styles.footerInner}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.footerLogo} />
+          <nav className={styles.footerLinks} aria-label="Legal">
+            <Link href="/terms">Terms of Service</Link>
+            <Link href="/privacy">Privacy Policy</Link>
+          </nav>
           <span>© {year} MyJobbs.com. All rights reserved.</span>
         </div>
       </footer>

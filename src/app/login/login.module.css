@@ -162,6 +162,23 @@
   border: 1px solid var(--color-border);
 }
 
+.legalLinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.legalLinks a {
+  color: inherit;
+}
+
+.legalLinks a:hover {
+  color: var(--color-primary);
+}
+
 .success {
   background: var(--color-bg);
   color: var(--color-text);

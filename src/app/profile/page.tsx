@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { resetViewContext } from '@/lib/clientUserContext';
 import styles from './profile.module.css';
 
 interface ProfileUser {
@@ -118,6 +119,12 @@ export default function ProfilePage() {
     setCompanySaved(true);
   }
 
+  // Make the header avatar pick up the new logo without waiting for its poll.
+  function notifyHeader() {
+    resetViewContext();
+    window.dispatchEvent(new Event('myjobbs:billing-changed'));
+  }
+
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -135,6 +142,7 @@ export default function ProfilePage() {
     }
     const body = await res.json();
     setCompany(body.company);
+    notifyHeader();
   }
 
   async function handleRemoveLogo() {
@@ -148,6 +156,7 @@ export default function ProfilePage() {
     }
     const body = await res.json();
     setCompany(body.company);
+    notifyHeader();
   }
 
   async function handleSaveHourlyRate(e: React.FormEvent) {

@@ -36,12 +36,19 @@ export function Header() {
   const [isViewAs, setIsViewAs] = useState(false);
   const [targetName, setTargetName] = useState<string | null>(null);
   const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [logoBroken, setLogoBroken] = useState(false);
   const [ctxVersion, setCtxVersion] = useState(0);
   const [features, setFeatures] = useState<{ quotes: boolean; invoices: boolean; timesheet: boolean; clients_crm: boolean } | null>(null);
   const [users, setUsers] = useState<HeaderUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const viewAsRef = useRef<HTMLDivElement>(null);
+
+  // A new logo URL gets a fresh chance to load after an earlier failure.
+  useEffect(() => {
+    setLogoBroken(false);
+  }, [companyLogo]);
 
   // Live: an admin changing this account (trial days, subscription, block,
   // password) reaches the open session within seconds - no reload needed.
@@ -58,6 +65,7 @@ export function Header() {
     setIsViewAs(ctx.isViewAs);
     setTargetName(ctx.targetName);
     setBilling(ctx.billing ?? null);
+    setCompanyLogo(ctx.companyLogoUrl ?? null);
     setFeatures({
       quotes: ctx.features.quotes,
       invoices: ctx.features.invoices,
@@ -77,6 +85,7 @@ export function Header() {
       setIsViewAs(ctx.isViewAs);
       setTargetName(ctx.targetName);
       setBilling(ctx.billing ?? null);
+      setCompanyLogo(ctx.companyLogoUrl ?? null);
       setFeatures({
         quotes: ctx.features.quotes,
         invoices: ctx.features.invoices,
@@ -260,7 +269,18 @@ export function Header() {
                 aria-haspopup="menu"
                 aria-controls="user-menu"
               >
-                {userEmail}
+                <span className={styles.userAvatar} aria-hidden="true">
+                  {companyLogo && !logoBroken ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={companyLogo} alt="" className={styles.userAvatarImage} onError={() => setLogoBroken(true)} />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                      <circle cx="12" cy="8.5" r="4" />
+                      <path d="M4 20.5c0-4.1 3.6-6.5 8-6.5s8 2.4 8 6.5z" />
+                    </svg>
+                  )}
+                </span>
+                <span className={styles.userMenuText}>{userEmail}</span>
               </button>
               {menuOpen && (
                 <div id="user-menu" className={styles.userMenuDropdown} role="menu">

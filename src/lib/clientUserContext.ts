@@ -15,6 +15,8 @@ export interface ViewContext {
   };
   /** Subscription/trial state of the effective owner (null if unavailable). */
   billing: BillingInfo | null;
+  /** URL of the signed-in user's company logo, or null when none is set. */
+  companyLogoUrl?: string | null;
 }
 
 let cachedContext: ViewContext | null = null;

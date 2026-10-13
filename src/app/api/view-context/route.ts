@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { requireUserScope, UnauthorizedError } from '@/lib/userScope';
 import { getFeatureFlags } from '@/lib/features';
 import { getBillingForUser } from '@/lib/billing';
+import { companyLogoUrl } from '@/lib/companyProfile';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,12 @@ export async function GET() {
 
   const features = await getFeatureFlags(scope.ownerUserId);
   const billing = await getBillingForUser(scope.ownerUserId);
+  // The signed-in user's own company logo (shown next to their email in the
+  // header); read-only, so no profile row is created as a side effect.
+  const profile = await prisma.companyProfile.findUnique({
+    where: { userId: scope.actorUserId },
+    select: { logoPath: true },
+  });
 
   return NextResponse.json({
     actorUserId: scope.actorUserId,
@@ -47,5 +54,6 @@ export async function GET() {
     targetName,
     features,
     billing,
+    companyLogoUrl: companyLogoUrl(profile?.logoPath ?? null),
   });
 }

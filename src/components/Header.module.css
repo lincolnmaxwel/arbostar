@@ -135,10 +135,43 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
-  max-width: 200px;
+  max-width: 240px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.userMenuText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+/* Company logo (or a person silhouette until one is uploaded). */
+.userAvatar {
+  flex: 0 0 auto;
+  /* Square for the silhouette; grows up to 64px for wide company logos. */
+  min-width: 28px;
+  max-width: 64px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.userAvatarImage {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  background: #fff;
+  padding: 2px;
 }
 
 .userMenuButton:hover {
@@ -372,7 +405,7 @@
   }
 
   .userMenuButton {
-    max-width: min(200px, 42vw);
+    max-width: min(220px, 46vw);
   }
 
   .signOutButton {

@@ -6,6 +6,16 @@ import { formatMoney } from '@/lib/quoteMath';
 import { formatPhoneInput } from '@/lib/formatPhone';
 import styles from '../app/timesheet/timesheet.module.css';
 import CatalogSearch from './CatalogSearch';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { localDb, PendingTimesheetEntry } from '@/lib/localDb';
+import { getViewContext } from '@/lib/clientUserContext';
+import {
+  TIMESHEET_SYNCED_EVENT,
+  discardPendingTimesheet,
+  newTimesheetEntryId,
+  queueTimesheetEntry,
+  retryPendingTimesheet,
+} from '@/lib/timesheetOffline';
 
 interface TimesheetClientOption {
   id: string;
@@ -42,6 +52,10 @@ interface TimesheetEntry {
   client: { id: string; name: string };
   products: TimesheetProduct[];
   invoice?: { number: number } | null;
+  /** Set on rows that only exist on this device so far (see timesheetOffline.ts). */
+  pending?: PendingTimesheetEntry['status'];
+  pendingError?: string;
+  localId?: string;
 }
 
 interface NewProductRow {
@@ -145,6 +159,52 @@ function RowIcon({ name }: { name: 'edit' | 'invoice' | 'details' | 'delete' }) 
 
 const EMPTY_NEW_CLIENT = { name: '', email: '', phone: '', address: '' };
 
+// Last-known lists kept per account so the form still works with no signal.
+function readCache<T>(name: string, owner: string | null): T | null {
+  if (!owner) return null;
+  try {
+    const raw = window.localStorage.getItem(`arbostar-ts-${name}:${owner}`);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(name: string, owner: string | null, value: unknown) {
+  if (!owner) return;
+  try {
+    window.localStorage.setItem(`arbostar-ts-${name}:${owner}`, JSON.stringify(value));
+  } catch {
+    // cache is a convenience only
+  }
+}
+
+function pendingToEntry(p: PendingTimesheetEntry, hourlyRate: number): TimesheetEntry {
+  const minutes = Math.max(0, Math.round((new Date(p.endedAt).getTime() - new Date(p.startedAt).getTime()) / 60000));
+  return {
+    id: `pending-${p.localId}`,
+    localId: p.localId,
+    pending: p.status,
+    pendingError: p.lastError,
+    workDate: `${p.workDate}T12:00:00.000Z`,
+    startedAt: p.startedAt,
+    endedAt: p.endedAt,
+    durationMinutes: minutes,
+    hourlyRate: String(hourlyRate),
+    serviceName: 'Labor',
+    status: 'open',
+    description: p.description,
+    client: { id: p.clientId, name: p.clientName },
+    products: p.products.map((product, index) => ({
+      id: `${p.localId}-${index}`,
+      name: product.name,
+      quantity: String(product.quantity),
+      unitPrice: String(product.unitPrice),
+      lineTotal: product.quantity * product.unitPrice,
+    })),
+  };
+}
+
 export function TimesheetClient() {
   const router = useRouter();
   const [clients, setClients] = useState<TimesheetClientOption[]>([]);
@@ -181,6 +241,28 @@ export function TimesheetClient() {
   const [detailsEntry, setDetailsEntry] = useState<TimesheetEntry | null>(null);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
 
+  // undefined = still resolving; null = unknown (offline-first features off).
+  const [ownerUserId, setOwnerUserId] = useState<string | null | undefined>(undefined);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const pendingRows = useLiveQuery(
+    () => (ownerUserId ? localDb.timesheetPending.where('ownerUserId').equals(ownerUserId).toArray() : []),
+    [ownerUserId],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    getViewContext()
+      .then((ctx) => {
+        if (!cancelled) setOwnerUserId(ctx?.ownerUserId ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnerUserId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadEntries = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
@@ -197,6 +279,7 @@ export function TimesheetClient() {
           return;
         }
         const body = await res.json();
+        setOfflineMode(false);
         setEntries(body.entries);
         // Prune stale selections (entries filtered out or invoiced elsewhere).
         setSelected((prev) => {
@@ -204,6 +287,11 @@ export function TimesheetClient() {
           const next = new Set([...prev].filter((id) => liveIds.has(id)));
           return next;
         });
+      } catch (err) {
+        // No connection: keep showing what is already on screen (plus anything
+        // waiting to sync) instead of an error.
+        if (err instanceof TypeError) setOfflineMode(true);
+        else throw err;
       } finally {
         if (!opts?.silent) setLoading(false);
       }
@@ -215,30 +303,67 @@ export function TimesheetClient() {
     loadEntries();
   }, [loadEntries]);
 
+  // Entries synced in the background (or the connection coming back): refresh.
   useEffect(() => {
+    const refresh = () => void loadEntries({ silent: true });
+    window.addEventListener(TIMESHEET_SYNCED_EVENT, refresh);
+    window.addEventListener('online', refresh);
+    return () => {
+      window.removeEventListener(TIMESHEET_SYNCED_EVENT, refresh);
+      window.removeEventListener('online', refresh);
+    };
+  }, [loadEntries]);
+
+  useEffect(() => {
+    if (ownerUserId === undefined) return;
+    // Show the last-known lists right away; fresh ones replace them below.
+    const cachedClients = readCache<TimesheetClientOption[]>('clients', ownerUserId);
+    const cachedCatalog = readCache<ServiceCatalogItem[]>('catalog', ownerUserId);
+    const cachedRate = readCache<number>('rate', ownerUserId);
+    if (cachedClients) setClients(sortClients(cachedClients));
+    if (cachedCatalog) setCatalog(cachedCatalog);
+    if (cachedRate !== null) setHourlyRate(cachedRate);
+
+    // A failed fetch with no connection is not an error: the cached lists above
+    // keep the form usable.
+    const reportError = (err: unknown, fallback: string) => {
+      if (err instanceof TypeError) setOfflineMode(true);
+      else setError(err instanceof Error ? err.message : fallback);
+    };
+
     fetch('/api/timesheet/clients')
       .then(async (res) => {
         const body = await res.json().catch(() => null);
         if (!res.ok) throw new Error(body?.message ?? body?.error ?? 'Failed to load clients.');
         return body;
       })
-      .then((body) => setClients(sortClients(body?.clients ?? [])))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load clients.'));
+      .then((body) => {
+        const list = sortClients(body?.clients ?? []);
+        setClients(list);
+        writeCache('clients', ownerUserId, list);
+      })
+      .catch((err: unknown) => reportError(err, 'Failed to load clients.'));
     fetch('/api/services')
       .then(async (res) => {
         const body = await res.json().catch(() => null);
         if (!res.ok) throw new Error(body?.message ?? body?.error ?? 'Failed to load services.');
         return body;
       })
-      .then((body) => setCatalog(body?.items ?? []))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load services.'));
+      .then((body) => {
+        setCatalog(body?.items ?? []);
+        writeCache('catalog', ownerUserId, body?.items ?? []);
+      })
+      .catch((err: unknown) => reportError(err, 'Failed to load services.'));
     fetch('/api/profile')
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => {
-        if (body?.user?.hourlyRate !== undefined) setHourlyRate(Number(body.user.hourlyRate));
+        if (body?.user?.hourlyRate !== undefined) {
+          setHourlyRate(Number(body.user.hourlyRate));
+          writeCache('rate', ownerUserId, Number(body.user.hourlyRate));
+        }
       })
     .catch(() => {});
-  }, []);
+  }, [ownerUserId]);
 
   useEffect(() => {
     if (!detailsEntry) return;
@@ -525,10 +650,22 @@ export function TimesheetClient() {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/timesheet', {
+      // Same key on the first attempt and on every later sync of this entry, so
+      // a request that actually reached the server before the connection died
+      // is never entered twice.
+      const clientEntryId = newTimesheetEntryId();
+      const productsPayload = form.products.map((p) => ({
+        name: p.name.trim(),
+        quantity: Number(p.quantity),
+        unitPrice: Number(p.unitPrice),
+      }));
+      let res: Response | null;
+      try {
+        res = await fetch('/api/timesheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          clientEntryId,
           clientId: form.clientId,
           workDate: form.workDate,
           startedAt: startedAt.toISOString(),
@@ -540,7 +677,37 @@ export function TimesheetClient() {
             unitPrice: Number(p.unitPrice),
           })),
         }),
-      });
+        });
+      } catch {
+        res = null; // no connection
+      }
+
+      // No connection (or the server is down): keep the entry on this device and
+      // let the background sync send it once it can.
+      if (!res || res.status >= 500) {
+        if (!ownerUserId) {
+          setError('Could not save the entry. Check your connection and try again.');
+          return;
+        }
+        const clientName = clients.find((c) => c.id === form.clientId)?.name ?? 'Client';
+        await queueTimesheetEntry(
+          {
+            ownerUserId,
+            clientId: form.clientId,
+            clientName,
+            workDate: form.workDate,
+            startedAt: startedAt.toISOString(),
+            endedAt: endedAt.toISOString(),
+            description: form.description.trim(),
+            products: productsPayload,
+          },
+          clientEntryId,
+        );
+        setForm((f) => ({ ...f, clientId: '', description: '', products: [] }));
+        setNotice('No connection: entry saved on this device. It will be sent automatically when you are back online.');
+        return;
+      }
+
       const body = await res.json();
       if (!res.ok) {
         const msg = typeof body.error === 'string' ? body.error : 'Could not save the entry.';
@@ -639,6 +806,12 @@ export function TimesheetClient() {
   }
 
   async function handleDeleteEntry(entry: TimesheetEntry) {
+    if (entry.localId) {
+      // Never reached the server: just drop the local copy.
+      if (!window.confirm('Delete this entry? It has not been synced yet.')) return;
+      await discardPendingTimesheet(entry.localId);
+      return;
+    }
     const confirmMessage = entry.status === 'invoiced'
       ? 'This entry is part of an invoice. Deleting it will also delete that invoice and all other entries linked to it. Do you want to continue?'
       : 'Delete this entry?';
@@ -682,6 +855,19 @@ export function TimesheetClient() {
     }
     loadEntries();
   }
+
+  // Entries that only exist on this device yet, shown first and flagged,
+  // honouring the same client/date filters as the server list.
+  const displayEntries = useMemo(() => {
+    const pending = (pendingRows ?? [])
+      .filter((p) => (!filterClientId || p.clientId === filterClientId))
+      .filter((p) => (!filterFrom || p.workDate >= filterFrom) && (!filterTo || p.workDate <= filterTo))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((p) => pendingToEntry(p, hourlyRate));
+    return [...pending, ...entries];
+  }, [pendingRows, entries, hourlyRate, filterClientId, filterFrom, filterTo]);
+  const pendingCount = (pendingRows ?? []).length;
+  const failedCount = (pendingRows ?? []).filter((p) => p.status === 'error').length;
 
   const openEntries = useMemo(() => entries.filter((e) => e.status === 'open'), [entries]);
   const openEntryIds = openEntries.map((entry) => entry.id);
@@ -975,11 +1161,25 @@ export function TimesheetClient() {
           </div>
         )}
 
+        {offlineMode && (
+          <div className={styles.notice} role="status">
+            You are offline. Showing the entries last loaded on this device; new entries are saved here and sent
+            automatically when the connection returns.
+          </div>
+        )}
+        {pendingCount > 0 && (
+          <div className={failedCount > 0 ? styles.error : styles.notice} role="status">
+            {failedCount > 0
+              ? `${failedCount} ${failedCount === 1 ? 'entry was' : 'entries were'} rejected by the server. See the rows marked "Sync failed".`
+              : `${pendingCount} ${pendingCount === 1 ? 'entry is' : 'entries are'} waiting to sync.`}
+          </div>
+        )}
+
         {loading ? (
           <div className={styles.empty}>
             <p>Loading entries...</p>
           </div>
-        ) : entries.length === 0 ? (
+        ) : displayEntries.length === 0 ? (
           <div className={styles.empty}>
             <p>No entries yet — add your first entry above.</p>
           </div>
@@ -1011,7 +1211,8 @@ export function TimesheetClient() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((e) => {
+                {displayEntries.map((e) => {
+                  const isPending = !!e.pending;
                   const isOpen = e.status === 'open';
                   const hours = (e.durationMinutes / 60).toFixed(2);
                   return (
@@ -1021,7 +1222,7 @@ export function TimesheetClient() {
                         <input
                           type="checkbox"
                           checked={selected.has(e.id)}
-                          disabled={!isOpen}
+                          disabled={!isOpen || isPending}
                           onChange={() => toggleSelect(e.id, e.status)}
                           aria-label={`Select entry for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
                         />
@@ -1064,12 +1265,20 @@ export function TimesheetClient() {
                       <td className={styles.nowrap}>{formatMoney(entrySubtotal(e))}</td>
                       <td>
                         <span className={`${styles.statusBadge} ${isOpen ? styles.statusOpen : styles.statusInvoiced}`}>
-                          {isOpen ? 'Open' : 'Invoiced'}
+                          {isPending ? (e.pending === 'error' ? 'Sync failed' : 'Pending sync') : isOpen ? 'Open' : 'Invoiced'}
                         </span>
+                        {e.pending === 'error' && (
+                          <div className={styles.rateLine}>
+                            {e.pendingError}{' '}
+                            <button type="button" className={styles.retryButton} onClick={() => void retryPendingTimesheet(e.localId!)}>
+                              Retry
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div className={styles.rowActions}>
-                          {isOpen && (
+                          {isOpen && !isPending && (
                             <button
                               type="button"
                               className={styles.iconButton}
@@ -1082,7 +1291,7 @@ export function TimesheetClient() {
                               <RowIcon name="edit" />
                             </button>
                           )}
-                          {isOpen && (
+                          {isOpen && !isPending && (
                             <button
                               type="button"
                               className={styles.iconButton}

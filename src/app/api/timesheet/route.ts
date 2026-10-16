@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
@@ -24,6 +25,8 @@ const entrySchema = z.object({
   endedAt: z.string(),
   description: z.string().trim().min(1, 'Description is required.'),
   products: z.array(productSchema).optional().default([]),
+  // Offline idempotency key (see TimesheetEntry.clientEntryId).
+  clientEntryId: z.string().min(8).max(100).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -87,6 +90,16 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
+  // A retried offline sync re-sends the same key: answer with the entry it
+  // already created instead of making a duplicate.
+  if (data.clientEntryId) {
+    const existing = await prisma.timesheetEntry.findUnique({
+      where: { userId_clientEntryId: { userId: scope.ownerUserId, clientEntryId: data.clientEntryId } },
+      include: { client: { select: { id: true, name: true } }, products: true },
+    });
+    if (existing) return NextResponse.json({ entry: existing, duplicate: true }, { status: 200 });
+  }
+
   const client = await prisma.client.findUnique({
     where: { id: data.clientId, userId: scope.ownerUserId },
   });
@@ -111,9 +124,12 @@ export async function POST(req: NextRequest) {
     0,
   );
 
-  const entry = await prisma.timesheetEntry.create({
+  let entry;
+  try {
+    entry = await prisma.timesheetEntry.create({
     data: {
       userId: scope.ownerUserId,
+      clientEntryId: data.clientEntryId ?? null,
       clientId: data.clientId,
       workDate: new Date(data.workDate + 'T12:00:00.000Z'),
       startedAt,
@@ -132,7 +148,19 @@ export async function POST(req: NextRequest) {
       },
     },
     include: { client: { select: { id: true, name: true } }, products: true },
-  });
+    });
+  } catch (err) {
+    // Two syncs of the same offline entry racing each other: the unique key
+    // makes the loser fail; hand it the winner's entry.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && data.clientEntryId) {
+      const existing = await prisma.timesheetEntry.findUnique({
+        where: { userId_clientEntryId: { userId: scope.ownerUserId, clientEntryId: data.clientEntryId } },
+        include: { client: { select: { id: true, name: true } }, products: true },
+      });
+      if (existing) return NextResponse.json({ entry: existing, duplicate: true }, { status: 200 });
+    }
+    throw err;
+  }
 
   await auditScopedMutation(scope, 'TimesheetEntry', entry.id, 'create');
 

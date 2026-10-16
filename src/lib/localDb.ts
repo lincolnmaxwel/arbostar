@@ -81,11 +81,35 @@ export interface PendingDelete {
   createdAt: number;
 }
 
+// A timesheet entry logged on this device that has not reached the server yet
+// (typically because there was no signal). `localId` doubles as the server's
+// idempotency key (TimesheetEntry.clientEntryId), so a retry can never create
+// a duplicate entry.
+export interface PendingTimesheetEntry {
+  localId: string;
+  ownerUserId: string;
+  clientId: string;
+  clientName: string;
+  workDate: string; // YYYY-MM-DD
+  startedAt: string; // ISO
+  endedAt: string; // ISO
+  description: string;
+  products: { name: string; quantity: number; unitPrice: number }[];
+  // 'pending' = waiting for a connection / next retry; 'error' = the server
+  // rejected it (validation, client gone, feature off) and it needs the user.
+  status: 'pending' | 'error';
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: number;
+  createdAt: number;
+}
+
 class LocalDb extends Dexie {
   drafts!: Table<DraftQuote, string>;
   photos!: Table<DraftPhoto, string>;
   outbox!: Table<OutboxEntry, number>;
   pendingDeletes!: Table<PendingDelete, string>;
+  timesheetPending!: Table<PendingTimesheetEntry, string>;
 
   constructor() {
     super('arbostar');
@@ -96,6 +120,13 @@ class LocalDb extends Dexie {
     });
     this.version(2).stores({
       pendingDeletes: 'serverId, draftId',
+    });
+    this.version(4).stores({
+      drafts: 'draftId, status, updatedAt, ownerUserId',
+      photos: 'id, draftId',
+      outbox: '++id, draftId, nextAttemptAt, ownerUserId',
+      pendingDeletes: 'serverId, draftId, ownerUserId',
+      timesheetPending: 'localId, ownerUserId, status',
     });
     this.version(3)
       .stores({

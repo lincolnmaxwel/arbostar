@@ -100,6 +100,31 @@ describe('timesheet API', () => {
     await prisma.user.delete({ where: { id: noFlag.id } });
   });
 
+  it('is idempotent for an offline entry retried with the same clientEntryId', async () => {
+    const key = `offline-${randomUUID()}`;
+    const first = await createEntry(
+      new Request('http://localhost/api/timesheet', {
+        method: 'POST',
+        body: JSON.stringify(entryPayload({ clientEntryId: key, description: 'Logged offline' })),
+      }) as any,
+    );
+    expect(first.status).toBe(201);
+    const created = (await first.json()).entry as { id: string };
+    entryIds.push(created.id);
+
+    const retry = await createEntry(
+      new Request('http://localhost/api/timesheet', {
+        method: 'POST',
+        body: JSON.stringify(entryPayload({ clientEntryId: key, description: 'Logged offline' })),
+      }) as any,
+    );
+    expect(retry.status).toBe(200);
+    const body = await retry.json();
+    expect(body.duplicate).toBe(true);
+    expect(body.entry.id).toBe(created.id);
+    expect(await prisma.timesheetEntry.count({ where: { userId, clientEntryId: key } })).toBe(1);
+  });
+
   it('creates an entry snapshotting the user hourly rate and computing duration', async () => {
     const entry = await createOpenEntry();
     expect(entry.durationMinutes).toBe(210);

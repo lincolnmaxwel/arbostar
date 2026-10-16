@@ -21,6 +21,10 @@ export async function clearOfflineCaches(): Promise<void> {
   try {
     window.localStorage.removeItem('arbostar-service-catalog');
     window.localStorage.removeItem(LAST_EMAIL_KEY);
+    // Timesheet form lists cached per account (clients, services, hourly rate).
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith('arbostar-ts-')) window.localStorage.removeItem(key);
+    }
   } catch {
     // best effort
   }

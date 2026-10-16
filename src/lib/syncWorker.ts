@@ -4,6 +4,7 @@ import { flushPendingDeletes } from '@/lib/pendingDeletes';
 import { pullServerQuotes } from '@/lib/pullServerQuotes';
 import { uploadPendingPhotos } from '@/lib/photoSync';
 import { getViewContext } from '@/lib/clientUserContext';
+import { syncPendingTimesheet } from '@/lib/timesheetOffline';
 
 export async function isReallyOnline(): Promise<boolean> {
   try {
@@ -81,6 +82,9 @@ export async function runSyncCycle(ownerUserId: string): Promise<void> {
       await recordFailure(entry.id!, (err as Error).message);
     }
   }
+
+  // Timesheet entries logged offline (same idea as the quote outbox above).
+  await syncPendingTimesheet(ownerUserId);
 
   // Photo uploads only ever got ONE shot before: a single useEffect in
   // QuoteBuilderForm, fired once when a draft's status first transitioned to

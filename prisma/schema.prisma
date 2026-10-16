@@ -329,9 +329,14 @@ model TimesheetEntry {
   invoiceId       String?
   invoice         Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   products        TimesheetProduct[]
+  // Idempotency key for entries logged offline: the device generates it once
+  // and re-sends it on every retry, so a retried POST can never create a
+  // duplicate entry. Null for entries created online before this existed.
+  clientEntryId   String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
+  @@unique([userId, clientEntryId])
   @@index([userId, workDate])
   @@index([clientId, workDate])
   @@index([invoiceId])

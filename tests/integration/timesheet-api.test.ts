@@ -18,6 +18,7 @@ import { prisma } from '@/lib/db';
 import { GET as listEntries, POST as createEntry } from '@/app/api/timesheet/route';
 import { PATCH as patchEntry, DELETE as deleteEntry } from '@/app/api/timesheet/[id]/route';
 import { POST as generateInvoice } from '@/app/api/timesheet/invoice/route';
+import { POST as createClientRoute } from '@/app/api/clients/route';
 import { sendInvoiceEmail } from '@/lib/email';
 
 const sessionMock = getServerSession as unknown as ReturnType<typeof vi.fn>;
@@ -98,6 +99,52 @@ describe('timesheet API', () => {
     sessionMock.mockResolvedValue({ user: { id: noFlag.id } });
     expect((await listEntries(new Request('http://localhost/api/timesheet') as any)).status).toBe(403);
     await prisma.user.delete({ where: { id: noFlag.id } });
+  });
+
+  it('creates a client with the id chosen offline, answers a retry with the same client, and merges on email', async () => {
+    const offlineId = randomUUID();
+    const email = `offline-client-${randomUUID()}@example.com`;
+    const post = (body: Record<string, unknown>) =>
+      createClientRoute(
+        new Request('http://localhost/api/clients', { method: 'POST', body: JSON.stringify(body) }) as any,
+      );
+
+    const first = await post({ id: offlineId, name: 'Made Offline', email });
+    expect(first.status).toBe(201);
+    expect((await first.json()).client.id).toBe(offlineId);
+
+    const retry = await post({ id: offlineId, name: 'Made Offline', email });
+    expect(retry.status).toBe(200);
+    const retryBody = await retry.json();
+    expect(retryBody.duplicate).toBe(true);
+    expect(retryBody.client.id).toBe(offlineId);
+
+    // Another device created a client with the same email under a different id: reuse it.
+    const merged = await post({ id: randomUUID(), name: 'Same Email', email });
+    expect(merged.status).toBe(200);
+    const mergedBody = await merged.json();
+    expect(mergedBody.merged).toBe(true);
+    expect(mergedBody.client.id).toBe(offlineId);
+
+    // An offline entry can reference the new client straight away.
+    const entry = await createEntry(
+      new Request('http://localhost/api/timesheet', {
+        method: 'POST',
+        body: JSON.stringify(entryPayload({ clientId: offlineId, clientEntryId: `k-${randomUUID()}` })),
+      }) as any,
+    );
+    expect(entry.status).toBe(201);
+    entryIds.push((await entry.json()).entry.id);
+
+    // A client id that belongs to somebody else is refused, not hijacked.
+    const stranger = await prisma.user.create({
+      data: { name: 'Other', email: `other-${randomUUID()}@example.com`, passwordHash: 'x', role: 'staff' },
+    });
+    const foreignId = randomUUID();
+    await prisma.client.create({ data: { id: foreignId, userId: stranger.id, name: 'Not yours' } });
+    expect((await post({ id: foreignId, name: 'Grab' })).status).toBe(409);
+    await prisma.client.deleteMany({ where: { userId: stranger.id } });
+    await prisma.user.delete({ where: { id: stranger.id } });
   });
 
   it('is idempotent for an offline entry retried with the same clientEntryId', async () => {

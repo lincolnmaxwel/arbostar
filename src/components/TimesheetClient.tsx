@@ -12,7 +12,9 @@ import { getViewContext } from '@/lib/clientUserContext';
 import {
   TIMESHEET_SYNCED_EVENT,
   discardPendingTimesheet,
+  newClientId,
   newTimesheetEntryId,
+  queueClient,
   queueTimesheetEntry,
   retryPendingTimesheet,
 } from '@/lib/timesheetOffline';
@@ -21,6 +23,8 @@ interface TimesheetClientOption {
   id: string;
   name: string;
   email: string | null;
+  /** Created on this device while offline; not on the server yet. */
+  pendingSync?: boolean;
 }
 
 interface ServiceCatalogItem {
@@ -207,7 +211,7 @@ function pendingToEntry(p: PendingTimesheetEntry, hourlyRate: number): Timesheet
 
 export function TimesheetClient() {
   const router = useRouter();
-  const [clients, setClients] = useState<TimesheetClientOption[]>([]);
+  const [serverClients, setClients] = useState<TimesheetClientOption[]>([]);
   const [catalog, setCatalog] = useState<ServiceCatalogItem[]>([]);
   const [entries, setEntries] = useState<TimesheetEntry[]>([]);
   const [hourlyRate, setHourlyRate] = useState(0);
@@ -248,6 +252,22 @@ export function TimesheetClient() {
     () => (ownerUserId ? localDb.timesheetPending.where('ownerUserId').equals(ownerUserId).toArray() : []),
     [ownerUserId],
   );
+
+  // Clients added offline sit next to the server ones, flagged until they sync.
+  const pendingClients = useLiveQuery(
+    () => (ownerUserId ? localDb.clientsPending.where('ownerUserId').equals(ownerUserId).toArray() : []),
+    [ownerUserId],
+  );
+  const clients = useMemo(() => {
+    const local: TimesheetClientOption[] = (pendingClients ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email || null,
+      pendingSync: true,
+    }));
+    const localIds = new Set(local.map((c) => c.id));
+    return sortClients([...serverClients.filter((c) => !localIds.has(c.id)), ...local]);
+  }, [serverClients, pendingClients]);
 
   useEffect(() => {
     let cancelled = false;
@@ -305,14 +325,26 @@ export function TimesheetClient() {
 
   // Entries synced in the background (or the connection coming back): refresh.
   useEffect(() => {
-    const refresh = () => void loadEntries({ silent: true });
+    const refresh = () => {
+      void loadEntries({ silent: true });
+      // A client added offline now exists on the server: pick up the real list.
+      fetch('/api/timesheet/clients')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body) => {
+          if (!body?.clients) return;
+          const list = sortClients(body.clients);
+          setClients(list);
+          writeCache('clients', ownerUserId ?? null, list);
+        })
+        .catch(() => {});
+    };
     window.addEventListener(TIMESHEET_SYNCED_EVENT, refresh);
     window.addEventListener('online', refresh);
     return () => {
       window.removeEventListener(TIMESHEET_SYNCED_EVENT, refresh);
       window.removeEventListener('online', refresh);
     };
-  }, [loadEntries]);
+  }, [loadEntries, ownerUserId]);
 
   useEffect(() => {
     if (ownerUserId === undefined) return;
@@ -382,17 +414,22 @@ export function TimesheetClient() {
     }
 
     setNewClientSaving(true);
+    // The id is chosen here and kept by the server, so a client created while
+    // offline can be used by entries immediately and never needs remapping.
+    const newId = newClientId();
     try {
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: newId,
           name: newClientForm.name.trim(),
           email: newClientForm.email.trim(),
           phone: newClientForm.phone.trim(),
           address: newClientForm.address.trim(),
         }),
       });
+      if (res.status >= 500) throw new TypeError('server unavailable');
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         setNewClientError(
@@ -417,7 +454,28 @@ export function TimesheetClient() {
       setNotice(`Client ${created.name} added.`);
       router.refresh();
     } catch {
-      setNewClientError('Could not create client. Check your connection and try again.');
+      // No connection: keep the client on this device; the background sync
+      // creates it (before any entries that use it) once it can.
+      if (!ownerUserId) {
+        setNewClientError('Could not create client. Check your connection and try again.');
+      } else {
+        await queueClient(
+          {
+            ownerUserId,
+            name: newClientForm.name.trim(),
+            email: newClientForm.email.trim(),
+            phone: newClientForm.phone.trim(),
+            address: newClientForm.address.trim(),
+          },
+          newId,
+        );
+        setForm((current) => ({ ...current, clientId: newId }));
+        setNewClientForm(EMPTY_NEW_CLIENT);
+        setNewClientOpen(false);
+        setNotice(
+          `No connection: client ${newClientForm.name.trim()} saved on this device. It will be created automatically when you are back online.`,
+        );
+      }
     } finally {
       setNewClientSaving(false);
     }
@@ -661,6 +719,9 @@ export function TimesheetClient() {
       }));
       let res: Response | null;
       try {
+        // A client that only exists on this device cannot be referenced yet:
+        // queue the entry, the sync creates the client first.
+        if ((pendingClients ?? []).some((c) => c.id === form.clientId)) throw new Error('client not synced yet');
         res = await fetch('/api/timesheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -915,7 +976,7 @@ export function TimesheetClient() {
                 >
                   <option value="">Select a client...</option>
                   {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{c.pendingSync ? `${c.name} (not synced yet)` : c.name}</option>
                   ))}
                 </select>
                 <button
@@ -1167,11 +1228,18 @@ export function TimesheetClient() {
             automatically when the connection returns.
           </div>
         )}
-        {pendingCount > 0 && (
+        {(pendingCount > 0 || (pendingClients ?? []).length > 0) && (
           <div className={failedCount > 0 ? styles.error : styles.notice} role="status">
             {failedCount > 0
               ? `${failedCount} ${failedCount === 1 ? 'entry was' : 'entries were'} rejected by the server. See the rows marked "Sync failed".`
-              : `${pendingCount} ${pendingCount === 1 ? 'entry is' : 'entries are'} waiting to sync.`}
+              : [
+                  pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? 'entry' : 'entries'}` : null,
+                  (pendingClients ?? []).length > 0
+                    ? `${(pendingClients ?? []).length} new ${(pendingClients ?? []).length === 1 ? 'client' : 'clients'}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' and ') + ' waiting to sync.'}
           </div>
         )}
 

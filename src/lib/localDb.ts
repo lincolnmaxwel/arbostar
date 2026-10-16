@@ -104,12 +104,30 @@ export interface PendingTimesheetEntry {
   createdAt: number;
 }
 
+// A client created on this device while offline (from the Timesheet form).
+// Its id is a real UUID the server accepts as the client's id, so pending
+// timesheet entries can reference it before it exists server-side.
+export interface PendingClient {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: 'pending' | 'error';
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt: number;
+  createdAt: number;
+}
+
 class LocalDb extends Dexie {
   drafts!: Table<DraftQuote, string>;
   photos!: Table<DraftPhoto, string>;
   outbox!: Table<OutboxEntry, number>;
   pendingDeletes!: Table<PendingDelete, string>;
   timesheetPending!: Table<PendingTimesheetEntry, string>;
+  clientsPending!: Table<PendingClient, string>;
 
   constructor() {
     super('arbostar');
@@ -120,6 +138,14 @@ class LocalDb extends Dexie {
     });
     this.version(2).stores({
       pendingDeletes: 'serverId, draftId',
+    });
+    this.version(5).stores({
+      drafts: 'draftId, status, updatedAt, ownerUserId',
+      photos: 'id, draftId',
+      outbox: '++id, draftId, nextAttemptAt, ownerUserId',
+      pendingDeletes: 'serverId, draftId, ownerUserId',
+      timesheetPending: 'localId, ownerUserId, status',
+      clientsPending: 'id, ownerUserId, status',
     });
     this.version(4).stores({
       drafts: 'draftId, status, updatedAt, ownerUserId',

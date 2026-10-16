@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { localDb } from '@/lib/localDb';
 import {
+  queueClient,
+  syncPendingClients,
   queueTimesheetEntry,
   syncPendingTimesheet,
   retryPendingTimesheet,
@@ -31,6 +33,7 @@ function respond(status: number, body: unknown = {}) {
 describe('timesheetOffline', () => {
   beforeEach(async () => {
     await localDb.timesheetPending.clear();
+    await localDb.clientsPending.clear();
     vi.restoreAllMocks();
   });
 
@@ -99,6 +102,61 @@ describe('timesheetOffline', () => {
     const row = await localDb.timesheetPending.get(id);
     expect(row?.status).toBe('pending');
     expect(row?.attempts).toBe(0);
+  });
+
+  it('creates an offline client first, then sends the entries that use it', async () => {
+    const clientId = await queueClient({ ownerUserId: OWNER, name: 'New Co', email: 'n@c.com', phone: '', address: '' });
+    await queueTimesheetEntry(entry(OWNER, { clientId, clientName: 'New Co' }));
+
+    const calls: string[] = [];
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(url);
+      const body = JSON.parse(init!.body as string);
+      if (url === '/api/clients') return { ok: true, status: 201, json: async () => ({ client: { id: body.id, name: body.name } }) };
+      return { ok: true, status: 201, json: async () => ({ entry: { id: 'e1' } }) };
+    }) as unknown as typeof fetch;
+
+    await syncPendingTimesheet(OWNER);
+    expect(calls).toEqual(['/api/clients', '/api/timesheet']);
+    expect(await localDb.clientsPending.count()).toBe(0);
+    expect(await localDb.timesheetPending.count()).toBe(0);
+  });
+
+  it('re-points entries to the existing client when the server merges by email', async () => {
+    const clientId = await queueClient({ ownerUserId: OWNER, name: 'Dup', email: 'd@c.com', phone: '', address: '' });
+    const id = await queueTimesheetEntry(entry(OWNER, { clientId, clientName: 'Dup' }));
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ client: { id: 'existing-client', name: 'Dup Existing' }, merged: true }),
+    })) as unknown as typeof fetch;
+
+    await syncPendingClients(OWNER);
+    const row = await localDb.timesheetPending.get(id);
+    expect(row?.clientId).toBe('existing-client');
+    expect(row?.clientName).toBe('Dup Existing');
+  });
+
+  it('holds entries while their client is not created yet, and fails them if the client is rejected', async () => {
+    const clientId = await queueClient({ ownerUserId: OWNER, name: 'Bad', email: '', phone: '', address: '' });
+    const id = await queueTimesheetEntry(entry(OWNER, { clientId, clientName: 'Bad' }));
+
+    // network down: nothing is sent for the entry
+    global.fetch = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+    await syncPendingTimesheet(OWNER);
+    expect((global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual(['/api/clients']);
+    expect((await localDb.timesheetPending.get(id))?.status).toBe('pending');
+
+    // server rejects the client for good
+    await localDb.clientsPending.update(clientId, { nextAttemptAt: Date.now() - 1 });
+    global.fetch = respond(400, { message: 'Invalid client.' }) as unknown as typeof fetch;
+    await syncPendingTimesheet(OWNER);
+    const row = await localDb.timesheetPending.get(id);
+    expect(row?.status).toBe('error');
+    expect(row?.lastError).toContain('Bad');
+    expect(row?.lastError).toContain('Invalid client.');
   });
 
   it('only syncs the given owner and can discard an entry', async () => {

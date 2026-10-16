@@ -7,6 +7,9 @@ import { getConfirmedClients } from '@/lib/clients';
 import { prisma } from '@/lib/db';
 
 const createClientSchema = z.object({
+  // Set by a device that created this client while offline: the id it already
+  // used locally (and in pending timesheet entries), so nothing needs remapping.
+  id: z.string().uuid().optional(),
   name: z.string().min(1),
   email: z.string().trim().email().optional().or(z.literal('')),
   phone: z.string().optional(),
@@ -56,9 +59,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  const offlineId = parsed.data.id;
+  if (offlineId) {
+    // A retried offline sync: answer with what the first attempt created.
+    const existing = await prisma.client.findUnique({ where: { id: offlineId } });
+    if (existing) {
+      if (existing.userId !== scope.ownerUserId) {
+        return NextResponse.json({ error: 'id-taken', message: 'Could not create client.' }, { status: 409 });
+      }
+      return NextResponse.json({ client: existing, duplicate: true }, { status: 200 });
+    }
+  }
+
   try {
     const client = await prisma.client.create({
       data: {
+        ...(offlineId ? { id: offlineId } : {}),
         userId: scope.ownerUserId,
         name: parsed.data.name,
         email: parsed.data.email || null,
@@ -72,6 +88,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ client }, { status: 201 });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // Offline-created client whose email already belongs to one of this
+      // user's clients: reuse that one (the device re-points its pending
+      // entries) instead of failing the whole sync.
+      if (offlineId && parsed.data.email) {
+        const sameEmail = await prisma.client.findFirst({
+          where: { userId: scope.ownerUserId, email: parsed.data.email },
+        });
+        if (sameEmail) return NextResponse.json({ client: sameEmail, merged: true }, { status: 200 });
+        const sameId = await prisma.client.findFirst({ where: { id: offlineId, userId: scope.ownerUserId } });
+        if (sameId) return NextResponse.json({ client: sameId, duplicate: true }, { status: 200 });
+      }
       return NextResponse.json(
         { error: 'email-taken', message: 'You already have a client with that email.' },
         { status: 409 },

@@ -117,3 +117,50 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---- Touch targets (phones and tablets) ----------------------------------
+   One standard for every control on a touch screen: at least 44x44px (the
+   size iOS and Android recommend for a fingertip), and form fields at 16px
+   text so iOS Safari does not zoom the page when one is focused. This sits
+   after the component styles' base rules but only raises minimums, so a
+   component can still be larger; it never shrinks anything. Opt a control out
+   with `data-compact` (e.g. a text link rendered as a <button> inside a
+   sentence). Desktop with a mouse keeps the compact sizes. */
+:root {
+  --tap-target: 44px;
+}
+
+@media (pointer: coarse), (max-width: 768px) {
+  button:not([data-compact]),
+  input[type='button']:not([data-compact]),
+  input[type='submit']:not([data-compact]),
+  a[class*='utton']:not([data-compact]) {
+    min-height: var(--tap-target);
+    min-width: var(--tap-target);
+  }
+
+  /* Anchors styled as buttons are inline by default; min-height needs a box. */
+  a[class*='utton']:not([data-compact]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='file']):not([type='range']):not([data-compact]),
+  select:not([data-compact]) {
+    min-height: var(--tap-target);
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='file']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+  }
+}

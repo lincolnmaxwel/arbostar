@@ -406,6 +406,21 @@ export function TimesheetClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [detailsEntry]);
 
+  // On a phone the panel opens below the fold: scroll it into view and focus
+  // the first field so the user lands right where they type.
+  useEffect(() => {
+    if (!newClientOpen) return;
+    const field = document.getElementById('new-ts-client-name');
+    if (!field) return;
+    const panel = field.closest('[role="group"]') ?? field;
+    // The app header is sticky (about 200px tall on a phone): scroll so the
+    // panel starts just below it instead of hiding its first field underneath.
+    const headerHeight = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
+    const top = panel.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    field.focus({ preventScroll: true });
+  }, [newClientOpen]);
+
   async function handleCreateClient() {
     setNewClientError(null);
     if (!newClientForm.name.trim()) {
@@ -1286,7 +1301,7 @@ export function TimesheetClient() {
                   return (
                     <>
                       <tr key={e.id} className={isOpen ? '' : styles.invoicedRow}>
-                      <td className={styles.selectCol}>
+                      <td className={styles.selectCol} data-label="Select">
                         <input
                           type="checkbox"
                           checked={selected.has(e.id)}
@@ -1295,8 +1310,8 @@ export function TimesheetClient() {
                           aria-label={`Select entry for ${e.client.name} on ${e.workDate.slice(0, 10)}`}
                         />
                       </td>
-                      <td className={styles.nowrap}>{e.workDate.slice(0, 10)}</td>
-                      <td className={styles.clientCell}>
+                      <td className={styles.nowrap} data-label="Date">{e.workDate.slice(0, 10)}</td>
+                      <td className={styles.clientCell} data-label="Client">
                         <div>{e.client.name}</div>
                         {e.description && (
                           <button
@@ -1312,12 +1327,12 @@ export function TimesheetClient() {
                           </button>
                         )}
                       </td>
-                      <td className={styles.nowrap}>
+                      <td className={styles.nowrap} data-label="Hours">
                         <div>{hours}</div>
                         <div className={styles.rateLine}>{formatMoney(Number(e.hourlyRate))}/hr</div>
                       </td>
-                      <td className={styles.nowrap}>{formatMoney(entryLaborTotal(e))}</td>
-                      <td>
+                      <td className={styles.nowrap} data-label="Labor">{formatMoney(entryLaborTotal(e))}</td>
+                      <td data-label="Products">
                         {e.products.length === 0 ? (
                           <span className={styles.productList}>—</span>
                         ) : (
@@ -1330,8 +1345,8 @@ export function TimesheetClient() {
                           </ul>
                         )}
                       </td>
-                      <td className={styles.nowrap}>{formatMoney(entrySubtotal(e))}</td>
-                      <td>
+                      <td className={styles.nowrap} data-label="Subtotal">{formatMoney(entrySubtotal(e))}</td>
+                      <td data-label="Status">
                         <span className={`${styles.statusBadge} ${isOpen ? styles.statusOpen : styles.statusInvoiced}`}>
                           {isPending ? (e.pending === 'error' ? 'Sync failed' : 'Pending sync') : isOpen ? 'Open' : 'Invoiced'}
                         </span>
@@ -1344,7 +1359,7 @@ export function TimesheetClient() {
                           </div>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Actions" className={styles.actionsCell}>
                         <div className={styles.rowActions}>
                           {isOpen && !isPending && (
                             <button

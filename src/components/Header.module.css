@@ -10,6 +10,23 @@
   z-index: 50;
 }
 
+/* Narrow screens: slide the header out of the way while scrolling down. */
+@media (max-width: 900px) {
+  .header {
+    transition: transform 0.22s ease;
+  }
+
+  .headerHidden {
+    transform: translateY(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    transition: none;
+  }
+}
+
 .inner {
   max-width: var(--max-width);
   width: 100%;

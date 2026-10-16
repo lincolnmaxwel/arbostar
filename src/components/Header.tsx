@@ -74,6 +74,41 @@ export function Header() {
     setLogoBroken(false);
   }, [companyLogo]);
 
+  // Phones: the header slides away while scrolling down (more room for long
+  // pages) and comes back as soon as the user scrolls up or reaches the top.
+  // The class only has an effect on narrow screens (see Header.module.css).
+  const [scrolledAway, setScrolledAway] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const y = window.scrollY;
+        const delta = y - lastY;
+        if (y < 80) {
+          setScrolledAway(false);
+          lastY = y;
+        } else if (delta > 8) {
+          setScrolledAway(true);
+          lastY = y;
+        } else if (delta < -8) {
+          setScrolledAway(false);
+          lastY = y;
+        }
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+  useEffect(() => {
+    setScrolledAway(false);
+  }, [pathname]);
+
   // Live: an admin changing this account (trial days, subscription, block,
   // password) reaches the open session within seconds - no reload needed.
   useLivePolling(async () => {
@@ -209,7 +244,7 @@ export function Header() {
 
   return (
     <>
-    <header className={styles.header}>
+    <header className={`${styles.header} ${scrolledAway && !menuOpen && !viewAsOpen ? styles.headerHidden : ''}`}>
       <div className={styles.inner}>
         <Link href="/quotes" className={styles.brand}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

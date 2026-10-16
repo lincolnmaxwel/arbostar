@@ -413,10 +413,14 @@ export function TimesheetClient() {
     const field = document.getElementById('new-ts-client-name');
     if (!field) return;
     const panel = field.closest('[role="group"]') ?? field;
-    // The app header is sticky (about 200px tall on a phone): scroll so the
-    // panel starts just below it instead of hiding its first field underneath.
+    // The app header is sticky, but on phones it slides away while scrolling
+    // down and comes back when scrolling up: leave room for it only when it
+    // will be showing.
     const headerHeight = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
-    const top = panel.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
+    const panelTop = panel.getBoundingClientRect().top + window.scrollY;
+    const narrow = window.matchMedia('(max-width: 900px)').matches;
+    const hidesWhileScrollingDown = narrow && panelTop > window.scrollY;
+    const top = panelTop - (hidesWhileScrollingDown ? 0 : headerHeight) - 12;
     window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     field.focus({ preventScroll: true });
   }, [newClientOpen]);

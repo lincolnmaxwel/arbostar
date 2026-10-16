@@ -75,7 +75,7 @@ export function Header() {
   }, [companyLogo]);
 
   // Phones: the header slides away while scrolling down (more room for long
-  // pages) and comes back as soon as the user scrolls up or reaches the top.
+  // pages) and stays away until the user is back at the very top of the page.
   // The class only has an effect on narrow screens (see Header.module.css).
   const [scrolledAway, setScrolledAway] = useState(false);
   useEffect(() => {
@@ -87,16 +87,12 @@ export function Header() {
         frame = 0;
         const y = window.scrollY;
         const delta = y - lastY;
-        if (y < 80) {
+        if (y < 8) {
           setScrolledAway(false);
-          lastY = y;
-        } else if (delta > 8) {
+        } else if (delta > 8 && y >= 80) {
           setScrolledAway(true);
-          lastY = y;
-        } else if (delta < -8) {
-          setScrolledAway(false);
-          lastY = y;
         }
+        lastY = y;
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });

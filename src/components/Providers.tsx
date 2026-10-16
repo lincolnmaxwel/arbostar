@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { SessionProvider, signOut, useSession } from 'next-auth/react';
+import { clearOfflineCaches } from '@/lib/clearOfflineCaches';
 
 // Single active session per account: when another device signs in, this
 // session is revoked server-side. Clear the cookie and send the user to the
@@ -15,7 +16,7 @@ function RevokedSessionGuard() {
     if (!revoked) return;
     // redirect:false + a relative navigation: never depends on NEXTAUTH_URL
     // matching the host the user is actually on.
-    void signOut({ redirect: false }).finally(() => {
+    void Promise.all([clearOfflineCaches(), signOut({ redirect: false })]).finally(() => {
       window.location.href = `/login?reason=${reason}`;
     });
   }, [revoked, reason]);

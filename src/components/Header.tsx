@@ -7,6 +7,7 @@ import { signOut, useSession } from 'next-auth/react';
 import { NewQuoteLink } from './NewQuoteLink';
 import { getViewContext, refreshViewContext, resetViewContext } from '@/lib/clientUserContext';
 import { useLivePolling } from '@/lib/useLivePolling';
+import { clearOfflineCaches, LAST_EMAIL_KEY } from '@/lib/clearOfflineCaches';
 import type { BillingInfo } from '@/lib/billing';
 import styles from './Header.module.css';
 
@@ -29,7 +30,30 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, update: updateSession } = useSession();
-  const userEmail = session?.user?.email ?? null;
+  // Offline the session fetch fails and useSession() goes empty; keep showing
+  // the last known email (and the user menu) instead of dropping to a bare
+  // "Sign out" button.
+  const [lastEmail, setLastEmail] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      if (session?.user?.email) {
+        setLastEmail(session.user.email);
+        window.localStorage.setItem(LAST_EMAIL_KEY, session.user.email);
+      } else {
+        // Reloaded while offline: fall back to the email remembered on this device.
+        const remembered = window.localStorage.getItem(LAST_EMAIL_KEY);
+        if (remembered) setLastEmail(remembered);
+      }
+    } catch {
+      // storage unavailable: the menu just hides while offline
+    }
+  }, [session?.user?.email]);
+  const userEmail = session?.user?.email ?? lastEmail;
+
+  async function handleSignOut() {
+    await clearOfflineCaches();
+    await signOut({ callbackUrl: '/login' });
+  }
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [actorRole, setActorRole] = useState<string | null>(null);
@@ -299,7 +323,7 @@ export function Header() {
                     type="button"
                     className={styles.userMenuItem}
                     role="menuitem"
-                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    onClick={handleSignOut}
                   >
                     Sign out
                   </button>
@@ -307,7 +331,7 @@ export function Header() {
               )}
             </div>
           ) : (
-            <button type="button" className={styles.signOutButton} onClick={() => signOut({ callbackUrl: '/login' })}>
+            <button type="button" className={styles.signOutButton} onClick={handleSignOut}>
               Sign out
             </button>
           )}

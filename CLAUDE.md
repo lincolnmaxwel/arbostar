@@ -145,3 +145,7 @@ Creating a timesheet entry works without a connection, with the same idea as quo
 ### Touch targets (mobile button standard)
 
 `src/app/globals.css` ends with one shared rule for touch screens (`@media (pointer: coarse), (max-width: 768px)`): every `button`, `input[type=button|submit]` and anchor whose class contains "utton" gets `min-height`/`min-width: var(--tap-target)` (44px, the iOS/Android fingertip size); text fields and selects get `min-height: 44px` and 16px text (below 16px iOS Safari zooms the page on focus); checkboxes/radios are 22px. It only raises minimums, so bigger components stay as they are, and desktop with a mouse keeps the compact sizes. Opt a control out with the `data-compact` attribute (e.g. a text link rendered as a `<button>` inside a sentence). New buttons need no extra mobile CSS.
+
+### Invoice numbers (per user)
+
+`Invoice.number` is sequential per account: each user's first invoice is #1. `nextInvoiceNumber(tx, userId)` (`src/lib/invoiceNumber.ts`) returns max+1 for that user under a Postgres advisory lock and must be called inside the transaction that creates the invoice (done in `POST /api/timesheet/invoice` and `POST /api/quotes/[id]/complete`). Uniqueness is `@@unique([userId, number])`; the old global unique index was dropped (migration `20261018000000`). Existing invoices keep their numbers; the autoincrement default remains only for rows created outside the app (tests).

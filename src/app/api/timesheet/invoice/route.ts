@@ -15,6 +15,7 @@ import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
 import { mailSenderFromProfile } from '@/lib/mailSender';
 import { buildInvoicePdf } from '@/lib/invoicePdf';
+import { nextInvoiceNumber } from '@/lib/invoiceNumber';
 
 const invoiceSchema = z.object({
   clientId: z.string().min(1),
@@ -221,6 +222,7 @@ export async function POST(req: NextRequest) {
 
         const created = await tx.invoice.create({
           data: {
+            number: await nextInvoiceNumber(tx, scope.ownerUserId),
             source: 'timesheet',
             userId: scope.ownerUserId,
             clientId: data.clientId,

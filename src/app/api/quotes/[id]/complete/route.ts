@@ -6,6 +6,7 @@ import { getCompanyProfile } from '@/lib/companyProfile';
 import { sendInvoiceEmail } from '@/lib/email';
 import { mailSenderFromProfile } from '@/lib/mailSender';
 import { buildInvoicePdf } from '@/lib/invoicePdf';
+import { nextInvoiceNumber } from '@/lib/invoiceNumber';
 
 // Marks a scheduled job Completed and generates its (one and only) Invoice —
 // a snapshot of the quote's totals at that moment, not a live recompute, so
@@ -47,10 +48,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'already-completed' }, { status: 409 });
   }
 
-  const [, invoice] = await prisma.$transaction([
-    prisma.quote.update({ where: { id: quote.id }, data: { status: 'completed' } }),
-    prisma.invoice.create({
+  const invoice = await prisma.$transaction(async (tx) => {
+    await tx.quote.update({ where: { id: quote.id }, data: { status: 'completed' } });
+    return tx.invoice.create({
       data: {
+        number: await nextInvoiceNumber(tx, quote.createdById),
         source: 'quote',
         quoteId: quote.id,
         userId: quote.createdById,
@@ -62,8 +64,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         total: quote.total,
         sentAt: new Date(),
       },
-    }),
-  ]);
+    });
+  });
 
   await auditScopedMutation(scope, 'Invoice', invoice.id, 'create');
 

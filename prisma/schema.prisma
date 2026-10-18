@@ -273,7 +273,8 @@ enum InvoicePaymentStatus {
 
 model Invoice {
   id            String               @id @default(uuid())
-  number        Int                  @unique @default(autoincrement())
+  // Sequential per user (see src/lib/invoiceNumber.ts); the default only serves rows created outside the app.
+  number        Int                  @default(autoincrement())
   source        InvoiceSource        @default(quote)
   quoteId       String?              @unique
   quote         Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)

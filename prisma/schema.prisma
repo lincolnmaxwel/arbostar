@@ -116,6 +116,9 @@ model User {
   // length) or an active/trialing/past_due Stripe subscription.
   trialEndsAt                  DateTime?
   billingExempt                Boolean   @default(false)
+  // Admin-set price for this user (Stripe Price id + amount in cents); null = the default plan price.
+  customPriceId                String?
+  customPriceCents             Int?
   stripeCustomerId             String?   @unique
   stripeSubscriptionId         String?
   subscriptionStatus           String?

@@ -8,6 +8,8 @@ import { prisma } from '@/lib/db';
 import { requireAdminSession, auditAdminAction } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
 import { deleteUserCascade } from '@/lib/cascadeDelete';
+import { describeStripeError, stripeConfigured } from '@/lib/stripe';
+import { PRICE_RANGE_MESSAGE, setUserPrice, validPriceCents } from '@/lib/planPrice';
 
 interface PatchUserBody {
   name?: unknown;
@@ -21,6 +23,8 @@ interface PatchUserBody {
   extendTrialDays?: unknown;
   /** Set the trial end to an exact moment (ISO string); may shorten or extend. */
   trialEndsAt?: unknown;
+  /** Own subscription price in cents; null goes back to the default plan price. */
+  customPriceCents?: unknown;
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -53,6 +57,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     sessionId?: string;
     billingExempt?: boolean;
     trialEndsAt?: Date;
+    customPriceId?: string | null;
+    customPriceCents?: number | null;
   } = {};
 
   if (body.name !== undefined) {
@@ -121,6 +127,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
     const base = Math.max(Date.now(), target.trialEndsAt?.getTime() ?? 0);
     data.trialEndsAt = new Date(base + days * 24 * 60 * 60 * 1000);
+  }
+
+  if (body.customPriceCents !== undefined) {
+    if (body.customPriceCents !== null && !validPriceCents(body.customPriceCents)) {
+      return NextResponse.json({ error: PRICE_RANGE_MESSAGE }, { status: 400 });
+    }
+    if (!stripeConfigured()) {
+      return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 503 });
+    }
+    try {
+      Object.assign(data, await setUserPrice(target, body.customPriceCents));
+    } catch (err) {
+      const { code } = describeStripeError('set user price', err);
+      return NextResponse.json({ error: `Could not change the price in Stripe${code ? ` (${code})` : ''}.` }, { status: 502 });
+    }
   }
 
   if (body.password !== undefined) {

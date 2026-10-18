@@ -3,7 +3,8 @@ import { prisma } from '@/lib/db';
 import { requireAdminSession } from '@/lib/userScope';
 import { adminAuthErrorResponse } from '@/lib/adminAuth';
 import { evaluateBilling } from '@/lib/billing';
-import { getPlanPrice } from '@/lib/stripe';
+import { getPlanPrice, stripeConfigured } from '@/lib/stripe';
+import { getDefaultPriceId } from '@/lib/planPrice';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export async function GET() {
 
   const [users, plan] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: 'asc' } }),
-    getPlanPrice(),
+    stripeConfigured() ? getDefaultPriceId().then((id) => getPlanPrice(id)) : null,
   ]);
 
   const subscriptions = users.map((u) => {
@@ -38,6 +39,7 @@ export async function GET() {
       daysLeft: b.daysLeft,
       cancelAtPeriodEnd: b.cancelAtPeriodEnd,
       autoRenews: b.autoRenews,
+      customPriceCents: u.customPriceCents,
       stripeCustomerId: u.stripeCustomerId,
       stripeSubscriptionId: u.stripeSubscriptionId,
     };

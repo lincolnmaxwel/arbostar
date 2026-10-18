@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { evaluateBilling, getTrialDays, renewalAfterSubscribe, RENEW_WINDOW_DAYS } from '@/lib/billing';
 import { requireBillingUser, billingAuthErrorResponse } from '@/lib/billingAuth';
 import { getPlanPrice, stripeConfigured } from '@/lib/stripe';
+import { priceIdForUser } from '@/lib/planPrice';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,10 @@ export async function GET() {
     return billingAuthErrorResponse(err);
   }
 
-  const [plan, trialDays] = await Promise.all([getPlanPrice(), getTrialDays()]);
+  const [plan, trialDays] = await Promise.all([
+    stripeConfigured() ? priceIdForUser(user).then((id) => getPlanPrice(id)) : null,
+    getTrialDays(),
+  ]);
   // What subscribing right now would do to a user still in their free trial.
   const renewal = plan ? renewalAfterSubscribe(user.trialEndsAt, plan.interval, plan.intervalCount) : null;
   const billing = evaluateBilling(user);

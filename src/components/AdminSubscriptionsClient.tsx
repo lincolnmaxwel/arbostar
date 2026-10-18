@@ -22,6 +22,7 @@ interface SubscriptionRow {
   daysLeft: number | null;
   cancelAtPeriodEnd: boolean;
   autoRenews: boolean;
+  customPriceCents: number | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
 }
@@ -67,6 +68,10 @@ export function AdminSubscriptionsClient() {
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
   const [trialDates, setTrialDates] = useState<Record<string, string>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+  const [defaultPrice, setDefaultPrice] = useState('');
+  const [applyToSubscribers, setApplyToSubscribers] = useState(false);
+  const [userPrices, setUserPrices] = useState<Record<string, string>>({});
+  const [priceBusy, setPriceBusy] = useState(false);
 
   const hasData = useRef(false);
 
@@ -116,6 +121,65 @@ export function AdminSubscriptionsClient() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  // Dollars typed by the admin -> whole cents (null when it is not a number).
+  function toCents(value: string): number | null {
+    const n = Number(value.trim().replace(/^\$/, ''));
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+  }
+
+  async function saveDefaultPrice() {
+    if (!data?.plan) return;
+    const cents = toCents(defaultPrice || String(data.plan.amount));
+    if (cents === null) {
+      setError('Enter a valid price, for example 89.00.');
+      return;
+    }
+    const label = `$${(cents / 100).toFixed(2)}`;
+    const who = applyToSubscribers
+      ? 'New subscribers AND every current subscriber without a custom price will pay this from their next renewal.'
+      : 'Only new subscriptions are affected; current subscribers keep what they pay now.';
+    if (!window.confirm(`Set the plan price to ${label} / ${data.plan.interval}? ${who}`)) return;
+    setPriceBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/admin/billing-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceCents: cents, applyToSubscribers }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? 'Could not change the price.');
+        return;
+      }
+      setNotice(
+        `Plan price is now ${label}.` +
+          (applyToSubscribers ? ` ${body.updated} subscription(s) updated${body.failed ? `, ${body.failed} failed (see server log)` : ''}.` : ''),
+      );
+      setDefaultPrice('');
+      setApplyToSubscribers(false);
+      await load();
+    } finally {
+      setPriceBusy(false);
+    }
+  }
+
+  function saveUserPrice(s: SubscriptionRow, clear: boolean) {
+    if (clear) {
+      patchUser(s.id, { customPriceCents: null }, `${s.email} now pays the default plan price.`);
+      return;
+    }
+    const cents = toCents(userPrices[s.id] ?? '');
+    if (cents === null) {
+      setError('Enter a valid price, for example 49.00.');
+      return;
+    }
+    const live = s.phase === 'subscribed' || s.phase === 'past_due';
+    if (!window.confirm(`Charge ${s.email} $${(cents / 100).toFixed(2)} instead of the default?${live ? ' Their current subscription switches to this price at the next renewal.' : ''}`)) return;
+    patchUser(s.id, { customPriceCents: cents }, `${s.email} will pay $${(cents / 100).toFixed(2)}.`);
   }
 
   async function deleteSubscription(s: SubscriptionRow) {
@@ -190,7 +254,12 @@ export function AdminSubscriptionsClient() {
   if (!data) return <p className={styles.error} role="alert">{error ?? 'Could not load subscriptions.'}</p>;
 
   const dash = data.stripeMode === 'live' ? 'https://dashboard.stripe.com' : 'https://dashboard.stripe.com/test';
-  const mrr = data.plan ? data.summary.subscribed * data.plan.amount : null;
+  const plan = data.plan;
+  const mrr = plan
+    ? data.subscriptions
+        .filter((s) => s.phase === 'subscribed')
+        .reduce((sum, s) => sum + (s.customPriceCents !== null ? s.customPriceCents / 100 : plan.amount), 0)
+    : null;
 
   const cards: { label: string; value: string | number; hint?: string }[] = [
     { label: 'Subscribed', value: data.summary.subscribed, hint: mrr !== null && data.plan ? `~${data.plan.currency} $${mrr.toFixed(2)} / ${data.plan.interval}` : undefined },
@@ -212,6 +281,41 @@ export function AdminSubscriptionsClient() {
           {data.plan && ` · Plan: ${data.plan.currency} $${data.plan.amount.toFixed(2)} / ${data.plan.interval}`}
         </span>
       </div>
+
+      {data.plan && (
+        <section className={sub.card} style={{ marginBottom: 20 }}>
+          <h3 className={sub.cardTitle}>Plan price</h3>
+          <p className={sub.hint}>
+            Current default: {data.plan.currency} ${data.plan.amount.toFixed(2)} / {data.plan.interval}. Accounts with their
+            own price (set under Manage) are not affected by this.
+          </p>
+          <div className={sub.field}>
+            <label className={sub.fieldLabel} htmlFor="default-price">
+              New price ({data.plan.currency})
+            </label>
+            <div className={sub.inline}>
+              <input
+                id="default-price"
+                type="number"
+                min="0.5"
+                step="0.01"
+                inputMode="decimal"
+                className={styles.input}
+                placeholder={data.plan.amount.toFixed(2)}
+                value={defaultPrice}
+                onChange={(e) => setDefaultPrice(e.target.value)}
+              />
+              <button type="button" className={styles.actionButton} disabled={priceBusy || !defaultPrice} onClick={saveDefaultPrice}>
+                Save price
+              </button>
+            </div>
+          </div>
+          <label className={sub.hint} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="checkbox" checked={applyToSubscribers} onChange={(e) => setApplyToSubscribers(e.target.checked)} />
+            Also move current subscribers to this price (from their next renewal, no refund or extra charge)
+          </label>
+        </section>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         {cards.map((c) => (
@@ -378,6 +482,55 @@ export function AdminSubscriptionsClient() {
                                 </div>
                               </div>
                             </section>
+
+                            {data.plan && (
+                              <section className={sub.card}>
+                                <h3 className={sub.cardTitle}>Price</h3>
+                                <p className={sub.hint}>
+                                  {s.customPriceCents !== null
+                                    ? `Custom price: ${data.plan.currency} $${(s.customPriceCents / 100).toFixed(2)} / ${data.plan.interval}.`
+                                    : `Pays the default price (${data.plan.currency} $${data.plan.amount.toFixed(2)} / ${data.plan.interval}).`}
+                                </p>
+                                <div className={sub.field}>
+                                  <label className={sub.fieldLabel} htmlFor={`price-${s.id}`}>
+                                    Own price
+                                  </label>
+                                  <div className={sub.inline}>
+                                    <input
+                                      id={`price-${s.id}`}
+                                      type="number"
+                                      min="0.5"
+                                      step="0.01"
+                                      inputMode="decimal"
+                                      className={styles.input}
+                                      placeholder={(s.customPriceCents !== null ? s.customPriceCents / 100 : data.plan.amount).toFixed(2)}
+                                      value={userPrices[s.id] ?? ''}
+                                      onChange={(e) => setUserPrices((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                    />
+                                    <button
+                                      type="button"
+                                      className={styles.actionButton}
+                                      disabled={busyId === s.id || !userPrices[s.id]}
+                                      onClick={() => saveUserPrice(s, false)}
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                                {s.customPriceCents !== null && (
+                                  <div>
+                                    <button
+                                      type="button"
+                                      className={styles.actionButton}
+                                      disabled={busyId === s.id}
+                                      onClick={() => saveUserPrice(s, true)}
+                                    >
+                                      Use default price
+                                    </button>
+                                  </div>
+                                )}
+                              </section>
+                            )}
 
                             <section className={sub.card}>
                               <h3 className={sub.cardTitle}>Billing</h3>

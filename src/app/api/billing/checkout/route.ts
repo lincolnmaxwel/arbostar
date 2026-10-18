@@ -4,6 +4,7 @@ import { addBillingInterval, evaluateBilling, MIN_TRIAL_END_MS } from '@/lib/bil
 import { requireBillingUser, billingAuthErrorResponse, billingNotConfiguredResponse } from '@/lib/billingAuth';
 import { describeStripeError, getPlanPrice, getStripe, stripeConfigured } from '@/lib/stripe';
 import { appBaseUrl } from '@/lib/emailLayout';
+import { getDefaultPriceId, priceIdForUser } from '@/lib/planPrice';
 
 export async function POST() {
   let user;
@@ -13,7 +14,8 @@ export async function POST() {
     return billingAuthErrorResponse(err);
   }
   if (!stripeConfigured()) return billingNotConfiguredResponse();
-  if (!(process.env.STRIPE_PRICE_ID as string).startsWith('price_')) {
+  const priceId = await priceIdForUser(user);
+  if (!priceId.startsWith('price_') || !(await getDefaultPriceId()).startsWith('price_')) {
     console.error('[billing/checkout] STRIPE_PRICE_ID must be a Price id (price_...), not a Product id (prod_...)');
     return NextResponse.json(
       { error: 'Billing is misconfigured: the plan id must start with "price_". Please contact support.' },
@@ -60,7 +62,7 @@ export async function POST() {
   // for Stripe to defer, the subscription simply starts today.
   const now = Date.now();
   const hasTrialLeft = !!user.trialEndsAt && user.trialEndsAt.getTime() - now > MIN_TRIAL_END_MS;
-  const plan = hasTrialLeft ? await getPlanPrice() : null;
+  const plan = hasTrialLeft ? await getPlanPrice(priceId) : null;
   const prepay = hasTrialLeft && !!plan;
   let trialEnd: number | null = null;
   if (hasTrialLeft && user.trialEndsAt) {
@@ -93,7 +95,7 @@ export async function POST() {
       customer: customerId,
       client_reference_id: user.id,
       line_items: [
-        { price: process.env.STRIPE_PRICE_ID as string, quantity: 1 },
+        { price: priceId, quantity: 1 },
         ...(prepay && plan?.productId
           ? [
               {

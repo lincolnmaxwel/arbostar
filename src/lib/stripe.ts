@@ -93,7 +93,7 @@ export async function syncSubscriptionById(subscriptionId: string, fallback?: St
   }
 }
 
-let priceCache: { at: number; value: PlanPrice | null } | null = null;
+const priceCache = new Map<string, { at: number; value: PlanPrice | null }>();
 
 export interface PlanPrice {
   amount: number;
@@ -105,12 +105,13 @@ export interface PlanPrice {
   unitAmount: number;
 }
 
-/** Display price of the configured plan (cached for 10 minutes; null when unavailable). */
-export async function getPlanPrice(): Promise<PlanPrice | null> {
+/** Display price of a plan Price (default: STRIPE_PRICE_ID; cached for 10 minutes; null when unavailable). */
+export async function getPlanPrice(priceId: string = process.env.STRIPE_PRICE_ID as string): Promise<PlanPrice | null> {
   if (!stripeConfigured()) return null;
-  if (priceCache && Date.now() - priceCache.at < 10 * 60 * 1000) return priceCache.value;
+  const cached = priceCache.get(priceId);
+  if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached.value;
   try {
-    const price = await getStripe().prices.retrieve(process.env.STRIPE_PRICE_ID as string);
+    const price = await getStripe().prices.retrieve(priceId);
     const value =
       price.unit_amount != null
         ? {
@@ -122,7 +123,7 @@ export async function getPlanPrice(): Promise<PlanPrice | null> {
             unitAmount: price.unit_amount,
           }
         : null;
-    priceCache = { at: Date.now(), value };
+    priceCache.set(priceId, { at: Date.now(), value });
     return value;
   } catch (err) {
     console.error('[stripe] could not load plan price', err);

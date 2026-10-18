@@ -237,6 +237,11 @@ export function Header() {
   }
 
   const billingNotice = !isViewAs && !pathname.startsWith('/billing') ? describeBillingNotice(billing) : null;
+  // Admin viewing a locked account still sees all its data; just say it is locked.
+  const lockedViewAsNotice =
+    isViewAs && billing && !billing.access
+      ? `This account's ${billing.phase === 'canceled' ? 'subscription has ended' : 'free trial has ended'}, so the user is locked out of MyJobbs. You can still see everything as an admin.`
+      : null;
 
   return (
     <>
@@ -369,6 +374,11 @@ export function Header() {
         </div>
       </div>
     </header>
+    {lockedViewAsNotice && (
+      <div className={styles.billingBannerUrgent} role="status" data-testid="view-as-locked-notice">
+        <span>{lockedViewAsNotice}</span>
+      </div>
+    )}
     {billingNotice && (
       <div className={billingNotice.urgent ? styles.billingBannerUrgent : styles.billingBanner} role="status">
         <span>{billingNotice.text}</span>

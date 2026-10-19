@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
+import { addProductsToCatalog } from '@/lib/catalogSync';
 import {
   computeTimesheetTotals,
   productLineAmount,
@@ -16,6 +17,10 @@ const productSchema = z.object({
   name: z.string().min(1),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
+  // How the row is billed (same fields as /services); when present the product
+  // is also added to the services catalog if that name is new.
+  billingType: z.enum(['quantity', 'hourly']).optional(),
+  unit: z.string().trim().max(20).nullish(),
 });
 
 const entrySchema = z.object({
@@ -162,6 +167,7 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  await addProductsToCatalog(scope.ownerUserId, data.products);
   await auditScopedMutation(scope, 'TimesheetEntry', entry.id, 'create');
 
   return NextResponse.json({ entry }, { status: 201 });

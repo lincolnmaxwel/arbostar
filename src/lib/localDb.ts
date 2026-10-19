@@ -94,7 +94,7 @@ export interface PendingTimesheetEntry {
   startedAt: string; // ISO
   endedAt: string; // ISO
   description: string;
-  products: { name: string; quantity: number; unitPrice: number }[];
+  products: { name: string; quantity: number; unitPrice: number; billingType?: 'quantity' | 'hourly'; unit?: string | null }[];
   // 'pending' = waiting for a connection / next retry; 'error' = the server
   // rejected it (validation, client gone, feature off) and it needs the user.
   status: 'pending' | 'error';

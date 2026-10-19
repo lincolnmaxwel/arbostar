@@ -227,7 +227,7 @@
 
 .productRow {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
   gap: 8px;
   margin-bottom: 8px;
   align-items: center;

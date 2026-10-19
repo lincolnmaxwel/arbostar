@@ -226,7 +226,7 @@ export function TimesheetClient() {
   const [form, setForm] = useState({
     clientId: '',
     workDate: todayLocal(),
-    startTime: '09:00',
+    startTime: '08:00',
     endTime: '17:00',
     description: '',
     products: [] as NewProductRow[],
@@ -323,10 +323,24 @@ export function TimesheetClient() {
     loadEntries();
   }, [loadEntries]);
 
+  // Products typed into an entry become Services on the server: reload the list.
+  const refreshCatalog = useCallback(() => {
+    if (ownerUserId === undefined) return;
+    fetch('/api/services')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!body?.items) return;
+        setCatalog(body.items);
+        writeCache('catalog', ownerUserId, body.items);
+      })
+      .catch(() => {});
+  }, [ownerUserId]);
+
   // Entries synced in the background (or the connection coming back): refresh.
   useEffect(() => {
     const refresh = () => {
       void loadEntries({ silent: true });
+      refreshCatalog();
       // A client added offline now exists on the server: pick up the real list.
       fetch('/api/timesheet/clients')
         .then((res) => (res.ok ? res.json() : null))
@@ -523,7 +537,7 @@ export function TimesheetClient() {
   function addProductRow() {
     setForm((f) => ({
       ...f,
-      products: [...f.products, { id: crypto.randomUUID(), name: '', quantity: '1', unitPrice: '' }],
+      products: [...f.products, { id: crypto.randomUUID(), name: '', quantity: '1', unitPrice: '', billingType: 'quantity', unit: '' }],
     }));
   }
 
@@ -668,6 +682,7 @@ export function TimesheetClient() {
             name: product.name.trim(),
             quantity: Number(product.quantity),
             unitPrice: Number(product.unitPrice),
+            ...(product.billingType ? { billingType: product.billingType, unit: product.unit ?? null } : {}),
           })),
         }),
       });
@@ -735,6 +750,8 @@ export function TimesheetClient() {
         name: p.name.trim(),
         quantity: Number(p.quantity),
         unitPrice: Number(p.unitPrice),
+        billingType: p.billingType ?? ('quantity' as const),
+        unit: (p.billingType ?? 'quantity') === 'hourly' ? null : p.unit?.trim() || null,
       }));
       let res: Response | null;
       try {
@@ -751,11 +768,7 @@ export function TimesheetClient() {
           startedAt: startedAt.toISOString(),
           endedAt: endedAt.toISOString(),
           description: form.description.trim(),
-          products: form.products.map((p) => ({
-            name: p.name.trim(),
-            quantity: Number(p.quantity),
-            unitPrice: Number(p.unitPrice),
-          })),
+          products: productsPayload,
         }),
         });
       } catch {
@@ -797,6 +810,7 @@ export function TimesheetClient() {
       setForm((f) => ({ ...f, clientId: '', description: '', products: [] }));
       setNotice('Entry saved.');
       await loadEntries({ silent: true });
+      refreshCatalog();
     } finally {
       setSaving(false);
     }
@@ -1143,6 +1157,33 @@ export function TimesheetClient() {
                     onChange={(e) => updateProductRow(p.id, { name: e.target.value })}
                     aria-label="Product name"
                   />
+                  <select
+                    className={styles.input}
+                    value={p.billingType ?? 'quantity'}
+                    onChange={(e) => {
+                      const billingType = e.target.value as ServiceCatalogItem['billingType'];
+                      updateProductRow(p.id, {
+                        billingType,
+                        ...(billingType === 'hourly' ? { unit: null, quantity: durationHoursOrOne(form.startTime, form.endTime) } : {}),
+                      });
+                    }}
+                    aria-label="Billing type"
+                  >
+                    <option value="quantity">Quantity</option>
+                    <option value="hourly">Hour</option>
+                  </select>
+                  {(p.billingType ?? 'quantity') === 'quantity' ? (
+                    <input
+                      className={styles.input}
+                      placeholder="Unit (optional)"
+                      maxLength={20}
+                      value={p.unit ?? ''}
+                      onChange={(e) => updateProductRow(p.id, { unit: e.target.value })}
+                      aria-label="Unit"
+                    />
+                  ) : (
+                    <span aria-hidden="true" />
+                  )}
                   <input
                     className={styles.input}
                     type="number"

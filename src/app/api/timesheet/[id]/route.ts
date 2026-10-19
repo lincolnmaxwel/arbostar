@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireUserScope, auditScopedMutation, UnauthorizedError } from '@/lib/userScope';
 import { isFeatureEnabled, featureDisabledResponse } from '@/lib/features';
 import { prisma } from '@/lib/db';
+import { addProductsToCatalog } from '@/lib/catalogSync';
 import { deleteInvoiceCascade } from '@/lib/cascadeDelete';
 import {
   computeTimesheetTotals,
@@ -17,6 +18,10 @@ const productSchema = z.object({
   name: z.string().min(1),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
+  // How the row is billed (same fields as /services); when present the product
+  // is also added to the services catalog if that name is new.
+  billingType: z.enum(['quantity', 'hourly']).optional(),
+  unit: z.string().trim().max(20).nullish(),
 });
 
 const patchSchema = z.object({
@@ -116,6 +121,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   });
 
+  if (data.products) await addProductsToCatalog(scope.ownerUserId, data.products);
   await auditScopedMutation(scope, 'TimesheetEntry', entry.id, 'update');
 
   const updated = await prisma.timesheetEntry.findUniqueOrThrow({

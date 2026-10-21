@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import styles from './landing.module.css';
+import contact from './contact.module.css';
+import { ContactForm } from '@/components/ContactForm';
+import { WHATSAPP_DISPLAY, whatsappUrl } from '@/lib/contact';
 
 export const metadata = {
   title: 'MyJobbs - Quotes, timesheets and invoices for field crews',
@@ -158,6 +161,7 @@ export default async function LandingPage() {
           <nav className={styles.navLinks} aria-label="Sections">
             <a href="#features">Features</a>
             <a href="#how">How it works</a>
+            <a href="#contact">Contact</a>
           </nav>
           <div className={styles.navActions}>
             <Link href="/login" className={styles.navSignIn}>
@@ -281,6 +285,32 @@ export default async function LandingPage() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        <section id="contact" className={styles.section}>
+          <div className={styles.container}>
+            <div className={styles.sectionHead}>
+              <span className={styles.eyebrow}>Contact</span>
+              <h2 className={styles.sectionTitle}>Questions? Talk to us</h2>
+              <p className={styles.sectionText}>
+                Send us a message and we will reply by email, or chat with us directly on WhatsApp.
+              </p>
+            </div>
+            <div className={contact.wrap}>
+              <div className={contact.panel}>
+                <ContactForm />
+              </div>
+              <aside className={`${contact.panel} ${contact.side}`}>
+                <h3 className={contact.sideTitle}>Prefer WhatsApp?</h3>
+                <p className={contact.sideText}>Tap the button and the conversation opens with us, ready to send.</p>
+                <a href={whatsappUrl()} className={contact.whatsapp} target="_blank" rel="noopener noreferrer">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.7-5A8.5 8.5 0 1 1 21 11.5z" /></svg>
+                  Chat on WhatsApp
+                </a>
+                <p className={contact.number}>{WHATSAPP_DISPLAY}</p>
+              </aside>
+            </div>
           </div>
         </section>
 

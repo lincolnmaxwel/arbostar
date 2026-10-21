@@ -2,6 +2,7 @@ import { formatMoney } from '@/lib/quoteMath';
 import { sendGraphMail } from '@/lib/graphMail';
 import type { MailSender } from '@/lib/mailSender';
 import { emailLayout } from '@/lib/emailLayout';
+import { contactRecipient } from '@/lib/contact';
 
 function escapeHtml(value: string): string {
   return value
@@ -500,5 +501,36 @@ export async function sendPaymentFailedEmail(opts: SendPaymentFailedEmailOptions
     to: opts.to,
     subject: 'Action needed: payment failed for your MyJobbs subscription',
     html,
+  });
+}
+
+export interface SendContactRequestEmailOptions {
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+}
+
+// Landing-page contact form: goes to the owner's inbox; Reply-To is the visitor
+// so answering the email answers them.
+export async function sendContactRequestEmail(opts: SendContactRequestEmailOptions): Promise<void> {
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>New message from the <strong>MyJobbs</strong> website contact form:</p>
+      <table style="border-collapse:collapse;margin:12px 0;">
+        <tr><td style="padding:4px 16px 4px 0;color:#5a6785;">Name</td><td><strong>${escapeHtml(opts.name)}</strong></td></tr>
+        <tr><td style="padding:4px 16px 4px 0;color:#5a6785;">Email</td><td><a href="mailto:${escapeHtml(opts.email)}">${escapeHtml(opts.email)}</a></td></tr>
+        ${opts.phone ? `<tr><td style="padding:4px 16px 4px 0;color:#5a6785;">Phone</td><td>${escapeHtml(opts.phone)}</td></tr>` : ''}
+      </table>
+      <p style="white-space:pre-line;background:#f3f6fb;border-radius:8px;padding:14px;">${escapeHtml(opts.message)}</p>
+      <p style="color:#5a6785;font-size:13px;">Reply to this email to answer ${escapeHtml(opts.name)} directly.</p>
+    </div>
+  `);
+
+  await sendGraphMail({
+    to: contactRecipient(),
+    subject: `MyJobbs contact: ${opts.name}`.slice(0, 120),
+    html,
+    replyTo: opts.email,
   });
 }

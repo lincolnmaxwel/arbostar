@@ -6,6 +6,7 @@ import styles from './landing.module.css';
 import contact from './contact.module.css';
 import { ContactForm } from '@/components/ContactForm';
 import { WHATSAPP_DISPLAY, whatsappUrl } from '@/lib/contact';
+import { turnstileSiteKey } from '@/lib/turnstile';
 
 export const metadata = {
   title: 'MyJobbs - Quotes, timesheets and invoices for field crews',
@@ -299,7 +300,7 @@ export default async function LandingPage() {
             </div>
             <div className={contact.wrap}>
               <div className={contact.panel}>
-                <ContactForm />
+                <ContactForm turnstileSiteKey={turnstileSiteKey()} />
               </div>
               <aside className={`${contact.panel} ${contact.side}`}>
                 <h3 className={contact.sideTitle}>Prefer WhatsApp?</h3>

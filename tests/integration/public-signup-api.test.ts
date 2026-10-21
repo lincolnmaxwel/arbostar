@@ -273,3 +273,31 @@ describe('public sign-up', () => {
     expect(await prisma.pendingSignup.count({ where: { email } })).toBe(0);
   });
 });
+describe('public sign-up with the Turnstile robot check on', () => {
+  const email = `turnstile-${randomUUID()}@example.com`;
+
+  beforeEach(() => {
+    sendMock.mockClear();
+    process.env.TURNSTILE_SECRET_KEY = 'secret';
+  });
+  afterAll(async () => {
+    process.env.TURNSTILE_SECRET_KEY = '';
+    vi.unstubAllGlobals();
+    await prisma.pendingSignup.deleteMany({ where: { email } });
+  });
+
+  it('refuses without a token: no pending row, no email', async () => {
+    const res = await signupReq({ name: 'Bot', email, password: 'My-new-pass1', acceptTerms: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('turnstile');
+    expect(await prisma.pendingSignup.count({ where: { email } })).toBe(0);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('goes through when Cloudflare accepts the token', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) }));
+    const res = await signupReq({ name: 'Human', email, password: 'My-new-pass1', acceptTerms: true, turnstileToken: 'ok' });
+    expect(res.status).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+});

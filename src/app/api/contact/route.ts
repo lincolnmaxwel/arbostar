@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { CONTACT_LIMITS, contactRateLimited } from '@/lib/contact';
 import { sendContactRequestEmail } from '@/lib/email';
+import { TURNSTILE_ERROR, clientIp, verifyTurnstile } from '@/lib/turnstile';
 
 const SUCCESS = { ok: true, message: 'Thanks! Your message was sent. We will get back to you soon.' };
 
@@ -8,7 +9,7 @@ const SUCCESS = { ok: true, message: 'Thanks! Your message was sent. We will get
 // honeypot field and a per-IP throttle.
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
-    | { name?: unknown; email?: unknown; phone?: unknown; message?: unknown; website?: unknown }
+    | { name?: unknown; email?: unknown; phone?: unknown; message?: unknown; website?: unknown; turnstileToken?: unknown }
     | null;
 
   // Real users never see the honeypot; a filled value is a bot, so answer the
@@ -36,12 +37,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const ip = clientIp(req);
   if (contactRateLimited(ip)) {
     return NextResponse.json(
       { error: 'Too many messages from your connection. Please try again later or use WhatsApp.' },
       { status: 429 },
     );
+  }
+
+  if (!(await verifyTurnstile(body?.turnstileToken, ip))) {
+    return NextResponse.json({ error: TURNSTILE_ERROR, code: 'turnstile' }, { status: 400 });
   }
 
   try {

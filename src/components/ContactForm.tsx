@@ -2,13 +2,16 @@
 
 import { useState, type FormEvent } from 'react';
 import styles from '@/app/contact.module.css';
+import { TurnstileWidget } from '@/components/TurnstileWidget';
 
-export function ContactForm() {
+export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [website, setWebsite] = useState(''); // honeypot, real users never fill it
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
@@ -16,13 +19,17 @@ export function ContactForm() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    setBusy(true);
     setError(null);
+    if (turnstileSiteKey && !turnstileToken) {
+      setError('Please complete the robot check first.');
+      return;
+    }
+    setBusy(true);
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, message, website }),
+        body: JSON.stringify({ name, email, phone, message, website, turnstileToken }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
       if (!res.ok) {
@@ -37,6 +44,7 @@ export function ContactForm() {
     } catch {
       setError('We could not reach the server. Check your connection and try again.');
     } finally {
+      setTurnstileReset((n) => n + 1);
       setBusy(false);
     }
   }
@@ -86,6 +94,7 @@ export function ContactForm() {
           <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
         </label>
       </div>
+      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} resetKey={turnstileReset} />
       {error && (
         <p className={styles.error} role="alert">
           {error}

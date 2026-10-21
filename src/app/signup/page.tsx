@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { SignupForm } from '@/components/SignupForm';
 import styles from '@/app/login/login.module.css';
+import { turnstileSiteKey } from '@/lib/turnstile';
+
+// The Turnstile site key is read from the environment per request, not at build time.
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Start your free trial | MyJobbs',
@@ -16,7 +20,7 @@ export default function SignupPage() {
           <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.logo} />
         </h1>
         <p className={styles.subtitle}>Start your free trial</p>
-        <SignupForm />
+        <SignupForm turnstileSiteKey={turnstileSiteKey()} />
         <div className={styles.links}>
           <Link href="/login" className={styles.linkButton}>
             Already have an account? Sign in

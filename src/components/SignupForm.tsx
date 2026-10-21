@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { PasswordMatch, PasswordRequirements } from '@/components/PasswordRequirements';
 import { passwordProblem } from '@/lib/passwordPolicy';
+import { TurnstileWidget } from '@/components/TurnstileWidget';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
 
-export function SignupForm() {
+export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,6 +16,8 @@ export function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [website, setWebsite] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailExists, setEmailExists] = useState(false);
@@ -37,19 +40,25 @@ export function SignupForm() {
       return;
     }
 
+    if (turnstileSiteKey && !turnstileToken) {
+      setError('Please complete the robot check first.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const response = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, acceptTerms, website }),
+        body: JSON.stringify({ name, email, password, acceptTerms, website, turnstileToken }),
       });
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         setError(body.error ?? 'Could not start your free trial. Please try again.');
         setEmailExists(body.code === 'email-exists');
+        setTurnstileReset((n) => n + 1);
         setSubmitting(false);
         return;
       }
@@ -57,6 +66,7 @@ export function SignupForm() {
       setSuccess(true);
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
+      setTurnstileReset((n) => n + 1);
       setSubmitting(false);
     }
   }
@@ -194,6 +204,7 @@ export function SignupForm() {
           onChange={(event) => setWebsite(event.target.value)}
         />
       </div>
+      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} resetKey={turnstileReset} />
       <button className={styles.button} type="submit" disabled={submitting}>
         {submitting ? 'Starting your trial...' : 'Start free trial'}
       </button>

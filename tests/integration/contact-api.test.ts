@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const sendGraphMail = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/graphMail', () => ({ sendGraphMail }));
@@ -60,5 +60,38 @@ describe('POST /api/contact', () => {
   it('answers 502 when the email cannot be sent', async () => {
     sendGraphMail.mockRejectedValue(new Error('smtp down'));
     expect((await post(valid)).status).toBe(502);
+  });
+});
+
+describe('POST /api/contact with the Turnstile robot check on', () => {
+  beforeEach(() => {
+    sendGraphMail.mockReset();
+    sendGraphMail.mockResolvedValue(undefined);
+    process.env.TURNSTILE_SECRET_KEY = 'secret';
+  });
+  afterEach(() => {
+    process.env.TURNSTILE_SECRET_KEY = '';
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses a request with no token and sends nothing', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await post(valid);
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('turnstile');
+    expect(sendGraphMail).not.toHaveBeenCalled();
+  });
+
+  it('refuses a token Cloudflare rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: false }) }));
+    expect((await post({ ...valid, turnstileToken: 'bad' })).status).toBe(400);
+    expect(sendGraphMail).not.toHaveBeenCalled();
+  });
+
+  it('sends the email when Cloudflare accepts the token', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) }));
+    expect((await post({ ...valid, turnstileToken: 'good' })).status).toBe(200);
+    expect(sendGraphMail).toHaveBeenCalledTimes(1);
   });
 });

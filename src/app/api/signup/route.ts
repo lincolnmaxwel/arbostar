@@ -11,6 +11,7 @@ import {
   signupVerifyUrl,
 } from '@/lib/signups';
 import { sendSignupVerificationEmail } from '@/lib/email';
+import { TURNSTILE_ERROR, clientIp, verifyTurnstile } from '@/lib/turnstile';
 
 const SUCCESS = {
   ok: true,
@@ -21,7 +22,7 @@ const COOLDOWN_MS = SIGNUP_COOLDOWN_MINUTES * 60 * 1000;
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
-    | { name?: unknown; email?: unknown; password?: unknown; acceptTerms?: unknown; website?: unknown }
+    | { name?: unknown; email?: unknown; password?: unknown; acceptTerms?: unknown; website?: unknown; turnstileToken?: unknown }
     | null;
 
   // Honeypot: real users never see or fill this hidden field, so a non-empty
@@ -45,6 +46,11 @@ export async function POST(req: Request) {
   }
   if (body?.acceptTerms !== true) {
     return NextResponse.json({ error: 'You must accept the Terms and Privacy Policy.' }, { status: 400 });
+  }
+
+  // Robot check (Cloudflare Turnstile), before any database work.
+  if (!(await verifyTurnstile(body?.turnstileToken, clientIp(req)))) {
+    return NextResponse.json({ error: TURNSTILE_ERROR, code: 'turnstile' }, { status: 400 });
   }
 
   // An account with this address already exists. Case-insensitive: admin-created

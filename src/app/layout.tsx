@@ -4,6 +4,7 @@ import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistratio
 import { SyncLoopStarter } from '@/components/SyncLoopStarter';
 import { Header } from '@/components/Header';
 import { AppMain } from '@/components/AppMain';
+import { ProductTour } from '@/components/ProductTour';
 
 export const metadata = {
   title: 'MyJobbs',
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AppMain>{children}</AppMain>
           <ServiceWorkerRegistration />
           <SyncLoopStarter />
+          <ProductTour />
         </Providers>
       </body>
     </html>

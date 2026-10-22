@@ -22,7 +22,7 @@ interface HeaderUser {
 const PUBLIC_EXACT = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy'];
 const PUBLIC_PREFIXES = ['/portal/', '/invite/', '/signup/', '/reset-password/'];
 
-function isPublicPath(pathname: string): boolean {
+export function isPublicPath(pathname: string): boolean {
   return PUBLIC_EXACT.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
@@ -255,24 +255,24 @@ export function Header() {
           <div className={styles.mainNav}>
             {features?.quotes && (
               <>
-                <Link href="/quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
-                <NewQuoteLink className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
+                <Link href="/quotes" data-tour="nav-quotes" className={pathname === '/quotes' ? styles.active : ''}>Quotes</Link>
+                <NewQuoteLink data-tour="nav-new-quote" className={pathname.startsWith('/quotes/new') ? styles.active : ''}>New quote</NewQuoteLink>
               </>
             )}
             {(features?.clients_crm || features?.timesheet) && (
-              <Link href="/clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
+              <Link href="/clients" data-tour="nav-clients" className={pathname.startsWith('/clients') ? styles.active : ''}>Clients</Link>
             )}
             {features?.timesheet && (
-              <Link href="/timesheet" className={pathname.startsWith('/timesheet') ? styles.active : ''}>Timesheet</Link>
+              <Link href="/timesheet" data-tour="nav-timesheet" className={pathname.startsWith('/timesheet') ? styles.active : ''}>Timesheet</Link>
             )}
             {features?.timesheet && (
-              <Link href="/services" className={pathname.startsWith('/services') ? styles.active : ''}>Services</Link>
+              <Link href="/services" data-tour="nav-services" className={pathname.startsWith('/services') ? styles.active : ''}>Services</Link>
             )}
             {features?.invoices && (
-              <Link href="/invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
+              <Link href="/invoices" data-tour="nav-invoices" className={pathname.startsWith('/invoices') ? styles.active : ''}>Invoices</Link>
             )}
             {features?.invoices && (
-              <Link href="/financial" className={pathname.startsWith('/financial') ? styles.active : ''}>Financial</Link>
+              <Link href="/financial" data-tour="nav-financial" className={pathname.startsWith('/financial') ? styles.active : ''}>Financial</Link>
             )}
           </div>
         </nav>
@@ -355,6 +355,19 @@ export function Header() {
                   <Link href="/billing" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     {actorRole === 'admin' ? 'Subscriptions' : 'Subscription'}
                   </Link>
+                  {!isViewAs && actorRole !== 'admin' && (
+                    <button
+                      type="button"
+                      className={styles.userMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        window.dispatchEvent(new Event('myjobbs:start-tour'));
+                      }}
+                    >
+                      Product tour
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={styles.userMenuItem}

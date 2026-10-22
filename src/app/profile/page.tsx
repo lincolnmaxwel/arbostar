@@ -248,7 +248,7 @@ export default function ProfilePage() {
     <div className={styles.page}>
       <h1 className={styles.title}>Profile</h1>
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="profile-provider">
         <h2 className={styles.sectionTitle}>Service provider details</h2>
         <p className={styles.sectionHint}>Shown to the client on every quote — this is your business&apos;s own name, phone, email, address, and GST number, not the client&apos;s.</p>
         {companyError && <div className={styles.error}>{companyError}</div>}
@@ -316,7 +316,7 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="profile-hourly">
         <h2 className={styles.sectionTitle}>Default hourly rate</h2>
         <p className={styles.sectionHint}>
           Used when new timesheet entries are created — each entry snapshots this value, so changing it does not affect existing entries.
@@ -370,7 +370,7 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="profile-notifications">
         <h2 className={styles.sectionTitle}>Notification email</h2>
         <p className={styles.sectionHint}>
           Sent here when a client approves or declines a quote, or confirms/rejects a scheduling date. Leave blank to turn these notifications off entirely.
@@ -398,7 +398,7 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="profile-password">
         <h2 className={styles.sectionTitle}>Change password</h2>
         <p className={styles.sectionHint}>Signed in as {user.email}.</p>
         {passwordError && <div className={styles.error}>{passwordError}</div>}

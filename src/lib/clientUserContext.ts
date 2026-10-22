@@ -17,6 +17,8 @@ export interface ViewContext {
   billing: BillingInfo | null;
   /** URL of the signed-in user's company logo, or null when none is set. */
   companyLogoUrl?: string | null;
+  /** True until the signed-in user has finished or skipped the first-login tour. */
+  tourPending?: boolean;
 }
 
 let cachedContext: ViewContext | null = null;

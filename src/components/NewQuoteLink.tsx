@@ -13,7 +13,15 @@ import { ReactNode, MouseEvent } from 'react';
 // mount would go stale and silently reopen the same draft on every later
 // click) — going straight to the final URL with a client-generated id
 // sidesteps both.
-export function NewQuoteLink({ className, children }: { className?: string; children: ReactNode }) {
+export function NewQuoteLink({
+  className,
+  children,
+  'data-tour': dataTour,
+}: {
+  className?: string;
+  children: ReactNode;
+  'data-tour'?: string;
+}) {
   const router = useRouter();
 
   function handleClick(e: MouseEvent<HTMLAnchorElement>) {
@@ -23,7 +31,7 @@ export function NewQuoteLink({ className, children }: { className?: string; chil
   }
 
   return (
-    <a href="/quotes/new" className={className} onClick={handleClick}>
+    <a href="/quotes/new" className={className} data-tour={dataTour} onClick={handleClick}>
       {children}
     </a>
   );

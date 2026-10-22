@@ -110,6 +110,9 @@ model User {
   termsAcceptedAt   DateTime?
   termsVersion      String?
 
+  // First-login product tour: null = not completed/skipped yet (see ProductTour).
+  tourCompletedAt   DateTime?
+
   // Billing (Stripe). Access rule lives in src/lib/billing.ts: admins and
   // billingExempt users are never gated; everyone else needs a live trial
   // (trialEndsAt, set at account creation from the admin-configured trial

@@ -36,7 +36,9 @@ export async function PATCH(req: NextRequest) {
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: {
-      notificationEmail: parsed.data.notificationEmail || null,
+      // Only touch it when the request carries it: saving the hourly rate or
+      // service name must not wipe the notification email.
+      ...(parsed.data.notificationEmail !== undefined ? { notificationEmail: parsed.data.notificationEmail || null } : {}),
       ...(parsed.data.hourlyRate !== undefined ? { hourlyRate: parsed.data.hourlyRate } : {}),
       ...(parsed.data.defaultServiceName !== undefined
         ? { defaultServiceName: parsed.data.defaultServiceName }

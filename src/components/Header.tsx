@@ -355,7 +355,7 @@ export function Header() {
                   <Link href="/billing" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     {actorRole === 'admin' ? 'Subscriptions' : 'Subscription'}
                   </Link>
-                  {!isViewAs && actorRole !== 'admin' && (
+                  {!isViewAs && (
                     <button
                       type="button"
                       className={styles.userMenuItem}

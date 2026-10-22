@@ -19,6 +19,7 @@ interface AdminUser {
   createdAt: string;
   features: Record<FeatureKey, boolean>;
   billingExempt: boolean;
+  tourPending: boolean;
   billing: {
     phase: 'exempt' | 'subscribed' | 'past_due' | 'trial' | 'trial_ended' | 'canceled';
     access: boolean;
@@ -348,6 +349,16 @@ export function AdminUsersClient() {
       return;
     }
     setNotice(exempt ? `${user.email} is exempt from billing.` : `${user.email} now follows the normal trial/subscription rules.`);
+    await load();
+  }
+
+  async function handleShowTour(user: AdminUser, show: boolean) {
+    const result = await patchUser(user.id, { showTour: show });
+    if (!result.ok) {
+      setError(result.error ?? 'Update failed.');
+      return;
+    }
+    setNotice(show ? `${user.email} will see the product tour on their next load.` : `The product tour is off for ${user.email}.`);
     await load();
   }
 
@@ -704,6 +715,15 @@ export function AdminUsersClient() {
                     )}
                   </td>
                   <td>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={u.tourPending}
+                        disabled={savingUserId === u.id}
+                        onChange={(e) => handleShowTour(u, e.target.checked)}
+                      />
+                      Show tour
+                    </label>
                     <div className={styles.featureToggles}>
                       {FEATURES.map((f) => (
                         <button

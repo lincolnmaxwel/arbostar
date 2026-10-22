@@ -59,6 +59,7 @@ export function ProductTour() {
   const cardRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
 
+  const hasBox = box !== null;
   const step = index === null ? null : TOUR_STEPS[index];
   const isLast = index === TOUR_STEPS.length - 1;
 
@@ -78,7 +79,13 @@ export function ProductTour() {
     if (isPublicPath(pathname) || started.current) return;
     let cancelled = false;
     getViewContext().then((ctx) => {
-      if (cancelled || started.current || !ctx?.tourPending) return;
+      if (cancelled) return;
+      // An admin can switch the tour back on later: forget a finished one.
+      if (!ctx?.tourPending) {
+        started.current = false;
+        return;
+      }
+      if (started.current) return;
       if (ctx.isViewAs || ctx.billing?.access === false) return;
       started.current = true;
       setIndex(0);
@@ -150,7 +157,7 @@ export function ProductTour() {
   useLayoutEffect(() => {
     const h = cardRef.current?.offsetHeight ?? 0;
     setCardHeight((prev) => (prev === h ? prev : h));
-  }, [index, box !== null]);
+  }, [index, hasBox]);
 
   useEffect(() => {
     if (index === null) return;

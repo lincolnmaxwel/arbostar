@@ -179,6 +179,7 @@ function serializeUser(u: {
   createdAt: Date;
   featureFlags?: { feature: FeatureKey; enabled: boolean }[];
   billingExempt: boolean;
+  tourCompletedAt: Date | null;
   trialEndsAt: Date | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
@@ -196,6 +197,7 @@ function serializeUser(u: {
     hourlyRate: Number(u.hourlyRate),
     createdAt: u.createdAt,
     billingExempt: u.billingExempt,
+    tourPending: u.tourCompletedAt === null,
     billing: {
       phase: billing.phase,
       access: billing.access,

@@ -25,6 +25,8 @@ interface PatchUserBody {
   trialEndsAt?: unknown;
   /** Own subscription price in cents; null goes back to the default plan price. */
   customPriceCents?: unknown;
+  /** true = show the first-login product tour on the user's next load; false = mark it as seen. */
+  showTour?: unknown;
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -59,6 +61,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     trialEndsAt?: Date;
     customPriceId?: string | null;
     customPriceCents?: number | null;
+    tourCompletedAt?: Date | null;
   } = {};
 
   if (body.name !== undefined) {
@@ -106,6 +109,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'billingExempt must be true or false.' }, { status: 400 });
     }
     data.billingExempt = body.billingExempt;
+  }
+
+  if (body.showTour !== undefined) {
+    if (typeof body.showTour !== 'boolean') {
+      return NextResponse.json({ error: 'showTour must be true or false.' }, { status: 400 });
+    }
+    data.tourCompletedAt = body.showTour ? null : new Date();
   }
 
   if (body.trialEndsAt !== undefined) {

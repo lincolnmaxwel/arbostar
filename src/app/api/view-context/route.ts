@@ -55,7 +55,7 @@ export async function GET() {
     features,
     billing,
     companyLogoUrl: companyLogoUrl(profile?.logoPath ?? null),
-    // First-login tour: only for the real user (not admins, not while viewing as someone).
-    tourPending: !scope.isViewAs && actor?.role !== 'admin' && actor?.tourCompletedAt === null,
+    // First-login tour: only for the real user (never while an admin views as someone else).
+    tourPending: !scope.isViewAs && actor?.tourCompletedAt === null,
   });
 }

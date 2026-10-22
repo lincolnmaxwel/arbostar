@@ -15,6 +15,8 @@ import { prisma } from '@/lib/db';
 import { POST as tour } from '@/app/api/profile/tour/route';
 import { GET as viewContext } from '@/app/api/view-context/route';
 import { PATCH as patchProfile } from '@/app/api/profile/route';
+import { PATCH as adminPatchUser } from '@/app/api/admin/users/[id]/route';
+import { GET as adminListUsers } from '@/app/api/admin/users/route';
 
 const sessionMock = getServerSession as unknown as ReturnType<typeof vi.fn>;
 
@@ -52,15 +54,38 @@ describe('first-login product tour', () => {
     expect(await pending()).toBe(true);
   });
 
-  it('never auto-starts for an admin', async () => {
+  it('an admin account can be switched on for the tour like any other', async () => {
     sessionMock.mockResolvedValue({ user: { id: adminId } });
+    await prisma.user.update({ where: { id: adminId }, data: { tourCompletedAt: new Date() } });
     expect(await pending()).toBe(false);
+    await prisma.user.update({ where: { id: adminId }, data: { tourCompletedAt: null } });
+    expect(await pending()).toBe(true);
+    await prisma.user.update({ where: { id: adminId }, data: { tourCompletedAt: new Date() } });
   });
 
   it('does not start for an admin viewing as a new account', async () => {
     sessionMock.mockResolvedValue({ user: { id: adminId } });
     cookieValue.current = staffId;
     expect(await pending()).toBe(false);
+  });
+
+  it('an admin can turn the tour on and off for a user from the users page', async () => {
+    await prisma.user.update({ where: { id: staffId }, data: { tourCompletedAt: new Date() } });
+    sessionMock.mockResolvedValue({ user: { id: adminId } });
+    const patch = (body: unknown) =>
+      adminPatchUser(new Request('http://localhost/x', { method: 'PATCH', body: JSON.stringify(body) }), { params: { id: staffId } });
+    const listed = async () => ((await (await adminListUsers()).json()).users as { id: string; tourPending: boolean }[]).find((u) => u.id === staffId)?.tourPending;
+
+    expect(await listed()).toBe(false);
+    expect((await patch({ showTour: true })).status).toBe(200);
+    expect(await listed()).toBe(true);
+    // ...and the user sees it on their next load
+    sessionMock.mockResolvedValue({ user: { id: staffId } });
+    expect(await pending()).toBe(true);
+    sessionMock.mockResolvedValue({ user: { id: adminId } });
+    expect((await patch({ showTour: false })).status).toBe(200);
+    expect(await listed()).toBe(false);
+    expect((await patch({ showTour: 'yes' })).status).toBe(400);
   });
 
   it('rejects signed-out and malformed requests', async () => {

@@ -92,7 +92,7 @@ export function FinancialClient() {
 
   return (
     <div>
-      <div className={styles.filters}>
+      <div className={styles.filters} data-tour="page-financial">
         <div className={styles.presetTabs} role="tablist" aria-label="Period">
           {PRESETS.map((p) => (
             <button

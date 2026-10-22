@@ -992,7 +992,7 @@ export function TimesheetClient() {
       {error && <div className={styles.error} role="alert">{error}</div>}
       {notice && <div className={styles.notice} role="status">{notice}</div>}
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="page-timesheet">
         <h2 className={styles.sectionTitle}>New entry</h2>
         <p className={styles.rateNotice}>{rateNotice}</p>
 

@@ -97,7 +97,7 @@ export default function QuotesListPage() {
 
   return (
     <div>
-      <div className={styles.header}>
+      <div className={styles.header} data-tour="page-quotes">
         <h1 className={styles.title}>Quotes</h1>
         <NewQuoteLink className={styles.newButton}>+ New quote</NewQuoteLink>
       </div>

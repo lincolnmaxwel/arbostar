@@ -39,7 +39,7 @@ export default async function ClientsPage() {
   const clients = await getConfirmedClients(scope.ownerUserId);
 
   return (
-    <div>
+    <div data-tour="page-clients">
       <AutoRefresh />
       <div className={styles.header}>
         <h1 className={styles.title}>Clients</h1>

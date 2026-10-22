@@ -209,7 +209,7 @@ export function ServiceCatalogClient() {
       {error && <div className={styles.error} role="alert">{error}</div>}
       {notice && <div className={styles.notice} role="status">{notice}</div>}
 
-      <div className={styles.card}>
+      <div className={styles.card} data-tour="page-services">
         <h2 className={styles.sectionTitle}>Add service</h2>
         <p className={styles.sectionHint}>Services appear as shortcuts when adding products to a timesheet entry.</p>
         <form className={styles.createForm} onSubmit={handleCreate}>

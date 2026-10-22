@@ -16,24 +16,37 @@ describe('tour steps', () => {
     }
   });
 
-  it('explains the four Profile blocks first, then the menu pages, in order', () => {
-    const targets = TOUR_STEPS.map((s) => s.target).filter(Boolean);
-    expect(targets).toEqual([
+  it('shows how to reach Profile, explains its four blocks, then opens each page, in order', () => {
+    expect(TOUR_STEPS.map((s) => s.target).filter(Boolean)).toEqual([
+      'user-menu',
+      'menu-profile',
       'profile-provider',
       'profile-hourly',
       'profile-notifications',
       'profile-password',
-      'nav-quotes',
-      'nav-new-quote',
-      'nav-clients',
-      'nav-timesheet',
-      'nav-services',
-      'nav-invoices',
-      'nav-financial',
+      'page-quotes',
+      'page-new-quote',
+      'page-clients',
+      'page-timesheet',
+      'page-services',
+      'page-invoices',
+      'page-financial',
     ]);
   });
 
-  it('sends the Profile steps to /profile', () => {
-    for (const s of TOUR_STEPS.filter((x) => x.target?.startsWith('profile-'))) expect(s.route).toBe('/profile');
+  it('opens the account menu for the Profile entry and sends Profile blocks to /profile', () => {
+    expect(TOUR_STEPS.find((s) => s.id === 'menu-profile')?.openMenu).toBe(true);
+    for (const s of TOUR_STEPS.filter((x) => x.target?.startsWith('profile-'))) {
+      expect(s.route).toBe('/profile');
+      expect(s.interactive).toBe(true); // the user can fill the block in during the tour
+    }
+  });
+
+  it('opens every page through its menu link, gated by the account features', () => {
+    for (const s of TOUR_STEPS.filter((x) => x.target?.startsWith('page-'))) {
+      expect(s.route).toMatch(/^\//);
+      expect(s.via).toMatch(/^nav-/);
+      expect(s.requires?.length).toBeGreaterThan(0);
+    }
   });
 });

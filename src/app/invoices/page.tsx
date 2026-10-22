@@ -46,7 +46,7 @@ export default async function InvoicesPage() {
   }));
 
   return (
-    <div>
+    <div data-tour="page-invoices">
       <AutoRefresh />
       <div className={styles.header}>
         <h1 className={styles.title}>Invoices</h1>

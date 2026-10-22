@@ -165,6 +165,8 @@ export function Header() {
   useEffect(() => {
     if (!menuOpen) return;
     function onClickOutside(e: MouseEvent) {
+      // The product tour keeps the menu open while it points at Profile.
+      if (document.body.dataset.tourActive) return;
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
@@ -172,6 +174,13 @@ export function Header() {
     document.addEventListener('click', onClickOutside);
     return () => document.removeEventListener('click', onClickOutside);
   }, [menuOpen]);
+
+  // The product tour opens/closes the account menu to point at Profile.
+  useEffect(() => {
+    const onSetMenu = (e: Event) => setMenuOpen(Boolean((e as CustomEvent<{ open: boolean }>).detail?.open));
+    window.addEventListener('myjobbs:user-menu', onSetMenu);
+    return () => window.removeEventListener('myjobbs:user-menu', onSetMenu);
+  }, []);
 
   useEffect(() => {
     if (!viewAsOpen) return;
@@ -324,6 +333,7 @@ export function Header() {
               <button
                 type="button"
                 className={styles.userMenuButton}
+                data-tour="user-menu"
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
@@ -349,7 +359,7 @@ export function Header() {
                       Manage users
                     </Link>
                   )}
-                  <Link href="/profile" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <Link href="/profile" data-tour="menu-profile" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>
                     Profile
                   </Link>
                   <Link href="/billing" className={styles.userMenuItem} role="menuitem" onClick={() => setMenuOpen(false)}>

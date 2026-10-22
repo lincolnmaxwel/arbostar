@@ -375,7 +375,7 @@ export function QuoteBuilderForm({ draftId }: { draftId: string }) {
 
   return (
     <form className={styles.form} onSubmit={(e) => e.preventDefault()}>
-      <div className={styles.section}>
+      <div className={styles.section} data-tour="page-new-quote">
         <h2 className={styles.sectionTitle}>Client details</h2>
         {clients.length > 0 && (
           <div className={styles.field} style={{ position: 'relative' }}>

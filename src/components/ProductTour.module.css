@@ -136,3 +136,10 @@
     transition: none;
   }
 }
+
+.hint {
+  margin: -8px 0 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}

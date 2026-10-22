@@ -74,6 +74,8 @@ export function ProductTour() {
   const [pointAt, setPointAt] = useState<string | null>(null);
   const [cardHeight, setCardHeight] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [minimized, setMinimized] = useState(false); // phones: the card collapses to a small pill
+  const [isMobile, setIsMobile] = useState(false);
   const started = useRef(false);
   const features = useRef<ViewContext['features'] | null>(null);
   const scrolledFor = useRef<string | null>(null);
@@ -94,6 +96,7 @@ export function ProductTour() {
     setBox(null);
     setMenuBox(null);
     setPointAt(null);
+    setMinimized(false);
     started.current = true;
     fetch('/api/profile/tour', {
       method: 'POST',
@@ -129,6 +132,7 @@ export function ProductTour() {
     const onStart = () => {
       started.current = true;
       scrolledFor.current = null;
+      setMinimized(false);
       getViewContext().then((ctx) => {
         features.current = ctx?.features ?? null;
       });
@@ -136,6 +140,14 @@ export function ProductTour() {
     };
     window.addEventListener(START_TOUR_EVENT, onStart);
     return () => window.removeEventListener(START_TOUR_EVENT, onStart);
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 640px)');
+    const sync = () => setIsMobile(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
   }, []);
 
   // While the tour is open the account menu is not closed by outside clicks
@@ -254,6 +266,16 @@ export function ProductTour() {
 
   if (index === null || !step || isPublicPath(pathname)) return null;
 
+  // Minimized (phones only): no dimming and no blocking, just a pill to restore.
+  if (minimized && isMobile) {
+    return (
+      <button type="button" className={styles.pill} onClick={() => setMinimized(false)} data-testid="product-tour-minimized">
+        <span className={styles.pillText}>Product tour · {step.title}</span>
+        <span className={styles.pillAction}>Show</span>
+      </button>
+    );
+  }
+
   const centered = !activeTarget || !box;
   let cardStyle: React.CSSProperties | undefined;
   if (!centered && box) {
@@ -342,7 +364,12 @@ export function ProductTour() {
         aria-labelledby="tour-title"
         data-testid="product-tour"
       >
-        <div className={styles.step}>{index === 0 ? 'Quick tour' : isLast ? 'Done' : `Tour · ${progress}%`}</div>
+        <div className={styles.stepRow}>
+          <div className={styles.step}>{index === 0 ? 'Quick tour' : isLast ? 'Done' : `Tour · ${progress}%`}</div>
+          <button type="button" className={styles.minimize} onClick={() => setMinimized(true)} aria-label="Minimize the tour to see the page" data-compact>
+            Minimize
+          </button>
+        </div>
         <h2 id="tour-title" className={styles.title}>
           {step.title}
         </h2>

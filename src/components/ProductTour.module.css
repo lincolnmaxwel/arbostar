@@ -60,13 +60,73 @@
   transform: translate(-50%, -50%);
 }
 
+.stepRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .step {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-primary);
-  margin-bottom: 6px;
+}
+
+/* Phones only: collapse the card so the page can be seen and used. */
+.minimize {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.pill {
+  position: fixed;
+  z-index: 10000;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 10px 10px 10px 18px;
+  background: var(--color-primary);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  box-shadow: 0 10px 30px rgba(7, 27, 73, 0.4);
+  cursor: pointer;
+}
+
+.pillText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pillAction {
+  flex: 0 0 auto;
+  background: #fff;
+  color: var(--color-primary);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 800;
 }
 
 .title {
@@ -137,6 +197,11 @@
 }
 
 @media (max-width: 640px) {
+  .minimize {
+    display: inline-flex;
+    align-items: center;
+  }
+
   /* Phones: the card is a bottom sheet so it never hides the highlighted block. */
   .card:not(.centered) {
     left: 12px !important;

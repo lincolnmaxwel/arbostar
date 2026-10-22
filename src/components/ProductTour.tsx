@@ -14,6 +14,7 @@ const WAIT_FOR_TARGET_MS = 5000;
 const POINT_AT_MENU_MS = 800; // how long the menu link is highlighted before "clicking" it
 const SPOTLIGHT_PAD = 6;
 const CARD_GAP = 12;
+const HEADER_SAFE = 72; // the sticky header (and its highlighted menu link) stays uncovered
 const EDGE = 12;
 const CARD_WIDTH = 420; // keep in sync with .card in ProductTour.module.css
 const MIN_SIDE_WIDTH = 300; // narrowest card worth putting beside a block
@@ -69,6 +70,7 @@ export function ProductTour() {
   const router = useRouter();
   const [index, setIndex] = useState<number | null>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const [menuBox, setMenuBox] = useState<Box | null>(null); // menu link of the page being explained
   const [pointAt, setPointAt] = useState<string | null>(null);
   const [cardHeight, setCardHeight] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -83,11 +85,14 @@ export function ProductTour() {
   const step = index === null ? null : TOUR_STEPS[index];
   const isLast = index === TOUR_STEPS.length - 1;
   const activeTarget = pointAt ?? step?.target ?? null;
+  // On a page step the menu link that opens that page stays highlighted too.
+  const menuTarget = pointAt ? null : (step?.via ?? null);
 
   const finish = useCallback(() => {
     setAccountMenu(false);
     setIndex(null);
     setBox(null);
+    setMenuBox(null);
     setPointAt(null);
     started.current = true;
     fetch('/api/profile/tour', {
@@ -182,6 +187,25 @@ export function ProductTour() {
 
   // Keep the spotlight on its element while the page scrolls, resizes or loads.
   useEffect(() => {
+    if (!menuTarget) {
+      setMenuBox(null);
+      return;
+    }
+    let frame = 0;
+    const tick = () => {
+      const el = targetEl(menuTarget);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const next = { top: r.top, left: r.left, width: r.width, height: r.height };
+        setMenuBox((prev) => (sameBox(prev, next) ? prev : next));
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [menuTarget]);
+
+  useEffect(() => {
     if (!activeTarget) {
       setBox(null);
       return;
@@ -239,7 +263,7 @@ export function ProductTour() {
     const left = Math.min(Math.max(box.left, EDGE), vw - width - EDGE);
     let top: number;
     if (box.top + box.height + CARD_GAP + cardHeight <= vh - EDGE) top = box.top + box.height + CARD_GAP;
-    else if (box.top - CARD_GAP - cardHeight >= EDGE) top = box.top - CARD_GAP - cardHeight;
+    else if (box.top - CARD_GAP - cardHeight >= HEADER_SAFE) top = box.top - CARD_GAP - cardHeight;
     else top = vh - cardHeight - EDGE; // target too tall: card pinned to the bottom
     cardStyle = { top, left };
 
@@ -254,7 +278,7 @@ export function ProductTour() {
       cardStyle = {
         width: sideWidth,
         left: onRight ? box.left + box.width + CARD_GAP : box.left - CARD_GAP - sideWidth,
-        top: Math.min(Math.max(box.top, EDGE), Math.max(EDGE, vh - cardHeight - EDGE)),
+        top: Math.min(Math.max(box.top, HEADER_SAFE), Math.max(HEADER_SAFE, vh - cardHeight - EDGE)),
       };
     }
   }
@@ -269,6 +293,11 @@ export function ProductTour() {
   const panel = (key: string, s: React.CSSProperties) => (
     <div key={key} className={styles.blocker} aria-hidden="true" style={{ right: 'auto', bottom: 'auto', ...s }} />
   );
+
+  const pad = (b: Box): Box => ({ top: b.top - SPOTLIGHT_PAD, left: b.left - SPOTLIGHT_PAD, width: b.width + 2 * SPOTLIGHT_PAD, height: b.height + 2 * SPOTLIGHT_PAD });
+  const holes: Box[] = [];
+  if (!centered && box) holes.push(pad(box));
+  if (menuBox) holes.push(pad(menuBox));
 
   const progress = Math.round((index / (TOUR_STEPS.length - 1)) * 100);
   const primaryLabel = index === 0 ? 'Start tour' : isLast ? 'Finish' : 'Next';
@@ -285,15 +314,25 @@ export function ProductTour() {
       ) : (
         <div className={styles.blocker} aria-hidden="true" />
       )}
-      {centered || !box ? (
-        <div className={styles.dim} aria-hidden="true" />
-      ) : (
+      <svg className={styles.mask} aria-hidden="true">
+        <defs>
+          <mask id="tour-hole">
+            <rect width="100%" height="100%" fill="#fff" />
+            {holes.map((h, i) => (
+              <rect key={i} x={h.left} y={h.top} width={h.width} height={h.height} rx="10" fill="#000" />
+            ))}
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(7, 27, 73, 0.62)" mask="url(#tour-hole)" />
+      </svg>
+      {holes.map((h, i) => (
         <div
-          className={styles.spotlight}
+          key={i}
+          className={`${styles.spotlight} ${i === 1 ? styles.menuRing : ''}`}
           aria-hidden="true"
-          style={{ top: holeTop, left: holeLeft, width: holeWidth, height: holeHeight }}
+          style={{ top: h.top, left: h.left, width: h.width, height: h.height }}
         />
-      )}
+      ))}
       <div
         ref={cardRef}
         className={`${styles.card} ${centered ? styles.centered : ''}`}

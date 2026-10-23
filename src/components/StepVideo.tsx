@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './StepVideo.module.css';
 
 interface StepVideoProps {
@@ -10,26 +10,21 @@ interface StepVideoProps {
   label: string;
 }
 
-// The card preview plays slower than the enlarged clip so each step is easy to follow.
-const PREVIEW_SPEED = 0.6;
+// Both the card preview and the enlarged clip play slower than normal so each step is easy to follow.
+const PLAYBACK_SPEED = 0.6;
+
+// playbackRate is a property, not an attribute, and the browser resets it once metadata loads.
+function slowDown(el: HTMLVideoElement | null) {
+  if (!el) return;
+  el.playbackRate = PLAYBACK_SPEED;
+  el.addEventListener('loadedmetadata', () => {
+    el.playbackRate = PLAYBACK_SPEED;
+  });
+}
 
 // Looping preview inside a landing card; clicking it opens the clip enlarged.
 export default function StepVideo({ src, largeSrc, label }: StepVideoProps) {
   const [open, setOpen] = useState(false);
-  const previewRef = useRef<HTMLVideoElement>(null);
-
-  // playbackRate is a property, not an attribute; reapplied after metadata loads because the browser resets it.
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    const apply = () => {
-      el.playbackRate = PREVIEW_SPEED;
-    };
-    apply();
-    el.addEventListener('loadedmetadata', apply);
-    return () => el.removeEventListener('loadedmetadata', apply);
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -47,7 +42,7 @@ export default function StepVideo({ src, largeSrc, label }: StepVideoProps) {
   return (
     <>
       <button type="button" className={styles.preview} onClick={() => setOpen(true)} aria-label={`Enlarge: ${label}`}>
-        <video ref={previewRef} className={styles.video} src={src} autoPlay loop muted playsInline preload="metadata" />
+        <video ref={slowDown} className={styles.video} src={src} autoPlay loop muted playsInline preload="metadata" />
         <span className={styles.hint} aria-hidden="true">
           Click to enlarge
         </span>
@@ -58,6 +53,7 @@ export default function StepVideo({ src, largeSrc, label }: StepVideoProps) {
             ×
           </button>
           <video
+            ref={slowDown}
             className={styles.large}
             src={largeSrc ?? src}
             autoPlay

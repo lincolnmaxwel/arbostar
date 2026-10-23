@@ -160,7 +160,7 @@ The admin `/billing` view has a "Plan price" card and, under each account's Mana
 
 ### Landing "How it works" videos
 
-A step in `STEPS` (`src/app/page.tsx`) can carry `video`: a muted, looping, autoplay clip from `public/videos/` shown under its text by `src/components/StepVideo.tsx` (click opens `videoLarge` in a lightbox: Esc, backdrop or × closes). Step 1 previews `build_quote_tiny.mp4` (960x600) and enlarges to `build_quote.mp4` (1280x800). Static build-time assets, so `public/` is fine here (unlike runtime uploads).
+A step in `STEPS` (`src/app/page.tsx`) can carry `video`: a muted, looping, autoplay clip from `public/videos/` shown under its text by `src/components/StepVideo.tsx` (click opens `videoLarge` in a lightbox: Esc, backdrop or × closes). Step 2 previews `myjobbs-approve-compact.mp4` and enlarges to `myjobbs-approve-full.mp4`. Step 1 previews `build_quote_tiny.mp4` (960x600) and enlarges to `build_quote.mp4` (1280x800). Static build-time assets, so `public/` is fine here (unlike runtime uploads).
 
 ### Landing contact section
 

@@ -158,6 +158,10 @@ The admin `/billing` view has a "Plan price" card and, under each account's Mana
 
 **Timesheet products -> Services:** a product row in a timesheet entry carries the same fields as `/services` (name, price, billing type Quantity/Hour, unit). On save, `addProductsToCatalog()` (`src/lib/catalogSync.ts`, called by `POST /api/timesheet`, so offline-synced entries get it too, and by `PATCH /api/timesheet/[id]`) creates a `ServiceCatalogItem` for any product name the user does not have yet (case-insensitive; existing services and prices are never overwritten; rows without `billingType` are ignored). New entries default to 08:00-17:00.
 
+### Landing "How it works" videos
+
+A step in `STEPS` (`src/app/page.tsx`) can carry `video`: a muted, looping, autoplay clip from `public/videos/` shown under its text (`.stepVideo`). Step 1 uses `build_quote.mp4`; `build_quote_tiny.mp4` is the lighter fallback to swap in if the normal one is too heavy. Static build-time assets, so `public/` is fine here (unlike runtime uploads).
+
 ### Landing contact section
 
 The landing page has a "Contact" section (`#contact`, nav link too) with a form (`src/components/ContactForm.tsx`) and a WhatsApp button (`wa.me/5511984704925`, number in `src/lib/contact.ts`). `POST /api/contact` (public, outside the middleware) validates name/email/message, ignores a filled hidden `website` honeypot, throttles 5 messages/hour per IP (in memory) and emails the owner via `sendContactRequestEmail()` (`src/lib/email.ts`) with Reply-To set to the visitor. Recipient is `CONTACT_TO_EMAIL` (default lincolnmaxwel@hotmail.com). 502 when the email send fails.

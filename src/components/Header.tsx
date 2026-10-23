@@ -19,7 +19,7 @@ interface HeaderUser {
 
 // Pages that render without the app header (landing, auth flows, legal, the
 // public client portal).
-const PUBLIC_EXACT = ['/', '/login', '/signup', '/forgot-password', '/terms', '/privacy'];
+const PUBLIC_EXACT = ['/', '/demo', '/login', '/signup', '/forgot-password', '/terms', '/privacy'];
 const PUBLIC_PREFIXES = ['/portal/', '/invite/', '/signup/', '/reset-password/'];
 
 export function isPublicPath(pathname: string): boolean {

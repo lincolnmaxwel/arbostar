@@ -164,6 +164,7 @@ export default async function LandingPage() {
           <nav className={styles.navLinks} aria-label="Sections">
             <a href="#features">Features</a>
             <a href="#how">How it works</a>
+            <Link href="/demo">Demo</Link>
             <a href="#contact">Contact</a>
           </nav>
           <div className={styles.navActions}>
@@ -204,7 +205,7 @@ export default async function LandingPage() {
               </ul>
             </div>
 
-            <div className={styles.preview} aria-hidden="true">
+            <Link href="/demo" className={styles.preview} aria-label="Try the live demo with sample data">
               <div className={styles.previewCard}>
                 <div className={styles.previewHead}>
                   <div>
@@ -239,6 +240,7 @@ export default async function LandingPage() {
                     <span>$1,711.50</span>
                   </div>
                 </div>
+                <span className={styles.previewCta}>Try the live demo &rarr;</span>
               </div>
               <div className={styles.floatPaid}>
                 <span className={styles.floatDot} /> Invoice paid
@@ -246,7 +248,7 @@ export default async function LandingPage() {
               <div className={styles.floatSync}>
                 <Icon name="phone" /> Synced from the field
               </div>
-            </div>
+            </Link>
           </div>
         </section>
 

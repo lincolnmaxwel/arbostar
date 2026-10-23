@@ -140,7 +140,7 @@ const FEATURES: { icon: IconName; title: string; text: string }[] = [
 
 // A step may carry a short looping demo video from public/videos (swap in the *_tiny.mp4 variant if too heavy).
 const STEPS: { n: string; title: string; text: string; video?: string }[] = [
-  { n: '1', title: 'Build the quote', text: 'Add line items and photos, even without internet. Send it with one tap.', video: '/videos/build_quote.mp4' },
+  { n: '1', title: 'Build the quote', text: 'Add line items and photos, even without internet. Send it with one tap.', video: '/videos/build_quote_tiny.mp4' },
   { n: '2', title: 'Client approves and books', text: 'They review online, approve, and choose a date that works for them.' },
   { n: '3', title: 'Invoice and get paid', text: 'Complete the job to issue the invoice, then mark it paid and send the receipt.' },
 ];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './StepVideo.module.css';
 
 interface StepVideoProps {
@@ -10,9 +10,25 @@ interface StepVideoProps {
   label: string;
 }
 
+// The card preview plays slower than the enlarged clip so each step is easy to follow.
+const PREVIEW_SPEED = 0.6;
+
 // Looping preview inside a landing card; clicking it opens the clip enlarged.
 export default function StepVideo({ src, largeSrc, label }: StepVideoProps) {
   const [open, setOpen] = useState(false);
+  const previewRef = useRef<HTMLVideoElement>(null);
+
+  // playbackRate is a property, not an attribute; reapplied after metadata loads because the browser resets it.
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const apply = () => {
+      el.playbackRate = PREVIEW_SPEED;
+    };
+    apply();
+    el.addEventListener('loadedmetadata', apply);
+    return () => el.removeEventListener('loadedmetadata', apply);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -31,7 +47,7 @@ export default function StepVideo({ src, largeSrc, label }: StepVideoProps) {
   return (
     <>
       <button type="button" className={styles.preview} onClick={() => setOpen(true)} aria-label={`Enlarge: ${label}`}>
-        <video className={styles.video} src={src} autoPlay loop muted playsInline preload="metadata" />
+        <video ref={previewRef} className={styles.video} src={src} autoPlay loop muted playsInline preload="metadata" />
         <span className={styles.hint} aria-hidden="true">
           Click to enlarge
         </span>

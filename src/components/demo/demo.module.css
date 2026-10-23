@@ -281,3 +281,29 @@
     display: none;
   }
 }
+
+/* Same pattern as the real header: the menu drops to its own full-width row
+   and every section stays visible (wrapping), no hidden horizontal scroll. */
+@media (max-width: 900px) {
+  .topBar {
+    position: static;
+  }
+
+  .topBarInner {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .tabs {
+    order: 3;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .tab {
+    padding: 8px 12px;
+  }
+}

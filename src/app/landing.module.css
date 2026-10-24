@@ -1,7 +1,8 @@
 .page {
   background: #fff;
   color: var(--color-text);
-  overflow-x: hidden;
+  /* clip, not hidden: hidden would make .page a scroll container and break the sticky header */
+  overflow-x: clip;
 }
 
 .container {
@@ -15,18 +16,68 @@
   position: sticky;
   top: 0;
   z-index: 40;
+  box-sizing: border-box;
+  height: 66px;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: saturate(160%) blur(10px);
   border-bottom: 1px solid var(--color-border);
+  transition:
+    background var(--duration-standard) var(--ease-standard),
+    border-color var(--duration-standard) var(--ease-standard),
+    backdrop-filter var(--duration-standard) var(--ease-standard);
 }
 
 .navInner {
+  box-sizing: border-box;
+  height: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 12px 24px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 32px;
+  border-radius: var(--radius-pill);
+  background: rgba(222, 236, 255, 0);
+  box-shadow: 0 0 0 rgba(7, 27, 73, 0);
+  backdrop-filter: blur(0);
+  transition:
+    max-width 0.45s var(--ease-standard),
+    height 0.45s var(--ease-standard),
+    transform 0.45s var(--ease-standard),
+    background 0.5s var(--ease-standard),
+    box-shadow 0.45s var(--ease-standard),
+    backdrop-filter 0.5s var(--ease-standard);
+}
+
+/* Scrolled: the bar lets go of the top edge and floats as a pill that follows the page. */
+.navFloating {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.navFloating .navInner {
+  pointer-events: auto;
+  max-width: 1040px;
+  height: 56px;
+  transform: translateY(8px);
+  padding: 0 12px 0 22px;
+  /* frosted glass: translucent light blue over a strong blur of whatever scrolls behind,
+     a bright rim and a soft top highlight (a plain colour, so it can fade in) */
+  background: rgba(225, 238, 255, 0.5);
+  backdrop-filter: blur(18px) saturate(180%);
+  box-shadow:
+    0 10px 32px rgba(7, 27, 73, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav,
+  .navInner {
+    transition: none;
+  }
 }
 
 .brand {
@@ -93,14 +144,15 @@
 
 /* ---- Hero ---- */
 .hero {
-  background:
-    radial-gradient(900px 420px at 85% -10%, rgba(0, 214, 219, 0.18), transparent 60%),
-    radial-gradient(800px 420px at 0% 0%, rgba(7, 91, 255, 0.12), transparent 60%),
-    #fff;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
   padding: 72px 0 88px;
 }
 
 .heroInner {
+  position: relative;
+  z-index: 1;
   max-width: 1120px;
   margin: 0 auto;
   padding: 0 24px;

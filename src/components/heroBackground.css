@@ -1,0 +1,120 @@
+/* Animated hero background (see HeroBackground.tsx). Class names are prefixed
+   because the SVG is injected as raw markup, so CSS modules cannot scope them. */
+.hb {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* top and bottom fade out so it blends into the header and the next section */
+  -webkit-mask-image: linear-gradient(transparent, #000 90px, #000 calc(100% - 110px), transparent);
+  mask-image: linear-gradient(transparent, #000 90px, #000 calc(100% - 110px), transparent);
+}
+
+.hb-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* each half stays pinned to its own edge and always shows whole */
+.hb-side {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  overflow: visible;
+}
+
+.hb-side--left {
+  left: 0;
+}
+
+.hb-side--right {
+  right: 0;
+}
+
+.hb-float {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hb-floatA 9s ease-in-out infinite;
+}
+
+.hb-float--b { animation-name: hb-floatB; animation-duration: 11s; animation-delay: -4s; }
+.hb-float--c { animation-name: hb-floatB; animation-duration: 8.5s; animation-delay: -2s; }
+.hb-float--d { animation-name: hb-floatA; animation-duration: 10s; animation-delay: -6s; }
+.hb-float--e { animation-name: hb-floatA; animation-duration: 13s; animation-delay: -1s; }
+
+@keyframes hb-floatA {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(3px, -12px) rotate(-0.8deg); }
+}
+
+@keyframes hb-floatB {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-4px, -10px) rotate(0.8deg); }
+}
+
+/* light that runs along the lines, then rests until the next cycle */
+.hb-shine {
+  stroke-dasharray: 120 2000;
+  stroke-dashoffset: 120;
+  animation: hb-shine 6s cubic-bezier(0.55, 0.1, 0.35, 1) infinite;
+}
+
+@keyframes hb-shine {
+  0% { stroke-dashoffset: 120; }
+  16%, 100% { stroke-dashoffset: -1000; }
+}
+
+/* glare crossing the cards */
+.hb-sweep {
+  animation: hb-sweep 8s cubic-bezier(0.55, 0.1, 0.35, 1) infinite;
+}
+
+@keyframes hb-sweep {
+  0% { transform: translateX(0); }
+  10%, 100% { transform: translateX(760px); }
+}
+
+/* chart bars "breathing" */
+.hb-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: hb-bar 6s ease-in-out infinite;
+}
+
+@keyframes hb-bar {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.84); }
+}
+
+.hb-paused * {
+  animation-play-state: paused !important;
+}
+
+/* Phones: the hero is tall and narrow, so a "100% high" half would shrink to a
+   sliver. Give each half its natural aspect ratio instead, document corner at
+   the top and chart corner at the bottom. */
+@media (max-width: 768px) {
+  .hb {
+    opacity: 0.75;
+  }
+
+  .hb-side {
+    width: 92vw;
+    height: auto;
+    aspect-ratio: 1031 / 763;
+  }
+
+  .hb-side--left {
+    top: 0;
+  }
+
+  .hb-side--right {
+    top: auto;
+    bottom: 0;
+  }
+}

@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import styles from './landing.module.css';
 import contact from './contact.module.css';
 import { ContactForm } from '@/components/ContactForm';
+import { FloatingNav } from '@/components/FloatingNav';
+import { HeroBackground } from '@/components/HeroBackground';
 import StepVideo from '@/components/StepVideo';
 import { WHATSAPP_DISPLAY, whatsappUrl } from '@/lib/contact';
 import { turnstileSiteKey } from '@/lib/turnstile';
@@ -155,7 +157,7 @@ export default async function LandingPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.nav}>
+      <FloatingNav className={styles.nav} floatingClassName={styles.navFloating}>
         <div className={styles.navInner}>
           <Link href="/" className={styles.brand}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -176,10 +178,11 @@ export default async function LandingPage() {
             </Link>
           </div>
         </div>
-      </header>
+      </FloatingNav>
 
       <main>
         <section className={styles.hero}>
+          <HeroBackground />
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
               <span className={styles.eyebrow}>Built for service businesses</span>

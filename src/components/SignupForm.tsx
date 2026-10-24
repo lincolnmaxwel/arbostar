@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { PasswordMatch, PasswordRequirements } from '@/components/PasswordRequirements';
 import { passwordProblem } from '@/lib/passwordPolicy';
-import { TurnstileWidget } from '@/components/TurnstileWidget';
+import { RobotCheckModal } from '@/components/RobotCheckModal';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
 
@@ -16,8 +16,7 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
   const [showPassword, setShowPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [website, setWebsite] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState('');
-  const [turnstileReset, setTurnstileReset] = useState(0);
+  const [checkingRobot, setCheckingRobot] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailExists, setEmailExists] = useState(false);
@@ -40,11 +39,17 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
       return;
     }
 
-    if (turnstileSiteKey && !turnstileToken) {
-      setError('Please complete the robot check first.');
+    // The robot check lives in its own dialog (it is tall and stays on screen
+    // after passing); it submits the form itself once it has a token.
+    if (turnstileSiteKey) {
+      setCheckingRobot(true);
       return;
     }
 
+    await send('');
+  }
+
+  async function send(turnstileToken: string) {
     setSubmitting(true);
 
     try {
@@ -58,7 +63,6 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
       if (!response.ok) {
         setError(body.error ?? 'Could not start your free trial. Please try again.');
         setEmailExists(body.code === 'email-exists');
-        setTurnstileReset((n) => n + 1);
         setSubmitting(false);
         return;
       }
@@ -66,7 +70,6 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
       setSuccess(true);
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
-      setTurnstileReset((n) => n + 1);
       setSubmitting(false);
     }
   }
@@ -204,10 +207,19 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           onChange={(event) => setWebsite(event.target.value)}
         />
       </div>
-      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} resetKey={turnstileReset} />
       <button className={styles.button} type="submit" disabled={submitting}>
         {submitting ? 'Starting your trial...' : 'Start free trial'}
       </button>
+      {checkingRobot && (
+        <RobotCheckModal
+          siteKey={turnstileSiteKey}
+          onCancel={() => setCheckingRobot(false)}
+          onVerified={(token) => {
+            setCheckingRobot(false);
+            void send(token);
+          }}
+        />
+      )}
     </form>
   );
 }

@@ -26,8 +26,19 @@ interface Box {
   height: number;
 }
 
+// Some targets exist twice (desktop header and phone tab bar); the hidden one
+// has no box, so take the first one that is actually on screen.
 function targetEl(target: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`[data-tour="${target}"]`);
+  const all = document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`);
+  for (const el of Array.from(all)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return el;
+  }
+  return null;
+}
+
+function isPhone(): boolean {
+  return window.matchMedia('(max-width: 640px)').matches;
 }
 
 function sameBox(a: Box | null, b: Box | null): boolean {
@@ -88,7 +99,7 @@ export function ProductTour() {
   const isLast = index === TOUR_STEPS.length - 1;
   const activeTarget = pointAt ?? step?.target ?? null;
   // On a page step the menu link that opens that page stays highlighted too.
-  const menuTarget = pointAt ? null : (step?.via ?? null);
+  const menuTarget = pointAt ? null : ((isMobile && step?.viaMobile) || step?.via || null);
 
   const finish = useCallback(() => {
     setAccountMenu(false);
@@ -176,9 +187,10 @@ export function ProductTour() {
         if (!s.target) break;
         setAccountMenu(Boolean(s.openMenu));
         if (s.route && window.location.pathname !== s.route) {
-          if (s.via && dir === 1 && targetEl(s.via)) {
+          const via = (isPhone() && s.viaMobile) || s.via;
+          if (via && dir === 1 && targetEl(via)) {
             scrolledFor.current = null;
-            setPointAt(s.via);
+            setPointAt(via);
             await sleep(POINT_AT_MENU_MS);
             setPointAt(null);
           }
@@ -229,8 +241,11 @@ export function ProductTour() {
         if (scrolledFor.current !== activeTarget) {
           scrolledFor.current = activeTarget;
           const r = el.getBoundingClientRect();
-          const inHeader = Boolean(el.closest('header'));
-          window.scrollTo({ top: inHeader ? 0 : Math.max(0, r.top + window.scrollY - 78), behavior: 'smooth' });
+          // Fixed bars (phone tab bar) never need scrolling to.
+          if (!el.closest('[data-tour-fixed]')) {
+            const inHeader = Boolean(el.closest('header'));
+            window.scrollTo({ top: inHeader ? 0 : Math.max(0, r.top + window.scrollY - 78), behavior: 'smooth' });
+          }
         }
         const r = el.getBoundingClientRect();
         const next = { top: r.top, left: r.left, width: r.width, height: r.height };
@@ -316,10 +331,26 @@ export function ProductTour() {
     <div key={key} className={styles.blocker} aria-hidden="true" style={{ right: 'auto', bottom: 'auto', ...s }} />
   );
 
-  const pad = (b: Box): Box => ({ top: b.top - SPOTLIGHT_PAD, left: b.left - SPOTLIGHT_PAD, width: b.width + 2 * SPOTLIGHT_PAD, height: b.height + 2 * SPOTLIGHT_PAD });
+  // Padded highlight, kept inside the screen (a tab-bar item can touch the edge).
+  const pad = (b: Box): Box => {
+    const left = Math.max(2, b.left - SPOTLIGHT_PAD);
+    const right = Math.min(window.innerWidth - 2, b.left + b.width + SPOTLIGHT_PAD);
+    return { top: b.top - SPOTLIGHT_PAD, left, width: right - left, height: b.height + 2 * SPOTLIGHT_PAD };
+  };
   const holes: Box[] = [];
   if (!centered && box) holes.push(pad(box));
   if (menuBox) holes.push(pad(menuBox));
+
+  // Phones: say the name of the tab-bar item being pointed at.
+  const chips: { text: string; box: Box }[] = [];
+  const addChip = (target: string | null, b: Box | null) => {
+    const text = target && b ? targetEl(target)?.dataset.tourLabel : null;
+    if (text && b) chips.push({ text, box: pad(b) });
+  };
+  if (isMobile) {
+    addChip(activeTarget, box);
+    addChip(menuTarget, menuBox);
+  }
 
   const progress = Math.round((index / (TOUR_STEPS.length - 1)) * 100);
   const primaryLabel = index === 0 ? 'Start tour' : isLast ? 'Finish' : 'Next';
@@ -355,9 +386,22 @@ export function ProductTour() {
           style={{ top: h.top, left: h.left, width: h.width, height: h.height }}
         />
       ))}
+      {chips.map((c) => (
+        <div
+          key={c.text}
+          className={styles.navLabel}
+          aria-hidden="true"
+          style={{
+            top: c.box.top - 40,
+            left: Math.min(Math.max(c.box.left + c.box.width / 2, 48), window.innerWidth - 48),
+          }}
+        >
+          {c.text}
+        </div>
+      ))}
       <div
         ref={cardRef}
-        className={`${styles.card} ${centered ? styles.centered : ''}`}
+        className={`${styles.card} ${centered ? styles.centered : ''} ${isMobile && step.openMenu ? styles.cardTop : ''} ${chips.length ? styles.cardChip : ''}`}
         style={cardStyle}
         role="dialog"
         aria-modal={open ? undefined : true}
@@ -371,9 +415,9 @@ export function ProductTour() {
           </button>
         </div>
         <h2 id="tour-title" className={styles.title}>
-          {step.title}
+          {(isMobile && step.mobile?.title) || step.title}
         </h2>
-        <p className={styles.text}>{step.text}</p>
+        <p className={styles.text}>{(isMobile && step.mobile?.text) || step.text}</p>
         {step.interactive && <p className={styles.hint}>You can type in the highlighted block right now.</p>}
         <div className={styles.actions}>
           {!isLast && (

@@ -95,7 +95,7 @@
   z-index: 10000;
   left: 12px;
   right: 12px;
-  bottom: 12px;
+  bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 12px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -207,9 +207,21 @@
     left: 12px !important;
     right: 12px;
     top: auto !important;
-    bottom: 12px;
+    /* above the bottom tab bar, so its highlighted item stays visible */
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 12px);
     width: auto;
     max-height: 46vh;
+  }
+
+  /* The account sheet opens where the card would sit: put the card on top. */
+  /* Leaves room for the name chip above the highlighted tab-bar item. */
+  .card.cardChip:not(.centered):not(.cardTop) {
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 52px);
+  }
+
+  .card.cardTop:not(.centered) {
+    top: 12px !important;
+    bottom: auto;
   }
 }
 
@@ -224,4 +236,31 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-primary);
+}
+
+/* Name of the tab-bar item the tour is pointing at (phones). */
+.navLabel {
+  position: fixed;
+  z-index: 10000;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(7, 27, 73, 0.3);
+}
+
+.navLabel::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-primary);
+  transform: translateX(-50%) rotate(45deg);
 }

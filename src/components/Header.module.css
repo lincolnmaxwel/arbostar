@@ -465,3 +465,33 @@
   color: #fff;
   text-decoration: none;
 }
+
+/* Phones: navigation lives in the bottom tab bar (MobileNav), so the top
+   header shrinks to the logo plus the "viewing as" controls. */
+@media (max-width: 640px) {
+  .inner {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-height: 52px;
+    padding: 6px 16px;
+  }
+
+  .nav,
+  .userMenu {
+    display: none;
+  }
+
+  .actions {
+    order: 0;
+    width: auto;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  .brandLogo {
+    height: 30px;
+  }
+}

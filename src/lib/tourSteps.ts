@@ -14,6 +14,8 @@ export interface TourStep {
   route?: string;
   /** Menu link to point at for a moment before opening `route`. */
   via?: string;
+  /** Same, on phones, where the menu is the bottom tab bar (pages not in the bar are under "More"). */
+  viaMobile?: string;
   /** Shown only when the account has at least one of these features. */
   requires?: TourFeature[];
   /** The user may type in / click the highlighted area while the step is shown. */
@@ -22,6 +24,8 @@ export interface TourStep {
   openMenu?: boolean;
   title: string;
   text: string;
+  /** Wording used on phones when it differs (the menu is at the bottom there). */
+  mobile?: { title?: string; text?: string };
 }
 
 export const TOUR_STEPS: TourStep[] = [
@@ -35,6 +39,9 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'user-menu',
     title: 'Your account menu',
     text: 'The button with your email, at the top right of every page, opens your account menu. Click it any time to reach your Profile, your Subscription and Sign out.',
+    mobile: {
+      text: 'The More button in the bottom bar opens your account menu. Tap it any time to reach your Profile, your Subscription, Sign out and the pages that do not fit in the bar.',
+    },
   },
   {
     id: 'menu-profile',
@@ -42,6 +49,9 @@ export const TOUR_STEPS: TourStep[] = [
     openMenu: true,
     title: 'Open your Profile',
     text: 'Choose Profile in this menu. Next we open it together and go through each block. You can fill the fields in right away.',
+    mobile: {
+      text: 'Choose Profile in this menu. Next we open it together and go through each block. You can fill the fields in right away.',
+    },
   },
   {
     id: 'profile-provider',
@@ -89,6 +99,7 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'page-new-quote',
     route: '/quotes/new',
     via: 'nav-new-quote',
+    viaMobile: 'nav-quotes',
     requires: ['quotes'],
     title: 'New quote',
     text: 'This is the quote builder. Start with the client details, then add priced items and photos. It works without internet and syncs when you are back online. "Save and Send" emails the client a link to approve it.',
@@ -116,9 +127,13 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'page-services',
     route: '/services',
     via: 'nav-services',
+    viaMobile: 'user-menu',
     requires: ['timesheet'],
     title: 'Services',
     text: 'Your price list: services and products with price, billing type and unit. They show up as shortcuts on quotes and timesheets, and a product you type into a timesheet is added here automatically.',
+    mobile: {
+      text: 'We opened Services from the More menu. It is your price list: services and products with price, billing type and unit. They show up as shortcuts on quotes and timesheets, and a product you type into a timesheet is added here automatically.',
+    },
   },
   {
     id: 'page-invoices',
@@ -134,13 +149,20 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'page-financial',
     route: '/financial',
     via: 'nav-financial',
+    viaMobile: 'user-menu',
     requires: ['invoices'],
     title: 'Financial',
     text: 'Pick a period (day, week, month, year or custom) to see jobs completed, paid and outstanding, with net, GST and total separated. You can also download a PDF report.',
+    mobile: {
+      text: 'We opened Financial from the More menu. Pick a period (day, week, month, year or custom) to see jobs completed, paid and outstanding, with net, GST and total separated. You can also download a PDF report.',
+    },
   },
   {
     id: 'finish',
     title: "You're all set!",
     text: 'Start by filling in your Profile, then create your first quote or timesheet entry. You can replay this tour anytime from the account menu (your email, top right) under "Product tour".',
+    mobile: {
+      text: 'Start by filling in your Profile, then create your first quote or timesheet entry. You can replay this tour anytime from the More menu under "Product tour".',
+    },
   },
 ];

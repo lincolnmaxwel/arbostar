@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { NewQuoteLink } from './NewQuoteLink';
+import { MobileNav } from './MobileNav';
 import { getViewContext, refreshViewContext, resetViewContext } from '@/lib/clientUserContext';
 import { useLivePolling } from '@/lib/useLivePolling';
 import { clearOfflineCaches, LAST_EMAIL_KEY } from '@/lib/clearOfflineCaches';
@@ -167,6 +168,8 @@ export function Header() {
     function onClickOutside(e: MouseEvent) {
       // The product tour keeps the menu open while it points at Profile.
       if (document.body.dataset.tourActive) return;
+      // The phone tab bar and its "More" sheet manage the same menu themselves.
+      if ((e.target as Element | null)?.closest('[data-mobile-nav]')) return;
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
@@ -397,6 +400,18 @@ export function Header() {
         </div>
       </div>
     </header>
+    <MobileNav
+      features={features}
+      pathname={pathname}
+      open={menuOpen}
+      onToggle={() => setMenuOpen((v) => !v)}
+      onClose={() => setMenuOpen(false)}
+      isAdmin={actorRole === 'admin'}
+      isViewAs={isViewAs}
+      email={userEmail}
+      onSignOut={handleSignOut}
+      onStartTour={() => window.dispatchEvent(new Event('myjobbs:start-tour'))}
+    />
     {lockedViewAsNotice && (
       <div className={styles.billingBannerUrgent} role="status" data-testid="view-as-locked-notice">
         <span>{lockedViewAsNotice}</span>

@@ -164,3 +164,20 @@ button {
     flex: 0 0 auto;
   }
 }
+
+/* Phones: height of the fixed bottom tab bar (MobileNav). */
+:root {
+  --mobile-nav-h: 60px;
+}
+
+.app-main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+@media (max-width: 640px) {
+  .app-main--with-nav {
+    padding-bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 24px);
+  }
+}

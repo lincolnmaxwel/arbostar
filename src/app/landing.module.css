@@ -481,6 +481,52 @@
   line-height: 1.6;
 }
 
+/* ---- Customization callout ---- */
+.customBlock {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px;
+  border-radius: var(--radius-lg);
+  color: #fff;
+  background: linear-gradient(135deg, #075bff, #00a9d6);
+  box-shadow: 0 16px 36px rgba(7, 27, 73, 0.15);
+}
+
+.customTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.customText {
+  font-size: 0.9688rem;
+  line-height: 1.6;
+  opacity: 0.95;
+  max-width: 640px;
+}
+
+.customCta {
+  flex: none;
+  background: #fff;
+  color: #075bff;
+  font-weight: 700;
+  padding: 12px 22px;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .customBlock {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+  }
+}
+
 /* ---- Steps ---- */
 .steps {
   list-style: none;

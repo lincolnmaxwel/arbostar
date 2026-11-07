@@ -275,6 +275,18 @@ export default async function LandingPage() {
                 </article>
               ))}
             </div>
+            <div className={styles.customBlock}>
+              <div>
+                <h3 className={styles.customTitle}>Need something that&apos;s not here? We&apos;ll build it.</h3>
+                <p className={styles.customText}>
+                  MyJobbs is fully customizable. If your business needs a feature the system doesn&apos;t have yet,
+                  just get in touch and we&apos;ll develop it for you.
+                </p>
+              </div>
+              <a href="#contact" className={styles.customCta}>
+                Request a feature &rarr;
+              </a>
+            </div>
           </div>
         </section>
 

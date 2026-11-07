@@ -213,6 +213,7 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
       {checkingRobot && (
         <RobotCheckModal
           siteKey={turnstileSiteKey}
+          message="Please confirm you are human. Your sign-up continues right after."
           onCancel={() => setCheckingRobot(false)}
           onVerified={(token) => {
             setCheckingRobot(false);

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import styles from '@/app/contact.module.css';
-import { TurnstileWidget } from '@/components/TurnstileWidget';
+import { RobotCheckModal } from '@/components/RobotCheckModal';
 
 export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string }) {
   const [name, setName] = useState('');
@@ -10,20 +10,32 @@ export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: stri
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [website, setWebsite] = useState(''); // honeypot, real users never fill it
-  const [turnstileToken, setTurnstileToken] = useState('');
-  const [turnstileReset, setTurnstileReset] = useState(0);
+  const [checkingRobot, setCheckingRobot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
 
-  async function submit(e: FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     setError(null);
-    if (turnstileSiteKey && !turnstileToken) {
-      setError('Please complete the robot check first.');
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      setError('Please fill in your name, email and message.');
       return;
     }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    // The robot check only runs now, once the form is complete.
+    if (turnstileSiteKey) {
+      setCheckingRobot(true);
+      return;
+    }
+    void send('');
+  }
+
+  async function send(turnstileToken: string) {
     setBusy(true);
     try {
       const res = await fetch('/api/contact', {
@@ -44,7 +56,6 @@ export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: stri
     } catch {
       setError('We could not reach the server. Check your connection and try again.');
     } finally {
-      setTurnstileReset((n) => n + 1);
       setBusy(false);
     }
   }
@@ -94,7 +105,6 @@ export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: stri
           <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
         </label>
       </div>
-      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstileToken} resetKey={turnstileReset} />
       {error && (
         <p className={styles.error} role="alert">
           {error}
@@ -103,6 +113,17 @@ export function ContactForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: stri
       <button type="submit" className={styles.submit} disabled={busy}>
         {busy ? 'Sending...' : 'Send message'}
       </button>
+      {checkingRobot && (
+        <RobotCheckModal
+          siteKey={turnstileSiteKey}
+          message="Please confirm you are human. Your message is sent right after."
+          onCancel={() => setCheckingRobot(false)}
+          onVerified={(token) => {
+            setCheckingRobot(false);
+            void send(token);
+          }}
+        />
+      )}
     </form>
   );
 }

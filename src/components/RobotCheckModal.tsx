@@ -13,10 +13,12 @@ export function RobotCheckModal({
   siteKey,
   onVerified,
   onCancel,
+  message = 'Please confirm you are human. Your request continues right after.',
 }: {
   siteKey: string;
   onVerified: (token: string) => void;
   onCancel: () => void;
+  message?: string;
 }) {
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
@@ -46,7 +48,7 @@ export function RobotCheckModal({
         <h2 id="robot-check-title" className={styles.title}>
           One quick check
         </h2>
-        <p className={styles.text}>Please confirm you are human. Your sign-up continues right after.</p>
+        <p className={styles.text}>{message}</p>
         <div className={styles.widget}>
           <TurnstileWidget siteKey={siteKey} onToken={(token) => token && onVerified(token)} />
         </div>

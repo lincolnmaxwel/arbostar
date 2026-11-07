@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/db';
+import { verifyTurnstile } from '@/lib/turnstile';
 
 // Stable, user-facing error messages surfaced by the login page when a real
 // account exists but its status blocks sign-in. NextAuth v4.24.7 propagates
@@ -55,9 +56,13 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        turnstileToken: { label: 'Robot check', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        // Robot check (no-op when Turnstile is not configured). Checked before
+        // the password so a bot gets no signal about the credentials.
+        if (!(await verifyTurnstile(credentials.turnstileToken))) throw new Error('Robot check failed.');
         return authorizeCredentials(credentials.email, credentials.password);
       },
     }),

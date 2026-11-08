@@ -81,7 +81,7 @@ describe('admin sign-up approval queue', () => {
     expect((await GET()).status).toBe(403);
     const row = await queued();
     expect((await call(approve, row.id, { trialDays: 10 })).status).toBe(403);
-    expect((await call(deny, row.id)).status).toBe(403);
+    expect((await call(deny, row.id, { reason: 'x' })).status).toBe(403);
   });
 
   it('lists only email-confirmed, undecided requests with all their details', async () => {
@@ -126,10 +126,13 @@ describe('admin sign-up approval queue', () => {
 
   it('deny blocks the email; removing it from the list lets the person ask again', async () => {
     const row = await queued();
-    expect((await call(deny, row.id)).status).toBe(200);
+    expect((await call(deny, row.id, { reason: '  ' })).status).toBe(400);
+    expect(await prisma.pendingSignup.count({ where: { email: row.email } })).toBe(1);
+    expect((await call(deny, row.id, { reason: 'Not a tree service' })).status).toBe(200);
     expect(await prisma.pendingSignup.count({ where: { email: row.email } })).toBe(0);
     const blocked = await prisma.blockedEmail.findUniqueOrThrow({ where: { email: row.email } });
     expect(blocked.referral).toBe('Referred by John Smith');
+    expect(blocked.reason).toBe('Not a tree service');
 
     const list = await (await GET()).json();
     expect(list.blocked.map((b: { id: string }) => b.id)).toContain(blocked.id);

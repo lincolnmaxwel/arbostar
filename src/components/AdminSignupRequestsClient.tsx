@@ -19,6 +19,7 @@ interface BlockedRow {
   name: string | null;
   phone: string | null;
   referral: string | null;
+  reason: string | null;
   createdAt: string;
 }
 
@@ -42,6 +43,9 @@ export function AdminSignupRequestsClient({
   const [busyId, setBusyId] = useState<string | null>(null);
   // Which request has its approval form open, with its two inputs.
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  // Which request has its denial form open, and the reason typed so far.
+  const [denyingId, setDenyingId] = useState<string | null>(null);
+  const [denyReason, setDenyReason] = useState('');
   const [trialDays, setTrialDays] = useState('15');
   const [price, setPrice] = useState('');
 
@@ -110,21 +114,28 @@ export function AdminSignupRequestsClient({
   }
 
   async function deny(row: PendingRequest) {
-    if (!window.confirm(`Deny ${row.email}? The email goes on the blocked list and cannot sign up again until you remove it there.`)) {
+    const reason = denyReason.trim();
+    if (!reason) {
+      setError('Enter the reason for denying this request.');
       return;
     }
     setBusyId(row.id);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/admin/signup-requests/${row.id}/deny`, { method: 'POST' });
+      const res = await fetch(`/api/admin/signup-requests/${row.id}/deny`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(body.error ?? 'Could not deny this request.');
         return;
       }
       setNotice(`${row.email} was denied and added to the blocked list.`);
-      if (approvingId === row.id) setApprovingId(null);
+      setDenyingId(null);
+      setDenyReason('');
       await load();
       onChanged();
     } finally {
@@ -245,14 +256,59 @@ export function AdminSignupRequestsClient({
                       disabled={busyId === row.id}
                       onClick={() => {
                         setApprovingId(row.id);
+                        setDenyingId(null);
                         setError(null);
                       }}
                     >
                       Approve
                     </button>
-                    <button type="button" className={styles.deleteButton} disabled={busyId === row.id} onClick={() => deny(row)}>
+                    <button
+                      type="button"
+                      className={styles.deleteButton}
+                      disabled={busyId === row.id}
+                      onClick={() => {
+                        setDenyingId(row.id);
+                        setDenyReason('');
+                        setApprovingId(null);
+                        setError(null);
+                      }}
+                    >
                       Deny
                     </button>
+                  </div>
+                )}
+
+                {denyingId === row.id && (
+                  <div style={{ marginTop: 16 }}>
+                    <div className={styles.field}>
+                      <label htmlFor={`deny-${row.id}`}>Reason for denying (saved on the blocked list)</label>
+                      <textarea
+                        id={`deny-${row.id}`}
+                        className={styles.input}
+                        rows={3}
+                        maxLength={500}
+                        autoFocus
+                        placeholder="e.g. Not a tree service business; could not reach by phone"
+                        value={denyReason}
+                        onChange={(e) => setDenyReason(e.target.value)}
+                      />
+                    </div>
+                    <p className={styles.userEmail}>
+                      {row.email} will be blocked and cannot sign up again until you remove it from the blocked list.
+                    </p>
+                    <div className={styles.rowActions}>
+                      <button
+                        type="button"
+                        className={styles.deleteButton}
+                        disabled={busyId === row.id || !denyReason.trim()}
+                        onClick={() => deny(row)}
+                      >
+                        {busyId === row.id ? 'Denying...' : 'Confirm denial'}
+                      </button>
+                      <button type="button" className={styles.actionButton} disabled={busyId === row.id} onClick={() => setDenyingId(null)}>
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -276,6 +332,7 @@ export function AdminSignupRequestsClient({
                     <th>Name</th>
                     <th>Phone</th>
                     <th>Referral</th>
+                    <th>Reason denied</th>
                     <th>Blocked on</th>
                     <th />
                   </tr>
@@ -287,6 +344,7 @@ export function AdminSignupRequestsClient({
                       <td>{row.name ?? '-'}</td>
                       <td>{row.phone ?? '-'}</td>
                       <td>{row.referral ?? '-'}</td>
+                      <td style={{ whiteSpace: 'pre-wrap' }}>{row.reason ?? '-'}</td>
                       <td>{fmt(row.createdAt)}</td>
                       <td>
                         <button type="button" className={styles.actionButton} disabled={busyId === row.id} onClick={() => unblock(row)}>

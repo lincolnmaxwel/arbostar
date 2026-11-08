@@ -416,6 +416,8 @@ model BlockedEmail {
   name        String?
   phone       String?
   referral    String?
+  // Why the admin denied it (required in the UI), so a mistake can be reviewed later.
+  reason      String?
   createdAt   DateTime @default(now())
   blockedById String?
 }

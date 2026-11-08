@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { lookupInvite } from '@/lib/invites';
 import { AcceptInviteForm } from '@/components/AcceptInviteForm';
+import { AuthBackground } from '@/components/AuthBackground';
 import styles from '@/app/login/login.module.css';
 
 // Public page (outside middleware's matcher): the invite token in the URL is
@@ -18,6 +19,7 @@ export default async function InvitePage({ params }: { params: { token: string }
 
   return (
     <div className={styles.page}>
+      <AuthBackground />
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

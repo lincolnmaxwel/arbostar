@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { RobotCheckModal } from '@/components/RobotCheckModal';
+import { AuthBackground } from '@/components/AuthBackground';
 import styles from './login.module.css';
 
 function EyeIcon({ off }: { off: boolean }) {
@@ -102,6 +103,7 @@ export function LoginForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string
 
   return (
     <div className={styles.page}>
+      <AuthBackground />
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

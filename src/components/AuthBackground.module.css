@@ -1,0 +1,13 @@
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, #f3f8ff 0%, #e6f0ff 100%);
+}
+
+/* The hero fades its top and bottom into neighbouring sections; here it fills the whole screen. */
+.bg :global(.hb) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}

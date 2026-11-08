@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SignupForm } from '@/components/SignupForm';
+import { AuthBackground } from '@/components/AuthBackground';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
 import { turnstileSiteKey } from '@/lib/turnstile';
@@ -15,6 +16,7 @@ export const metadata = {
 export default function SignupPage() {
   return (
     <div className={styles.page}>
+      <AuthBackground />
       <div className={`${styles.card} ${signupStyles.wide}`}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

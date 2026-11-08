@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { lookupReset } from '@/lib/passwordReset';
 import { ResetPasswordForm } from '@/components/ResetPasswordForm';
+import { AuthBackground } from '@/components/AuthBackground';
 import styles from '@/app/login/login.module.css';
 
 // Public page (outside middleware's matcher): the token in the URL is the only
@@ -18,6 +19,7 @@ export default async function ResetPasswordPage({ params }: { params: { token: s
 
   return (
     <div className={styles.page}>
+      <AuthBackground />
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

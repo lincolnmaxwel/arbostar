@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AuthBackground } from '@/components/AuthBackground';
 import styles from '@/app/login/login.module.css';
 
 export const metadata = {
@@ -8,6 +9,7 @@ export const metadata = {
 export default function SignupReceivedPage() {
   return (
     <div className={styles.page}>
+      <AuthBackground />
       <div className={styles.card}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

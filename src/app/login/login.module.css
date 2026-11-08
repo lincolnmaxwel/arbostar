@@ -10,7 +10,7 @@
      of reach (it can't be scrolled to); auto margins fall back to the top. */
   align-items: flex-start;
   justify-content: center;
-  background: #eef4ff url('/brand/background-login.jpg') center / cover no-repeat;
+  background: #eef4ff;
 }
 
 .card {
@@ -22,6 +22,8 @@
   width: 100%;
   max-width: 400px;
   margin: auto;
+  position: relative;
+  z-index: 1;
   animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
 }
 

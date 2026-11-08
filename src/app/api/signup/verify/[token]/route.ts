@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { sendSignupRequestAdminEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/emailLayout';
 import { hashSignupToken, lookupSignup } from '@/lib/signups';
 
 // Public endpoint: the unguessable one-time token from the verification email
@@ -46,6 +48,32 @@ export async function POST(req: Request, { params }: { params: { token: string }
   });
   if (burned.count !== 1) {
     return NextResponse.json({ error: 'This verification link was already used.' }, { status: 410 });
+  }
+
+  // Tell the admin(s) right away so they can contact the person. Best effort:
+  // the applicant's confirmation never fails because of this email.
+  try {
+    const admins = await prisma.user.findMany({
+      where: { role: 'admin', status: 'active' },
+      select: { email: true, notificationEmail: true },
+    });
+    const recipients = Array.from(new Set(admins.map((a) => a.notificationEmail || a.email)));
+    const reviewUrl = `${appBaseUrl()}/admin/users`;
+    await Promise.allSettled(
+      recipients.map((to) =>
+        sendSignupRequestAdminEmail({
+          to,
+          name: signup.name,
+          email: signup.email,
+          phone: signup.phone,
+          referral: signup.referral,
+          requestedAt: signup.createdAt,
+          reviewUrl,
+        }),
+      ),
+    );
+  } catch (err) {
+    console.error('[signup-verify] admin notification failed', err);
   }
 
   return NextResponse.json({ ok: true, email: signup.email }, { status: 200 });

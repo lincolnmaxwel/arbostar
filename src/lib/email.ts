@@ -532,6 +532,48 @@ export async function sendPaymentFailedEmail(opts: SendPaymentFailedEmailOptions
   });
 }
 
+export interface SendSignupRequestAdminEmailOptions {
+  to: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  referral: string | null;
+  requestedAt: Date;
+  reviewUrl: string;
+}
+
+// Admin heads-up: someone confirmed their email and waits for approval. Carries
+// everything they filled in; Reply-To is the applicant so replying contacts them.
+export async function sendSignupRequestAdminEmail(opts: SendSignupRequestAdminEmailOptions): Promise<void> {
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:4px 16px 4px 0;color:#5a6785;vertical-align:top;">${label}</td><td>${value}</td></tr>`;
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>A new person confirmed their email and is <strong>waiting for your approval</strong> on <strong>MyJobbs</strong>:</p>
+      <table style="border-collapse:collapse;margin:12px 0;">
+        ${row('Name', `<strong>${escapeHtml(opts.name)}</strong>`)}
+        ${row('Email', `<a href="mailto:${escapeHtml(opts.email)}">${escapeHtml(opts.email)}</a>`)}
+        ${row('Phone', opts.phone ? escapeHtml(opts.phone) : '-')}
+        ${row('Requested', escapeHtml(opts.requestedAt.toUTCString()))}
+      </table>
+      <p style="color:#5a6785;margin-bottom:4px;">How they heard about us / who referred them:</p>
+      <p style="white-space:pre-line;background:#f3f6fb;border-radius:8px;padding:14px;margin-top:0;">${escapeHtml(opts.referral ?? '-')}</p>
+      <p style="margin:24px 0;">
+        <a href="${opts.reviewUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Review request
+        </a>
+      </p>
+    </div>
+  `);
+
+  await sendGraphMail({
+    to: opts.to,
+    subject: `New MyJobbs access request: ${opts.name}`.slice(0, 120),
+    html,
+    replyTo: opts.email,
+  });
+}
+
 export interface SendContactRequestEmailOptions {
   name: string;
   email: string;

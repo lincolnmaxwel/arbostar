@@ -2,10 +2,13 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 
-vi.mock('@/lib/email', () => ({ sendSignupVerificationEmail: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/lib/email', () => ({
+  sendSignupVerificationEmail: vi.fn().mockResolvedValue(undefined),
+  sendSignupRequestAdminEmail: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { prisma } from '@/lib/db';
-import { sendSignupVerificationEmail } from '@/lib/email';
+import { sendSignupVerificationEmail, sendSignupRequestAdminEmail } from '@/lib/email';
 import { POST as signup } from '@/app/api/signup/route';
 import { POST as verify } from '@/app/api/signup/verify/[token]/route';
 import { hashSignupToken, signupExpiry, SIGNUP_COOLDOWN_MINUTES } from '@/lib/signups';
@@ -185,6 +188,11 @@ describe('public sign-up', () => {
     expect(pending.acceptedAt).toBeNull();
     expect(pending.phone).toBe(PROFILE.phone);
     expect(pending.referral).toBe(PROFILE.referral);
+
+    // Every active admin is told, with the applicant's details.
+    const adminMail = vi.mocked(sendSignupRequestAdminEmail);
+    expect(adminMail).toHaveBeenCalled();
+    expect(adminMail.mock.calls[0][0]).toMatchObject({ name: 'New Person', email, ...PROFILE });
 
     // Signing up again while waiting is refused with a clear code.
     const again = await signupReq({ name: 'New Person', email, password: 'Long-enough1', acceptTerms: true, ...PROFILE });

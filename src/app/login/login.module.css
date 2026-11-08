@@ -5,7 +5,10 @@
   overflow-y: auto;
   padding: 24px 16px;
   display: flex;
-  align-items: center;
+  /* The card centers itself with margin: auto instead of align-items: center.
+     Centering a flex item taller than its scroll container pushes the top out
+     of reach (it can't be scrolled to); auto margins fall back to the top. */
+  align-items: flex-start;
   justify-content: center;
   background: #eef4ff url('/brand/background-login.jpg') center / cover no-repeat;
 }
@@ -18,6 +21,7 @@
   padding: 40px 32px;
   width: 100%;
   max-width: 400px;
+  margin: auto;
   animation: fade-in-up var(--duration-standard) var(--ease-out-expo) both;
 }
 

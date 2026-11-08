@@ -48,3 +48,20 @@
   font-weight: 700;
   text-decoration: underline;
 }
+
+/* Wider card for the sign-up form, with paired fields side by side. */
+.wide {
+  max-width: 600px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

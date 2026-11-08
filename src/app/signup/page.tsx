@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { SignupForm } from '@/components/SignupForm';
 import styles from '@/app/login/login.module.css';
+import signupStyles from '@/app/signup/signup.module.css';
 import { turnstileSiteKey } from '@/lib/turnstile';
 
 // The Turnstile site key is read from the environment per request, not at build time.
@@ -14,7 +15,7 @@ export const metadata = {
 export default function SignupPage() {
   return (
     <div className={styles.page}>
-      <div className={styles.card}>
+      <div className={`${styles.card} ${signupStyles.wide}`}>
         <h1 className={styles.title}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/myjobbs-logo2.png" alt="MyJobbs.com" className={styles.logo} />

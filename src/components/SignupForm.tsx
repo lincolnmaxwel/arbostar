@@ -107,6 +107,7 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           )}
         </div>
       )}
+      <div className={signupStyles.row}>
       <div className={styles.field}>
         <label htmlFor="signup-name">Name</label>
         <input
@@ -138,6 +139,8 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           required
         />
       </div>
+      </div>
+      <div className={signupStyles.row}>
       <div className={styles.field}>
         <label htmlFor="signup-phone">Phone</label>
         <input
@@ -171,6 +174,8 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           {referralWordCount(referral)}/{REFERRAL_MIN_WORDS} words minimum
         </small>
       </div>
+      </div>
+      <div className={signupStyles.row}>
       <div className={styles.field}>
         <label htmlFor="signup-password">Password</label>
         <div className={styles.passwordWrap}>
@@ -198,7 +203,6 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           </button>
         </div>
       </div>
-      <PasswordRequirements password={password} />
       <div className={styles.field}>
         <label htmlFor="signup-confirm">Confirm password</label>
         <input
@@ -214,6 +218,8 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           required
         />
       </div>
+      </div>
+      <PasswordRequirements password={password} />
       <PasswordMatch password={password} confirm={confirm} />
       <div className={signupStyles.termsField}>
         <input

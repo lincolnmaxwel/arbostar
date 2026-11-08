@@ -132,7 +132,7 @@ Sign-up no longer creates an account. `/signup` ("Request access") also collects
 
 ### Auth page background
 
-Login, sign-up (+ verify/received), forgot/reset password and invite pages render `<AuthBackground />` (`src/components/AuthBackground.tsx`) as the first child of `styles.page`: the landing `HeroBackground` animation pinned full-screen behind the card (fixed layer, mask fade removed). The card is `position: relative; z-index: 1`. New auth pages using `login.module.css` \ should add it too.
+Login, sign-up (+ verify/received), forgot/reset password and invite pages render `<AuthBackground />` (`src/components/AuthBackground.tsx`) as the first child of `styles.page`: the landing `HeroBackground` animation pinned full-screen behind the card (fixed layer, mask fade removed). The card is `position: relative; z-index: 1`. New auth pages using the `.page` wrapper of `login.module.css` should add it too.
 
 ### Single active session per account
 

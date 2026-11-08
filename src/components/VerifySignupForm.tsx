@@ -20,12 +20,12 @@ export function VerifySignupForm({ token }: { token: string }) {
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(body.error ?? 'Could not create your account. Please try again.');
+        setError(body.error ?? 'Could not confirm your email. Please try again.');
         setSubmitting(false);
         return;
       }
 
-      window.location.href = '/login?verified=1';
+      window.location.href = '/signup/received';
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
       setSubmitting(false);

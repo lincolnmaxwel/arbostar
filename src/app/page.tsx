@@ -174,7 +174,7 @@ export default async function LandingPage() {
               Sign in
             </Link>
             <Link href="/signup" className={styles.navCta}>
-              Start free trial
+              Request access
             </Link>
           </div>
         </div>
@@ -185,17 +185,18 @@ export default async function LandingPage() {
           <HeroBackground />
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
-              <span className={styles.eyebrow}>Built for service businesses</span>
+              <span className={styles.eyebrow}>Private access &middot; By invitation</span>
               <h1 className={styles.heroTitle}>
                 From quote to paid invoice, <span className={styles.gradientText}>all in one place.</span>
               </h1>
               <p className={styles.heroText}>
                 MyJobbs helps field crews write quotes on site, get them approved online, schedule the work and invoice
-                with GST. It keeps working when the signal does not.
+                with GST. It keeps working when the signal does not. Access is limited and by invitation, so every
+                team gets a setup that fits.
               </p>
               <div className={styles.heroActions}>
                 <Link href="/signup" className={styles.primaryButton}>
-                  Start free trial
+                  Request access
                 </Link>
                 <Link href="/login" className={styles.secondaryButton}>
                   Sign in
@@ -309,6 +310,34 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        <section id="vip" className={styles.section}>
+          <div className={styles.container}>
+            <div className={styles.vipBlock}>
+              <span className={styles.eyebrow}>Exclusive access</span>
+              <h2 className={styles.sectionTitle}>MyJobbs is not open to everyone</h2>
+              <p className={styles.sectionText}>
+                We open the platform to a limited group of businesses, by invitation and after a short review. This is
+                how we protect the quality of the service and the satisfaction of every customer.
+              </p>
+              <ol className={styles.vipSteps}>
+                <li>
+                  <strong>Request access.</strong> Tell us who you are and how you heard about MyJobbs.
+                </li>
+                <li>
+                  <strong>We talk.</strong> We contact each person who signs up to understand your needs and make sure
+                  the system fits your business.
+                </li>
+                <li>
+                  <strong>You get in.</strong> Once approved, you receive your trial and start using the system.
+                </li>
+              </ol>
+              <Link href="/signup" className={styles.primaryButton}>
+                Request access
+              </Link>
+            </div>
+          </div>
+        </section>
+
         <section id="contact" className={styles.section}>
           <div className={styles.container}>
             <div className={styles.sectionHead}>
@@ -337,13 +366,15 @@ export default async function LandingPage() {
 
         <section className={styles.ctaBand}>
           <div className={styles.container}>
-            <h2 className={styles.ctaTitle}>Ready to quote smarter?</h2>
-            <p className={styles.ctaText}>Create your account and start quoting, scheduling, and invoicing from one place.</p>
+            <h2 className={styles.ctaTitle}>Want to quote smarter?</h2>
+            <p className={styles.ctaText}>
+              Request access and we will contact you personally to understand your business before opening your account.
+            </p>
             <Link href="/signup" className={styles.ctaButton}>
-              Start free trial
+              Request access
             </Link>
             <p className={styles.ctaSignIn}>
-              Already have an account? <Link href="/login">Sign in</Link>
+              Already approved? <Link href="/login">Sign in</Link>
             </p>
           </div>
         </section>

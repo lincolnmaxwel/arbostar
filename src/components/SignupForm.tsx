@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { PasswordMatch, PasswordRequirements } from '@/components/PasswordRequirements';
 import { passwordProblem } from '@/lib/passwordPolicy';
+import { formatPhoneInput } from '@/lib/formatPhone';
+import { phoneProblem, referralProblem, referralWordCount, REFERRAL_MAX_LENGTH, REFERRAL_MIN_WORDS } from '@/lib/signups';
 import { RobotCheckModal } from '@/components/RobotCheckModal';
 import styles from '@/app/login/login.module.css';
 import signupStyles from '@/app/signup/signup.module.css';
@@ -11,6 +13,8 @@ import signupStyles from '@/app/signup/signup.module.css';
 export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [referral, setReferral] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +33,11 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
     setError(null);
     setEmailExists(false);
 
+    const contactProblem = phoneProblem(phone) ?? referralProblem(referral);
+    if (contactProblem) {
+      setError(contactProblem);
+      return;
+    }
     const problem = passwordProblem(password);
     if (problem) {
       setError(problem);
@@ -56,12 +65,12 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
       const response = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, acceptTerms, website, turnstileToken }),
+        body: JSON.stringify({ name, email, phone, referral, password, acceptTerms, website, turnstileToken }),
       });
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(body.error ?? 'Could not start your free trial. Please try again.');
+        setError(body.error ?? 'Could not send your request. Please try again.');
         setEmailExists(body.code === 'email-exists');
         setSubmitting(false);
         return;
@@ -80,7 +89,7 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
         <strong>Check your email</strong>
         <p className={signupStyles.successCopy}>
           We sent a confirmation link to <strong>{email}</strong>. Check your inbox and spam folder, then use the link
-          within 24 hours to confirm your address.
+          within 24 hours. After you confirm, our team reviews your request and contacts you.
         </p>
       </section>
     );
@@ -128,6 +137,39 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
           maxLength={254}
           required
         />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor="signup-phone">Phone</label>
+        <input
+          id="signup-phone"
+          className={styles.input}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel-national"
+          placeholder="(555) 123-4567"
+          value={phone}
+          onChange={(event) => setPhone(formatPhoneInput(event.target.value))}
+          disabled={submitting}
+          maxLength={14}
+          required
+        />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor="signup-referral">How did you hear about us?</label>
+        <textarea
+          id="signup-referral"
+          className={styles.input}
+          rows={2}
+          placeholder="Who referred you? Tell us a little (at least 3 words)"
+          value={referral}
+          onChange={(event) => setReferral(event.target.value)}
+          disabled={submitting}
+          maxLength={REFERRAL_MAX_LENGTH}
+          required
+        />
+        <small className={signupStyles.successCopy}>
+          {referralWordCount(referral)}/{REFERRAL_MIN_WORDS} words minimum
+        </small>
       </div>
       <div className={styles.field}>
         <label htmlFor="signup-password">Password</label>
@@ -208,7 +250,7 @@ export function SignupForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: strin
         />
       </div>
       <button className={styles.button} type="submit" disabled={submitting}>
-        {submitting ? 'Starting your trial...' : 'Start free trial'}
+        {submitting ? 'Sending your request...' : 'Request access'}
       </button>
       {checkingRobot && (
         <RobotCheckModal

@@ -116,7 +116,7 @@ export function LoginForm({ turnstileSiteKey = '' }: { turnstileSiteKey?: string
         )}
         {emailVerified && !error && (
           <p className={styles.success} role="status">
-            Email confirmed. Sign in to start your free trial.
+            Email confirmed.
           </p>
         )}
         {error && <p className={styles.error} role="alert">{error}</p>}

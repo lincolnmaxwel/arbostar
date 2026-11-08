@@ -425,7 +425,7 @@ export async function sendSignupVerificationEmail(opts: SendSignupVerificationEm
   const html = emailLayout(`
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
       <p>Hi ${escapeHtml(opts.name)},</p>
-      <p>Welcome to <strong>MyJobbs</strong>. Your free trial account is ready to use as soon as you confirm your email address:</p>
+      <p>Thanks for your interest in <strong>MyJobbs</strong>. Please confirm your email address. Our team then reviews your request and contacts you personally:</p>
       <p style="margin:24px 0;">
         <a href="${opts.verifyUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
           Confirm my email
@@ -433,7 +433,7 @@ export async function sendSignupVerificationEmail(opts: SendSignupVerificationEm
       </p>
       <p style="color:#5a6785;font-size:13px;">This link works once and expires in ${opts.expiresInHours} hours. If the button does not work, copy this address into your browser:<br/>
         <span style="word-break:break-all;">${escapeHtml(opts.verifyUrl)}</span></p>
-      <p style="color:#5a6785;font-size:13px;">If you were not expecting this email, you can ignore it. Your account will not be created unless you confirm.</p>
+      <p style="color:#5a6785;font-size:13px;">If you were not expecting this email, you can ignore it. Your request is not sent to our team unless you confirm.</p>
     </div>
   `);
 
@@ -442,6 +442,34 @@ export async function sendSignupVerificationEmail(opts: SendSignupVerificationEm
     subject: 'Confirm your MyJobbs email',
     html,
   });
+}
+
+export interface SendSignupApprovedEmailOptions {
+  to: string;
+  name: string;
+  loginUrl: string;
+  trialDays: number;
+}
+
+// Sent when an admin approves an invite-only sign-up request.
+export async function sendSignupApprovedEmail(opts: SendSignupApprovedEmailOptions): Promise<void> {
+  const trial =
+    opts.trialDays > 0
+      ? `You have a <strong>${opts.trialDays}-day free trial</strong> starting now.`
+      : 'Your account is ready to use.';
+  const html = emailLayout(`
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#071b49;">
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p>Good news: your access to <strong>MyJobbs</strong> was approved. ${trial} Sign in with the email and password you chose when you signed up:</p>
+      <p style="margin:24px 0;">
+        <a href="${opts.loginUrl}" style="display:inline-block;background:#075bff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+          Sign in
+        </a>
+      </p>
+    </div>
+  `);
+
+  await sendGraphMail({ to: opts.to, subject: 'Your MyJobbs access was approved', html });
 }
 
 export interface SendPasswordResetEmailOptions {

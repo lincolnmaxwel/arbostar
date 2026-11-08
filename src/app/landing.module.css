@@ -697,3 +697,48 @@
     text-align: center;
   }
 }
+
+/* ---- VIP / invitation-only block ---- */
+.vipBlock {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 40px 32px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 16px 36px rgba(7, 27, 73, 0.08);
+}
+
+.vipSteps {
+  list-style: none;
+  counter-reset: vip;
+  text-align: left;
+  display: grid;
+  gap: 14px;
+  margin: 28px 0;
+  padding: 0;
+}
+
+.vipSteps li {
+  counter-increment: vip;
+  position: relative;
+  padding-left: 44px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.vipSteps li::before {
+  content: counter(vip);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  background: linear-gradient(135deg, #075bff, #00d6db);
+}

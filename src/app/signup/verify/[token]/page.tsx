@@ -10,19 +10,19 @@ const PROBLEM_COPY: Record<'invalid' | 'expired' | 'used', { title: string; body
     title: 'Verification link not found',
     body: 'This verification link is not valid. Check that you opened the full link from your email.',
     href: '/signup',
-    link: 'Start your free trial',
+    link: 'Request access',
   },
   expired: {
     title: 'Verification link expired',
     body: 'This verification link has expired. Start again to get a new link.',
     href: '/signup',
-    link: 'Start your free trial',
+    link: 'Request access',
   },
   used: {
     title: 'Verification link already used',
-    body: 'This verification link has already been used to create an account.',
-    href: '/login',
-    link: 'Go to sign in',
+    body: 'This email was already confirmed. Our team has your request.',
+    href: '/',
+    link: 'Back to home',
   },
 };
 
@@ -39,7 +39,7 @@ export default async function VerifySignupPage({ params }: { params: { token: st
         {lookup.state === 'valid' ? (
           <>
             <p className={styles.subtitle}>
-              Confirm <strong>{lookup.signup.email}</strong> to create your account and start your free trial.
+              Confirm <strong>{lookup.signup.email}</strong> so our team can review your request.
             </p>
             <VerifySignupForm token={params.token} />
           </>

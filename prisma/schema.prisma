@@ -75,58 +75,58 @@ enum ServiceBillingType {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  name              String
-  email             String   @unique
-  passwordHash      String
-  role              Role     @default(staff)
-  status            UserStatus @default(active)
-  hourlyRate        Decimal  @db.Decimal(10, 2) @default(0)
+  id                  String               @id @default(uuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  role                Role                 @default(staff)
+  status              UserStatus           @default(active)
+  hourlyRate          Decimal              @default(0) @db.Decimal(10, 2)
   // Default service name for timesheet labor lines on invoices; snapshotted
   // into TimesheetEntry.serviceName at entry creation.
-  defaultServiceName String   @default("Labor")
+  defaultServiceName  String               @default("Labor")
   // Where client-response notifications (quote approved/declined, booking
   // date confirmed/rejected) get sent. Null means "use `email`" — kept
   // separate from the login email so a user can route notifications
   // elsewhere without changing how they sign in.
-  notificationEmail String?
-  createdAt         DateTime @default(now())
-  quotes            Quote[]
-  clients           Client[]
-  invoices          Invoice[]
-  timesheetEntries  TimesheetEntry[]
-  featureFlags      UserFeatureFlag[]
-  companyProfile    CompanyProfile?
-  auditLogTargets   AuditLog[]
+  notificationEmail   String?
+  createdAt           DateTime             @default(now())
+  quotes              Quote[]
+  clients             Client[]
+  invoices            Invoice[]
+  timesheetEntries    TimesheetEntry[]
+  featureFlags        UserFeatureFlag[]
+  companyProfile      CompanyProfile?
+  auditLogTargets     AuditLog[]
   serviceCatalogItems ServiceCatalogItem[]
-  passwordResets    PasswordReset[]
+  passwordResets      PasswordReset[]
   // Single active session: every sign-in rotates this id and stamps it into the
   // JWT, so an older login (another browser/device) stops validating. Null =
   // legacy account that has not signed in since this was introduced.
-  sessionId         String?
+  sessionId           String?
 
   // Terms acceptance, recorded when the account is created (public sign-up) —
   // null for accounts created before terms acceptance was tracked.
-  termsAcceptedAt   DateTime?
-  termsVersion      String?
+  termsAcceptedAt DateTime?
+  termsVersion    String?
 
   // First-login product tour: null = not completed/skipped yet (see ProductTour).
-  tourCompletedAt   DateTime?
+  tourCompletedAt DateTime?
 
   // Billing (Stripe). Access rule lives in src/lib/billing.ts: admins and
   // billingExempt users are never gated; everyone else needs a live trial
   // (trialEndsAt, set at account creation from the admin-configured trial
   // length) or an active/trialing/past_due Stripe subscription.
-  trialEndsAt                  DateTime?
-  billingExempt                Boolean   @default(false)
+  trialEndsAt                   DateTime?
+  billingExempt                 Boolean   @default(false)
   // Admin-set price for this user (Stripe Price id + amount in cents); null = the default plan price.
-  customPriceId                String?
-  customPriceCents             Int?
-  stripeCustomerId             String?   @unique
-  stripeSubscriptionId         String?
-  subscriptionStatus           String?
-  subscriptionPeriodEnd        DateTime?
-  subscriptionCancelAtPeriodEnd Boolean  @default(false)
+  customPriceId                 String?
+  customPriceCents              Int?
+  stripeCustomerId              String?   @unique
+  stripeSubscriptionId          String?
+  subscriptionStatus            String?
+  subscriptionPeriodEnd         DateTime?
+  subscriptionCancelAtPeriodEnd Boolean   @default(false)
 }
 
 // One-time "forgot password" link. Only the SHA-256 of the token is stored.
@@ -151,14 +151,14 @@ model AppSetting {
 }
 
 model Client {
-  id               String            @id @default(uuid())
+  id               String           @id @default(uuid())
   name             String
   email            String?
   phone            String?
   address          String?
   // Owner of this client record; the same email may exist per user.
   userId           String
-  user             User              @relation(fields: [userId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
   quotes           Quote[]
   invoices         Invoice[]
   timesheetEntries TimesheetEntry[]
@@ -172,59 +172,59 @@ model Client {
 // products — TimesheetProduct rows are immutable snapshots, never a live
 // relation to this catalog.
 model ServiceCatalogItem {
-  id           String              @id @default(uuid())
+  id           String             @id @default(uuid())
   userId       String
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
-  defaultPrice Decimal             @db.Decimal(10, 2)
+  defaultPrice Decimal            @db.Decimal(10, 2)
   // quantity = per unit/package; hourly = per hour (unit is always null then,
   // the unit is implicitly "hour"). A fraction of quantity is just a fraction
   // of the package (e.g. 0.5 of a 1kg item = half its price).
-  billingType  ServiceBillingType  @default(quantity)
+  billingType  ServiceBillingType @default(quantity)
   unit         String?
-  createdAt    DateTime            @default(now())
+  createdAt    DateTime           @default(now())
 
   @@index([userId])
 }
 
 model Quote {
-  id          String      @id @default(uuid())
-  number      Int         @unique @default(autoincrement())
-  revision    Int         @default(1)
-  status      QuoteStatus @default(draft)
-  draftId     String      @unique
-  clientId    String
+  id              String          @id @default(uuid())
+  number          Int             @unique @default(autoincrement())
+  revision        Int             @default(1)
+  status          QuoteStatus     @default(draft)
+  draftId         String          @unique
+  clientId        String
   // Cascade: deleting a Client removes all their quotes (and, transitively,
   // QuoteItems/QuotePhotos/ScheduleRounds via their own Cascade rules) — but
   // NOT their Invoice (Invoice.quote has no cascade, deliberately: an
   // invoice is a frozen record the client already received by email, so
   // deleting one requires an explicit DELETE /api/invoices/[id] first,
   // rather than silently vanishing as a side effect of deleting the client).
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  createdById String
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdById     String
   // Owner of the quote (also the invoice owner when this quote is completed).
   // The future Tenant migration will add `tenantId` alongside this owner
   // relation when the SaaS pivot lands.
-  createdBy   User        @relation(fields: [createdById], references: [id])
-  subtotal    Decimal     @db.Decimal(10, 2) @default(0)
-  taxRate     Decimal     @db.Decimal(5, 4) @default(0)
-  taxAmount   Decimal     @db.Decimal(10, 2) @default(0)
-  total       Decimal     @db.Decimal(10, 2) @default(0)
-  publicToken String      @unique @default(uuid())
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  subtotal        Decimal         @default(0) @db.Decimal(10, 2)
+  taxRate         Decimal         @default(0) @db.Decimal(5, 4)
+  taxAmount       Decimal         @default(0) @db.Decimal(10, 2)
+  total           Decimal         @default(0) @db.Decimal(10, 2)
+  publicToken     String          @unique @default(uuid())
   // Where the work happens — kept on the Quote, not the Client, since the
   // same client can request quotes for different properties (rental, a
   // second home, a job for someone else's address, etc).
-  serviceAddress   String?
-  bookingStatus    BookingStatus @default(idle)
-  scheduledDate    DateTime?
-  scheduledWindow  DayWindow?
-  rounds           ScheduleRound[]
-  sentAt      DateTime?
-  respondedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  items       QuoteItem[]
-  invoice     Invoice?
+  serviceAddress  String?
+  bookingStatus   BookingStatus   @default(idle)
+  scheduledDate   DateTime?
+  scheduledWindow DayWindow?
+  rounds          ScheduleRound[]
+  sentAt          DateTime?
+  respondedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  items           QuoteItem[]
+  invoice         Invoice?
 
   @@index([createdById])
 }
@@ -278,26 +278,26 @@ enum InvoicePaymentStatus {
 }
 
 model Invoice {
-  id            String               @id @default(uuid())
+  id               String               @id @default(uuid())
   // Sequential per user (see src/lib/invoiceNumber.ts); the default only serves rows created outside the app.
-  number        Int                  @default(autoincrement())
-  source        InvoiceSource        @default(quote)
-  quoteId       String?              @unique
-  quote         Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  userId        String
-  user          User                 @relation(fields: [userId], references: [id])
-  clientId      String
-  client        Client               @relation(fields: [clientId], references: [id])
-  serviceAddress String?
-  subtotal      Decimal              @db.Decimal(10, 2)
-  taxRate       Decimal              @db.Decimal(5, 4)
-  taxAmount     Decimal              @db.Decimal(10, 2)
-  total         Decimal              @db.Decimal(10, 2)
-  sentAt        DateTime?
-  paymentStatus InvoicePaymentStatus @default(pending)
-  paidAt        DateTime?
-  createdAt     DateTime             @default(now())
-  lineItems     InvoiceLineItem[]
+  number           Int                  @default(autoincrement())
+  source           InvoiceSource        @default(quote)
+  quoteId          String?              @unique
+  quote            Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  userId           String
+  user             User                 @relation(fields: [userId], references: [id])
+  clientId         String
+  client           Client               @relation(fields: [clientId], references: [id])
+  serviceAddress   String?
+  subtotal         Decimal              @db.Decimal(10, 2)
+  taxRate          Decimal              @db.Decimal(5, 4)
+  taxAmount        Decimal              @db.Decimal(10, 2)
+  total            Decimal              @db.Decimal(10, 2)
+  sentAt           DateTime?
+  paymentStatus    InvoicePaymentStatus @default(pending)
+  paidAt           DateTime?
+  createdAt        DateTime             @default(now())
+  lineItems        InvoiceLineItem[]
   timesheetEntries TimesheetEntry[]
 
   @@index([userId])
@@ -305,16 +305,16 @@ model Invoice {
 }
 
 model InvoiceLineItem {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   invoiceId     String
-  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   sourceEntryId String?
   description   String
   notes         String?
-  quantity      Decimal  @db.Decimal(10, 3)
-  unitPrice     Decimal  @db.Decimal(10, 2)
-  amount        Decimal  @db.Decimal(10, 2)
-  sortOrder     Int      @default(0)
+  quantity      Decimal @db.Decimal(10, 3)
+  unitPrice     Decimal @db.Decimal(10, 2)
+  amount        Decimal @db.Decimal(10, 2)
+  sortOrder     Int     @default(0)
 }
 
 model TimesheetEntry {
@@ -367,7 +367,7 @@ model UserInvite {
   email       String
   name        String
   role        Role         @default(staff)
-  hourlyRate  Decimal      @db.Decimal(10, 2) @default(0)
+  hourlyRate  Decimal      @default(0) @db.Decimal(10, 2)
   features    FeatureKey[]
   tokenHash   String       @unique
   expiresAt   DateTime
@@ -384,19 +384,40 @@ model UserInvite {
 // to User). The password is chosen at sign-up and stored here as a bcrypt
 // hash, so confirming only needs one click.
 model PendingSignup {
-  id           String    @id @default(uuid())
-  email        String
-  name         String
+  id              String    @id @default(uuid())
+  email           String
+  name            String
   // Nullable only so rows created before this field existed still migrate;
   // new rows always set it.
-  passwordHash String?
-  tokenHash    String    @unique
-  termsVersion String
-  expiresAt    DateTime
-  acceptedAt   DateTime?
-  createdAt    DateTime  @default(now())
+  passwordHash    String?
+  tokenHash       String    @unique
+  termsVersion    String
+  // Contact phone ("(xxx) xxx-xxxx") and the free-text "how did you hear about
+  // us / who referred you". Nullable so rows from before invite-only sign-up
+  // still migrate; new rows always set both.
+  phone           String?
+  referral        String?
+  expiresAt       DateTime
+  // Set when the person clicks the email link. From then on the row waits in
+  // the admin approval queue (no User exists yet).
+  emailVerifiedAt DateTime?
+  // Set when an admin approves it (the User is created in that transaction).
+  acceptedAt      DateTime?
+  createdAt       DateTime  @default(now())
 
   @@index([email])
+}
+
+// Sign-ups an admin denied. The address cannot sign up again until an admin
+// removes it from this list. The original sign-up details are kept for context.
+model BlockedEmail {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String?
+  phone       String?
+  referral    String?
+  createdAt   DateTime @default(now())
+  blockedById String?
 }
 
 model UserFeatureFlag {
@@ -440,12 +461,12 @@ model ScheduleRound {
 }
 
 model ScheduleOption {
-  id           String         @id @default(uuid())
+  id           String        @id @default(uuid())
   roundId      String
-  round        ScheduleRound  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  proposedDate DateTime       @db.Date
+  round        ScheduleRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  proposedDate DateTime      @db.Date
   window       DayWindow
-  chosen       Boolean        @default(false)
+  chosen       Boolean       @default(false)
 
   @@unique([roundId, proposedDate, window])
 }

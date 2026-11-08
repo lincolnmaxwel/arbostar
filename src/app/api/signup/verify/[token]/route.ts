@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server';
-import { FeatureKey } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashSignupToken, lookupSignup } from '@/lib/signups';
-import { trialEndsAtForNewUser } from '@/lib/billing';
-
-// The same default feature set an admin-created staff user gets
-// (POST /api/admin/users) — all four, enabled.
-const DEFAULT_FEATURES: FeatureKey[] = ['invoices', 'timesheet', 'clients_crm', 'quotes'];
-
-class SignupAlreadyUsedError extends Error {}
 
 // Public endpoint: the unguessable one-time token from the verification email
 // is the only credential, the same model as /api/invite/[token]/accept. No
-// body needed — the password was already chosen (and hashed) at sign-up; this
-// route only confirms the address, burning the token as it creates the user.
+// body needed. This route only confirms the address; an admin then approves
+// (creates the user, see /api/admin/signup-requests/[id]/approve) or denies.
 export async function POST(req: Request, { params }: { params: { token: string } }) {
   const lookup = await lookupSignup(params.token);
   if (lookup.state !== 'valid') {
@@ -45,40 +37,16 @@ export async function POST(req: Request, { params }: { params: { token: string }
     return NextResponse.json({ error: 'An account with this email already exists. Try signing in.' }, { status: 409 });
   }
 
-  const trialEndsAt = await trialEndsAtForNewUser();
-  try {
-    const user = await prisma.$transaction(async (tx) => {
-      // Burn the token first; count 0 means a concurrent confirm already won.
-      const burned = await tx.pendingSignup.updateMany({
-        where: { tokenHash: hashSignupToken(params.token), acceptedAt: null },
-        data: { acceptedAt: new Date() },
-      });
-      if (burned.count !== 1) throw new SignupAlreadyUsedError();
-
-      const created = await tx.user.create({
-        data: {
-          name: signup.name,
-          email: signup.email,
-          passwordHash: signup.passwordHash!,
-          role: 'staff',
-          status: 'active',
-          trialEndsAt,
-          termsAcceptedAt: new Date(),
-          termsVersion: signup.termsVersion,
-          featureFlags: { create: DEFAULT_FEATURES.map((feature) => ({ feature, enabled: true })) },
-        },
-      });
-      await tx.auditLog.create({
-        data: { entityType: 'User', entityId: created.id, action: 'self-signup', actorId: created.id },
-      });
-      return created;
-    });
-
-    return NextResponse.json({ ok: true, email: user.email }, { status: 201 });
-  } catch (err) {
-    if (err instanceof SignupAlreadyUsedError) {
-      return NextResponse.json({ error: 'This verification link was already used. Try signing in.' }, { status: 410 });
-    }
-    throw err;
+  // Confirming the address does NOT create an account any more: sign-up is
+  // invite-only, so the request now waits in the admin approval queue
+  // (`emailVerifiedAt` set, `acceptedAt` null). The token is burned here.
+  const burned = await prisma.pendingSignup.updateMany({
+    where: { tokenHash: hashSignupToken(params.token), emailVerifiedAt: null, acceptedAt: null },
+    data: { emailVerifiedAt: new Date() },
+  });
+  if (burned.count !== 1) {
+    return NextResponse.json({ error: 'This verification link was already used.' }, { status: 410 });
   }
+
+  return NextResponse.json({ ok: true, email: signup.email }, { status: 200 });
 }

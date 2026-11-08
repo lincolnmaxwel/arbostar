@@ -7,6 +7,8 @@ import {
   SIGNUP_COOLDOWN_MINUTES,
   SIGNUP_TTL_HOURS,
   generateSignupToken,
+  phoneProblem,
+  referralProblem,
   signupExpiry,
   signupVerifyUrl,
 } from '@/lib/signups';
@@ -15,14 +17,14 @@ import { TURNSTILE_ERROR, clientIp, verifyTurnstile } from '@/lib/turnstile';
 
 const SUCCESS = {
   ok: true,
-  message: 'Check your email to confirm your address. Your account will be ready as soon as you confirm.',
+  message: 'Check your email to confirm your address. After that, our team reviews your request and contacts you.',
 };
 
 const COOLDOWN_MS = SIGNUP_COOLDOWN_MINUTES * 60 * 1000;
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as
-    | { name?: unknown; email?: unknown; password?: unknown; acceptTerms?: unknown; website?: unknown; turnstileToken?: unknown }
+    | { name?: unknown; email?: unknown; phone?: unknown; referral?: unknown; password?: unknown; acceptTerms?: unknown; website?: unknown; turnstileToken?: unknown }
     | null;
 
   // Honeypot: real users never see or fill this hidden field, so a non-empty
@@ -33,6 +35,8 @@ export async function POST(req: Request) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body?.password === 'string' ? body.password : '';
+  const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+  const referral = typeof body?.referral === 'string' ? body.referral.trim().replace(/\s+/g, ' ') : '';
 
   if (name.length < 2 || name.length > 100) {
     return NextResponse.json({ error: 'Name must be 2 to 100 characters.' }, { status: 400 });
@@ -40,6 +44,10 @@ export async function POST(req: Request) {
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
   }
+  const phoneErr = phoneProblem(phone);
+  if (phoneErr) return NextResponse.json({ error: phoneErr }, { status: 400 });
+  const referralErr = referralProblem(referral);
+  if (referralErr) return NextResponse.json({ error: referralErr }, { status: 400 });
   const problem = passwordProblem(password);
   if (problem) {
     return NextResponse.json({ error: problem }, { status: 400 });
@@ -63,6 +71,27 @@ export async function POST(req: Request) {
   if (user) {
     return NextResponse.json(
       { error: 'An account with this email already exists.', code: 'email-exists' },
+      { status: 409 },
+    );
+  }
+
+  // Denied before: the address stays on the deny list until an admin removes it.
+  const blocked = await prisma.blockedEmail.findUnique({ where: { email }, select: { id: true } });
+  if (blocked) {
+    return NextResponse.json(
+      { error: 'We could not accept a sign-up with this email. Contact us if you think this is a mistake.', code: 'blocked' },
+      { status: 403 },
+    );
+  }
+
+  // Already confirmed the email and waiting for the team's approval.
+  const waiting = await prisma.pendingSignup.findFirst({
+    where: { email, emailVerifiedAt: { not: null }, acceptedAt: null },
+    select: { id: true },
+  });
+  if (waiting) {
+    return NextResponse.json(
+      { error: 'Your request is already with our team. We will contact you soon.', code: 'awaiting-approval' },
       { status: 409 },
     );
   }
@@ -95,7 +124,7 @@ export async function POST(req: Request) {
   const passwordHash = await bcrypt.hash(password, 10);
   const { token, tokenHash } = generateSignupToken();
   const row = await prisma.pendingSignup.create({
-    data: { email, name, passwordHash, tokenHash, termsVersion: TERMS_VERSION, expiresAt: signupExpiry() },
+    data: { email, name, phone, referral, passwordHash, tokenHash, termsVersion: TERMS_VERSION, expiresAt: signupExpiry() },
   });
 
   try {

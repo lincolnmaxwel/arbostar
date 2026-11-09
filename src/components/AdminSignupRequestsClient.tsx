@@ -23,20 +23,32 @@ interface BlockedRow {
   createdAt: string;
 }
 
+interface ApprovedRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  referral: string | null;
+  createdAt: string;
+  acceptedAt: string | null;
+  userId: string | null;
+  userStatus: string | null;
+  trialEndsAt: string | null;
+  customPriceCents: number | null;
+}
+
+type View = 'pending' | 'approved' | 'denied';
+
 function fmt(date: string | null): string {
   return date ? new Date(date).toLocaleString() : '-';
 }
 
-// Invite-only sign-up queue (view "approvals") and deny list (view "blocked").
-export function AdminSignupRequestsClient({
-  view,
-  onChanged,
-}: {
-  view: 'approvals' | 'blocked';
-  onChanged: () => void;
-}) {
+// Invite-only sign-up requests, split into Pending / Approved / Denied.
+export function AdminSignupRequestsClient({ onChanged }: { onChanged: () => void }) {
+  const [view, setView] = useState<View>('pending');
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [blocked, setBlocked] = useState<BlockedRow[]>([]);
+  const [approved, setApproved] = useState<ApprovedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -59,6 +71,7 @@ export function AdminSignupRequestsClient({
       }
       setPending(body.pending);
       setBlocked(body.blocked);
+      setApproved(body.approved ?? []);
       setError(null);
     } catch {
       setError('Could not reach the server.');
@@ -169,7 +182,28 @@ export function AdminSignupRequestsClient({
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-      {view === 'approvals' ? (
+      <div role="tablist" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {(
+          [
+            ['pending', `Pending (${pending.length})`],
+            ['approved', `Approved (${approved.length})`],
+            ['denied', `Denied (${blocked.length})`],
+          ] as [View, string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={view === key}
+            className={view === key ? styles.submitButton : styles.actionButton}
+            onClick={() => setView(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'pending' ? (
         <>
           <h2 className={styles.sectionTitle}>Pending approvals</h2>
           <p className={styles.userEmail}>
@@ -315,14 +349,55 @@ export function AdminSignupRequestsClient({
             ))
           )}
         </>
+      ) : view === 'approved' ? (
+        <>
+          <h2 className={styles.sectionTitle}>Approved requests</h2>
+          <p className={styles.userEmail}>People you approved, with the details they gave when they asked for access.</p>
+          {approved.length === 0 ? (
+            <p className={styles.emptyState}>No approved requests.</p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>How they heard about us</th>
+                    <th>Requested</th>
+                    <th>Approved on</th>
+                    <th>Trial ends</th>
+                    <th>Monthly price</th>
+                    <th>Account</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approved.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.name}</td>
+                      <td>{row.email}</td>
+                      <td>{row.phone ?? '-'}</td>
+                      <td style={{ whiteSpace: 'pre-wrap' }}>{row.referral ?? '-'}</td>
+                      <td>{fmt(row.createdAt)}</td>
+                      <td>{fmt(row.acceptedAt)}</td>
+                      <td>{fmt(row.trialEndsAt)}</td>
+                      <td>{row.customPriceCents != null ? `$${(row.customPriceCents / 100).toFixed(2)}` : 'Default'}</td>
+                      <td>{row.userStatus ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       ) : (
         <>
-          <h2 className={styles.sectionTitle}>Blocked emails</h2>
+          <h2 className={styles.sectionTitle}>Denied requests</h2>
           <p className={styles.userEmail}>
-            Denied requests. These emails cannot sign up again unless you remove them from this list.
+            These emails cannot sign up again unless you remove them from this list.
           </p>
           {blocked.length === 0 ? (
-            <p className={styles.emptyState}>No blocked emails.</p>
+            <p className={styles.emptyState}>No denied requests.</p>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -331,9 +406,9 @@ export function AdminSignupRequestsClient({
                     <th>Email</th>
                     <th>Name</th>
                     <th>Phone</th>
-                    <th>Referral</th>
+                    <th>How they heard about us</th>
                     <th>Reason denied</th>
-                    <th>Blocked on</th>
+                    <th>Denied on</th>
                     <th />
                   </tr>
                 </thead>

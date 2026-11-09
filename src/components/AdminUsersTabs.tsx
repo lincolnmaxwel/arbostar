@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { AdminUsersClient } from '@/components/AdminUsersClient';
 import { AdminSignupRequestsClient } from '@/components/AdminSignupRequestsClient';
 
-type Tab = 'users' | 'approvals' | 'blocked';
+type Tab = 'users' | 'approvals';
 
-// Manage Users page: the user list plus the invite-only sign-up queue and its
-// deny list, in separate tabs.
+// Manage Users page: the user list plus the invite-only sign-up requests
+// (Pending / Approved / Denied sub-tabs inside Approvals).
 export function AdminUsersTabs() {
   const [tab, setTab] = useState<Tab>('users');
   const [pendingCount, setPendingCount] = useState<number | null>(null);
@@ -44,16 +44,13 @@ export function AdminUsersTabs() {
           Users
         </button>
         <button type="button" role="tab" aria-selected={tab === 'approvals'} style={tabStyle(tab === 'approvals')} onClick={() => setTab('approvals')}>
-          Pending approvals{pendingCount ? ` (${pendingCount})` : ''}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'blocked'} style={tabStyle(tab === 'blocked')} onClick={() => setTab('blocked')}>
-          Blocked emails
+          Approvals{pendingCount ? ` (${pendingCount})` : ''}
         </button>
       </div>
       {tab === 'users' ? (
         <AdminUsersClient />
       ) : (
-        <AdminSignupRequestsClient view={tab} onChanged={refreshCount} />
+        <AdminSignupRequestsClient onChanged={refreshCount} />
       )}
     </div>
   );

@@ -114,6 +114,13 @@ describe('admin sign-up approval queue', () => {
 
     // Already handled: a second approval is refused.
     expect((await call(approve, row.id, { trialDays: 30 })).status).toBe(404);
+
+    // It moves from Pending to Approved, keeping the sign-up details and the account.
+    const list = await (await GET()).json();
+    expect(list.pending.map((p: { id: string }) => p.id)).not.toContain(row.id);
+    const done = list.approved.find((a: { id: string }) => a.id === row.id);
+    expect(done).toMatchObject({ referral: 'Referred by John Smith', userId: user.id, userStatus: 'active' });
+    expect(done.acceptedAt).toBeTruthy();
   });
 
   it('rejects an invalid trial length or price', async () => {
